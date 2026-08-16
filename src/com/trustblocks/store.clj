@@ -98,12 +98,15 @@
 (defn get-instance
   "Read an instance back out as Concerto JSON, restoring $class and the original
   camelCase property names."
-  [node id & {:keys [table] :or {table contract-table}}]
+  [node id & {:keys [table reg] :or {table contract-table}}]
   ;; The id must be matched as a literal in the binding pattern. Writing
   ;; {:xt/id $id} with an :args param does NOT filter -- XTDB treats $id as
   ;; another column to project and returns the entire table.
   (let [q (list 'from table [{:xt/id id} (symbol "*")])]
     (when-let [record (first (xt/q node q))]
-      (concerto/<-xtdb record))))
+      ;; With a registry we can restore each level's exact declared property
+      ;; names; without one, camelCase is inferred and may not match.
+      (concerto/<-xtdb record (when reg
+                                (memoize #(model/property-names reg %)))))))
 
 (defn instance->json [instance] (json/generate-string instance {:pretty true}))
