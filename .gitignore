@@ -1,0 +1,35 @@
+# Reference material, not part of the project
+Contracts/
+
+# Upstream Biff working copy -- its own git repo, cloned separately.
+# See README for the sibling-repo layout and the :biff-local alias.
+biff/
+
+# XTDB local storage + log. Never commit; treat as a volume in prod.
+/storage/
+
+# Clojure / deps.edn
+.cpcache/
+/target/
+/classes/
+pom.xml
+pom.xml.asc
+*.jar
+*.class
+.nrepl-port
+.lsp/
+.clj-kondo/.cache
+.biff-dev-status.edn
+
+# Secrets -- generated from the TEMPLATE files, never committed
+config.env
+config.prod.env
+
+# Tooling binaries
+bin/tailwindcss
+bin/clj-kondo
+bin/cljfmt
+node_modules/
+
+# macOS
+.DS_Store

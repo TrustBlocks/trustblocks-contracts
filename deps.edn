@@ -1,0 +1,76 @@
+{:paths ["src" "resources" "target/resources"]
+
+ :deps {org.clojure/clojure {:mvn/version "1.12.5"}
+
+        ;; Biff 2 libraries. Pinned to an exact release candidate on purpose --
+        ;; v2 is pre-release and Jacob has stated everything is subject to
+        ;; breaking changes. Upgrade deliberately, never track branch HEAD.
+        com.biffweb/core     {:mvn/version "2.0.0-rc14"}
+        com.biffweb/config   {:mvn/version "2.0.0-rc14"}
+        com.biffweb/ring     {:mvn/version "2.0.0-rc14"}
+        com.biffweb/xtdb     {:mvn/version "2.0.0-rc14"}
+        com.biffweb/datastar {:mvn/version "2.0.0-rc14"}
+
+        dev.onionpancakes/chassis     {:mvn/version "1.0.365"}
+        metosin/malli                 {:mvn/version "0.20.1"}
+        cheshire/cheshire             {:mvn/version "6.2.0"}
+        camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}
+        babashka/process              {:mvn/version "0.6.25"}
+        org.clojure/tools.logging     {:mvn/version "1.3.1"}
+        org.clojure/tools.namespace   {:mvn/version "1.5.1"}
+        org.slf4j/slf4j-simple        {:mvn/version "2.0.18"}
+        nrepl/nrepl                   {:mvn/version "1.7.0"}
+        cider/cider-nrepl             {:mvn/version "0.59.0"}}
+
+ :aliases
+ {;; XTDB 2.1.0 needs these to reach Arrow's off-heap buffers through
+  ;; java.nio. Required on any JVM that starts the node. Also note XTDB 2.1.0
+  ;; runs on Java 21-24 only -- Java 25 will not work.
+  :xtdb-jvm-opts
+  {:jvm-opts ["--add-opens=java.base/java.nio=ALL-UNNAMED"
+              "--enable-native-access=ALL-UNNAMED"
+              "-Dio.netty.tryReflectionSetAccessible=true"]}
+
+  :run
+  {:extra-paths ["test"]
+   :extra-deps  {com.biffweb/tasks {:mvn/version "2.0.0-rc14"}}
+   :main-opts   ["-m" "com.biffweb.tasks.app"]
+   :jvm-opts    ["--add-opens=java.base/java.nio=ALL-UNNAMED"
+                 "--enable-native-access=ALL-UNNAMED"
+                 "-Dio.netty.tryReflectionSetAccessible=true"]}
+
+  :prod
+  {:main-opts ["-m" "com.trustblocks"]
+   :jvm-opts  ["--add-opens=java.base/java.nio=ALL-UNNAMED"
+               "--enable-native-access=ALL-UNNAMED"
+               "-Dio.netty.tryReflectionSetAccessible=true"
+               "-Djdk.attach.allowAttachSelf"
+               "-XX:-OmitStackTraceInFastThrow"
+               "-XX:+CrashOnOutOfMemoryError"]}
+
+  ;; Develop against the sibling biff/ clone instead of the pinned releases,
+  ;; e.g. when preparing an upstream PR or using an unreleased lib.
+  ;; Usage: clj -M:biff-local:run dev
+  ;; :override-deps (not :extra-deps) so Biff's own inter-lib deps resolve
+  ;; locally too.
+  :biff-local
+  {:override-deps
+   {com.biffweb/core     {:local/root "biff/libs/core"}
+    com.biffweb/config   {:local/root "biff/libs/config"}
+    com.biffweb/ring     {:local/root "biff/libs/ring"}
+    com.biffweb/xtdb     {:local/root "biff/libs/xtdb"}
+    com.biffweb/datastar {:local/root "biff/libs/datastar"}
+    com.biffweb/fx       {:local/root "biff/libs/fx"}
+    com.biffweb/graph    {:local/root "biff/libs/graph"}
+    com.biffweb/stuff    {:local/root "biff/libs/stuff"}}}
+
+  ;; Not yet published to Clojars -- local-only until Jacob releases them.
+  ;; MUST be combined with :biff-local, e.g. clj -M:biff-local:biff-unreleased:run dev
+  ;; These libs depend on fx/core via :local/root inside the biff repo, and
+  ;; deps.edn cannot compare a :local/root against an :mvn/version -- so mixing
+  ;; them with the pinned releases fails to build a classpath.
+  :biff-unreleased
+  {:extra-deps
+   {com.biffweb/authenticate {:local/root "biff/libs/authenticate"}
+    com.biffweb/admin        {:local/root "biff/libs/admin"}
+    com.biffweb/background   {:local/root "biff/libs/background"}}}}}

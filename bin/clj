@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Run the Clojure CLI against JDK 21.
+#
+# XTDB 2.1.0 requires Java 21-24. This machine's default JVM is Java 25, which
+# XTDB will not run on, so we pin JAVA_HOME here rather than changing the
+# system default (openjdk@21 is keg-only for exactly this reason).
+#
+# Usage:  bin/clj -M:run dev
+#         bin/clj -M:biff-local:biff-unreleased:run dev
+set -euo pipefail
+
+JAVA_HOME="${TRUSTBLOCKS_JAVA_HOME:-/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home}"
+
+if [[ ! -x "$JAVA_HOME/bin/java" ]]; then
+  echo "error: no JDK at $JAVA_HOME" >&2
+  echo "install it with: brew install openjdk@21" >&2
+  exit 1
+fi
+
+export JAVA_HOME
+export PATH="$JAVA_HOME/bin:$PATH"
+
+exec clojure "$@"
