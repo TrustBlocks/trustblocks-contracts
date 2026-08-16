@@ -87,7 +87,11 @@
                  (some-> (:concerto/class record) names-for))]
      (reduce-kv
       (fn [acc k v]
-        (if (= :xt/id k)
+        ;; Namespaced keys other than the reserved concerto/* ones are our own
+        ;; derived metadata (party indexes, effective dates). They must not
+        ;; reappear as Concerto properties, or the instance stops validating.
+        (if (or (= :xt/id k)
+                (and (namespace k) (not (reserved-inverse k))))
           acc
           (assoc acc (xt->field k known)
                  (cond
