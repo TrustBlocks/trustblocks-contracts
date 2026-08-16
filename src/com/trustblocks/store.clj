@@ -59,6 +59,22 @@
        (map model/strip-locations)
        model/registry))
 
+(defn registry-from-xtdb
+  "Rebuild the declaration registry from XTDB itself, with no filesystem access.
+
+  `put-model!` stores each parsed model whole, so reading it back and running it
+  through the same `model/registry` gives an identical registry. This is what
+  makes XTDB the source of truth in practice rather than just in principle: the
+  schema needed to interpret a record lives beside the record.
+
+  Building this scans every stored model, so callers doing many reads should
+  build it once and pass it as :reg."
+  [node]
+  (->> (xt/q node '(from :concerto-model [*]))
+       (keep :concerto/model)
+       (map concerto/<-xtdb)
+       model/registry))
+
 (defn model-dir-files
   "Every .cto in a directory (a template's model/ folder)."
   [dir]
@@ -83,9 +99,13 @@
 
 (defn put-instance!
   "Validate a Concerto instance against its $class, then write it to XTDB.
-  Refuses to write anything that does not validate."
+  Refuses to write anything that does not validate.
+
+  A nil `reg` resolves the schema from XTDB, so a caller that has already run
+  `put-model!` need not keep a registry around."
   [node reg instance & {:keys [table] :or {table contract-table}}]
-  (let [fqn (get instance "$class")]
+  (let [reg (or reg (registry-from-xtdb node))
+        fqn (get instance "$class")]
     (when-let [errs (validate reg instance)]
       (throw (ex-info "Concerto instance failed validation"
                       {:$class fqn :errors errs})))
@@ -104,9 +124,10 @@
   ;; another column to project and returns the entire table.
   (let [q (list 'from table [{:xt/id id} (symbol "*")])]
     (when-let [record (first (xt/q node q))]
-      ;; With a registry we can restore each level's exact declared property
-      ;; names; without one, camelCase is inferred and may not match.
-      (concerto/<-xtdb record (when reg
-                                (memoize #(model/property-names reg %)))))))
+      ;; Falls back to the stored schema rather than to ->camelCase: inferring
+      ;; the name is lossy for anything not plain camelCase (vechileID,
+      ;; INITIAL_DUE), so a faithful read must not be opt-in.
+      (let [reg (or reg (registry-from-xtdb node))]
+        (concerto/<-xtdb record (memoize #(model/property-names reg %)))))))
 
 (defn instance->json [instance] (json/generate-string instance {:pretty true}))
