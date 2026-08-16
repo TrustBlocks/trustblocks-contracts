@@ -114,7 +114,11 @@
 (def ^:private scalar
   {"concerto.metamodel@1.0.0.StringProperty"   :string
    "concerto.metamodel@1.0.0.BooleanProperty"  :boolean
-   "concerto.metamodel@1.0.0.DoubleProperty"   :double
+   ;; JSON has no int/double distinction for whole numbers, so a Double field
+   ;; commonly arrives as `85` rather than `85.0`. Concerto's own validator
+   ;; accepts that (verified against demandforecast and volumediscount), so
+   ;; :double would be stricter than the spec.
+   "concerto.metamodel@1.0.0.DoubleProperty"   number?
    "concerto.metamodel@1.0.0.IntegerProperty"  :int
    ;; Long is 64-bit in the spec but only 2^53-safe in Concerto's JS runtime.
    ;; On the JVM it is a true java.lang.Long and XTDB stores it as BIGINT, so
@@ -178,3 +182,17 @@
   [reg fqn]
   (some (fn [f] (get-in reg [f :declaration "identified" "name"]))
         (super-chain reg fqn)))
+
+(defn property-names
+  "XTDB key -> exact declared property name, across the whole inheritance chain.
+
+  Required for a faithful read. Deriving the name back from the key with
+  ->camelCase is lossy for anything that is not plain camelCase: `vechileID`
+  would come back as `vechileId`, and `INITIAL_DUE` as `initialDue`. The model
+  is the only authority on the original spelling."
+  [reg fqn]
+  (into {}
+        (for [f    (super-chain reg fqn)
+              prop (get-in reg [f :declaration "properties"])
+              :let [nm (get prop "name")]]
+          [(concerto/field->xt nm) nm])))

@@ -75,21 +75,32 @@
 
 (defn <-xtdb
   "XTDB record -> Concerto JSON instance. Drops XTDB's own :xt/id, which is a
-  copy of the identity field and would otherwise appear as a bogus property."
+  copy of the identity field and would otherwise appear as a bogus property.
+
+  `names-for` is an optional (fn [$class] -> {xt-key declared-name}). It is
+  resolved per level from that level's own :concerto/class, so a nested concept
+  gets its own declared names rather than its parent's. Without it we fall back
+  to ->camelCase, which is lossy for names like `vechileID` or `INITIAL_DUE`."
   ([record] (<-xtdb record nil))
-  ([record known]
-   (reduce-kv
-    (fn [acc k v]
-      (if (= :xt/id k)
-        acc
-        (assoc acc (xt->field k known)
-               (cond
-                 (map? v)            (<-xtdb v known)
-                 (and (vector? v)
-                      (some map? v)) (mapv #(if (map? %) (<-xtdb % known) %) v)
-                 :else               v))))
-    {}
-    record)))
+  ([record names-for]
+   (let [known (when names-for
+                 (some-> (:concerto/class record) names-for))]
+     (reduce-kv
+      (fn [acc k v]
+        ;; Namespaced keys other than the reserved concerto/* ones are our own
+        ;; derived metadata (party indexes, effective dates). They must not
+        ;; reappear as Concerto properties, or the instance stops validating.
+        (if (or (= :xt/id k)
+                (and (namespace k) (not (reserved-inverse k))))
+          acc
+          (assoc acc (xt->field k known)
+                 (cond
+                   (map? v)            (<-xtdb v names-for)
+                   (and (vector? v)
+                        (some map? v)) (mapv #(if (map? %) (<-xtdb % names-for) %) v)
+                   :else               v))))
+      {}
+      record))))
 
 (defn instance->doc
   "Concerto instance -> XTDB document, ready for :put-docs.
