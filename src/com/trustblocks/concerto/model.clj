@@ -58,37 +58,79 @@
        :name        (get d "name")
        :declaration d})))
 
-(defn type-resolver
-  "Resolve an unqualified type name (as it appears in `superType` and
-  ObjectProperty) to a fully qualified name, using the model's own namespace
-  plus its imports."
+(def ^:private type-identifier-class "concerto.metamodel@1.0.0.TypeIdentifier")
+
+(defn namespace-index
+  "Short type name -> namespace, from a model's own declarations plus its
+  imports. A local declaration shadows an import of the same name."
   [model]
-  (let [ns-   (get model "namespace")
-        local (into {} (for [d (get model "declarations")]
-                         [(get d "name") (str ns- "." (get d "name"))]))
-        imported
-        (into {}
-              (for [i (get model "imports")
-                    :let [i-ns (get i "namespace")]
-                    nm (case (get i "$class")
-                         "concerto.metamodel@1.0.0.ImportType"  [(get i "name")]
-                         "concerto.metamodel@1.0.0.ImportTypes" (get i "types")
-                         [])]
-                [nm (str i-ns "." nm)]))]
-    (fn [nm] (or (local nm) (imported nm) nm))))
+  (let [ns- (get model "namespace")]
+    (merge
+     (into {}
+           (for [i (get model "imports")
+                 :let [i-ns (get i "namespace")]
+                 nm (case (get i "$class")
+                      "concerto.metamodel@1.0.0.ImportType"  [(get i "name")]
+                      "concerto.metamodel@1.0.0.ImportTypes" (get i "types")
+                      [])]
+             [nm i-ns]))
+     (into {} (for [d (get model "declarations")] [(get d "name") ns-])))))
+
+(defn qualify-types
+  "Fill in the `namespace` of every TypeIdentifier in `x`, resolving short names
+  through `ns-for`.
+
+  The Concerto grammar writes type references unqualified -- `superType` and
+  ObjectProperty carry a bare `name` -- so the namespace has to be recovered
+  from the enclosing model's imports. Resolving that eagerly, once, is what
+  keeps the registry pure data. The alternative is to keep the model's import
+  resolver as a closure beside each declaration, which makes the registry
+  unserializable and so unstorable, undiffable and unexportable.
+
+  TypeIdentifier already carries an optional `namespace` in the metamodel, so a
+  qualified declaration is still a legal metamodel value: nothing is mangled and
+  nothing is invented. Walking on `$class` rather than on known parent fields
+  means decorator type references and Concerto 3's map key/value types are
+  covered without enumerating every site. A name that resolves to nothing is
+  left bare, exactly as it arrived."
+  [ns-for x]
+  (cond
+    (map? x)
+    (let [m (update-vals x #(qualify-types ns-for %))]
+      (if (and (= type-identifier-class (get m "$class"))
+               (not (contains? m "namespace")))
+        (if-let [ns- (ns-for (get m "name"))]
+          (assoc m "namespace" ns-)
+          m)
+        m))
+
+    (vector? x) (mapv #(qualify-types ns-for %) x)
+    :else       x))
+
+(defn type-fqn
+  "TypeIdentifier -> fully qualified name. Stays unqualified when the name never
+  resolved, in which case no declaration matches it and the caller stops there."
+  [node]
+  (when-let [nm (get node "name")]
+    (if-let [ns- (get node "namespace")]
+      (str ns- "." nm)
+      nm)))
 
 ;; ---------------------------------------------------------------- registry
 
 (defn registry
   "Build a lookup of every declaration across several parsed models, so that
-  inheritance chains crossing namespaces (TemplateModel -> Clause) resolve."
+  inheritance chains crossing namespaces (TemplateModel -> Clause) resolve.
+
+  Every declaration is fully qualified on the way in, so the registry is pure
+  data: it can be pr-str'd, stored, diffed and read back without losing the
+  import context needed to interpret it."
   [models]
   (reduce (fn [acc model]
-            (let [resolve-type (type-resolver model)]
+            (let [ns-for (namespace-index model)]
               (reduce (fn [acc {:keys [fqn declaration]}]
-                        (assoc acc fqn {:declaration  declaration
-                                        :namespace    (get model "namespace")
-                                        :resolve-type resolve-type}))
+                        (assoc acc fqn {:declaration (qualify-types ns-for declaration)
+                                        :namespace   (get model "namespace")}))
                       acc
                       (declarations model))))
           {}
@@ -99,14 +141,14 @@
   tagged object, so validation needs every ancestor's properties."
   [reg fqn]
   (loop [fqn fqn, seen [], guard 0]
-    (let [{:keys [declaration resolve-type]} (get reg fqn)]
+    (let [{:keys [declaration]} (get reg fqn)]
       (cond
         (nil? declaration) seen
         (< 20 guard)       (throw (ex-info "Cyclic supertype chain" {:fqn fqn :seen seen}))
         :else
         (let [seen' (conj seen fqn)]
-          (if-let [super (get-in declaration ["superType" "name"])]
-            (recur (resolve-type super) seen' (inc guard))
+          (if-let [super (type-fqn (get declaration "superType"))]
+            (recur super seen' (inc guard))
             seen'))))))
 
 ;; ---------------------------------------------------------------- malli
@@ -136,10 +178,10 @@
 (defn- enum-values [reg fqn]
   (into [:enum] (map #(get % "name")) (get-in reg [fqn :declaration "properties"])))
 
-(defn- property->malli [reg resolve-type prop]
+(defn- property->malli [reg prop]
   (let [base (or (scalar (get prop "$class"))
                  (when (= "concerto.metamodel@1.0.0.ObjectProperty" (get prop "$class"))
-                   (let [fqn (resolve-type (get-in prop ["type" "name"]))]
+                   (let [fqn (type-fqn (get prop "type"))]
                      (if (enum? reg fqn) (enum-values reg fqn) :map)))
                  ;; relationships store the referenced id
                  (when (= "concerto.metamodel@1.0.0.RelationshipProperty" (get prop "$class"))
@@ -160,12 +202,12 @@
       (throw (ex-info "Unknown $class -- is its model loaded?" {:fqn fqn})))
     (let [entries
           (for [f     (reverse chain)          ; parents first, child overrides
-                :let  [{:keys [declaration resolve-type]} (get reg f)]
+                :let  [{:keys [declaration]} (get reg f)]
                 prop  (get declaration "properties")
                 :let  [k (concerto/field->xt (get prop "name"))]]
             (if (get prop "isOptional")
-              [k {:optional true} (property->malli reg resolve-type prop)]
-              [k (property->malli reg resolve-type prop)]))]
+              [k {:optional true} (property->malli reg prop)]
+              [k (property->malli reg prop)]))]
       (m/schema
        (into [:map
               ;; $class is the linchpin: it is what makes the flattening lossless.
