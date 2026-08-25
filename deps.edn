@@ -11,6 +11,10 @@
         com.biffweb/xtdb     {:mvn/version "2.0.0-rc14"}
         com.biffweb/datastar {:mvn/version "2.0.0-rc14"}
 
+        ;; Concerto models as EDN and Malli schemas compiled from them at
+        ;; runtime. Not on Clojars yet -- see github.com/TrustBlocks/concerto-clj.
+        io.github.TrustBlocks/concerto-clj {:git/sha "d80655fb6b737765e60e66e0a8277e8b12daa4db"}
+
         dev.onionpancakes/chassis     {:mvn/version "1.0.365"}
         metosin/malli                 {:mvn/version "0.20.1"}
         cheshire/cheshire             {:mvn/version "6.2.0"}

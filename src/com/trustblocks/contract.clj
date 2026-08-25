@@ -15,9 +15,9 @@
   The role map is deliberately explicit. There is no semantic marker to infer
   it from, and guessing which String is a person would be worse than declaring
   it."
-  (:require [com.trustblocks.concerto :as concerto]
-            [com.trustblocks.concerto.model :as model]
-            [com.trustblocks.store :as store]
+  (:require [com.trustblocks.xtdb.keys :as k]
+            [com.trustblocks.concerto.metamodel :as mm]
+            [com.trustblocks.xtdb.store :as store]
             [xtdb.api :as xt]))
 
 (def party-table
@@ -67,9 +67,9 @@
         fqn (get instance "$class")]
     (when-let [errs (store/validate reg instance)]
       (throw (ex-info "Contract failed validation" {:$class fqn :errors errs})))
-    (let [doc  (merge (concerto/instance->doc
+    (let [doc  (merge (k/instance->doc
                        instance
-                       :identity-field (model/identity-field reg fqn))
+                       :identity-field (mm/identity-field reg fqn))
                       (projection instance))
           opts (cond-> {:into table} valid-from (assoc :valid-from valid-from))
           ;; One row per (contract, party). A join table rather than an array

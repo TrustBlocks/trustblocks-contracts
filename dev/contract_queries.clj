@@ -3,9 +3,10 @@
   them.
 
     bin/clj -M:xtdb-jvm-opts -i dev/contract_queries.clj"
-  (:require [clojure.pprint :as pp]
+  (:require [clojure.string]
+            [clojure.pprint :as pp]
             [com.trustblocks.contract :as contract]
-            [com.trustblocks.store :as store]
+            [com.trustblocks.xtdb.store :as store]
             [xtdb.api :as xt]
             [xtdb.node :as xt.node]))
 

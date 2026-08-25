@@ -13,8 +13,7 @@
   Concerto-validated writes as the design, no-codegen as the consequence.
   Schemaless storage is a means, not the pitch."
   (:require [clojure.string :as str]
-            [com.trustblocks.concerto.model :as model]
-            [com.trustblocks.store :as store]
+            [com.trustblocks.xtdb.store :as store]
             [malli.core :as m]
             [xtdb.api :as xt]
             [xtdb.node :as xt.node]))
@@ -99,14 +98,15 @@
       (println (str "\n" B "  Municipal contracts on Concerto + XTDB" O))
       (println (str D "  Glenwood Ave resurfacing — a contract, a dispute, and the record" O))
       (println)
-      (say "This is a live database, started just now. It speaks the Postgres")
+      (say "This is an XTDB Database an immutable, schemaless, bitemporal database")
+      (say "It is a live database, started just now. It speaks the Postgres")
       (say "wire protocol, so anything that talks to Postgres talks to it:")
       (println (str "\n" M "     psql -h 127.0.0.1 -p " PORT " -U xtdb -d xtdb" O))
-      (note "\nConnect from your laptop during the talk and run these queries yourself.")
       (pause)
 
       ;; 1 -------------------------------------------------------------------
       (beat 1 "The record cannot be destroyed")
+      (say "Records in XTDB are immuntable")
       (say "A contract is signed on 12 May. Someone then deletes it.")
       (load-template! node "acceptance-of-delivery")
       (xt/execute-tx node [[:put-docs {:into :agreement :valid-from #inst "2025-05-12"}
@@ -170,7 +170,7 @@
       (println (str "\n" D "   the CTO says:" O))
       (println (str "     " C "o Long businessDays" O))
       (let [reg (store/registry-from-xtdb node)
-            sch (model/->malli reg (get contract "$class"))]
+            sch (store/schema reg (get contract "$class"))]
         (println (str "\n" D "   the validator, compiled from it at runtime:" O))
         (doseq [entry (->> (m/form sch) (drop 1)
                            (filter #(#{:business-days :shipper :clause-id} (first %)))

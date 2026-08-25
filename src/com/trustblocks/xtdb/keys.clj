@@ -1,8 +1,11 @@
-(ns com.trustblocks.concerto
-  "Bijective transform between Concerto JSON instances and XTDB records.
+(ns com.trustblocks.xtdb.keys
+  "Concerto instances <-> XTDB records.
+
+  This is the storage adapter. `concerto-clj` knows nothing about XTDB and takes
+  a `key-fn`; everything XTDB-shaped lives here.
 
   XTDB 2 normalizes column names on write, and the normalization is lossy in
-  ways that matter here (all verified empirically against XTDB 2.1.0):
+  ways that matter (all verified empirically against XTDB 2.1.0):
 
     :$class        -> :/class          ($ is read as a namespace separator)
     :businessDays  -> :businessdays    (camelCase is lowercased -- NOT reversible)
@@ -14,12 +17,14 @@
   the whole mapping depends on -- and flattens field-name casing. Worse,
   `business_days` and `business-days` collide silently, last write winning.
 
-  So we canonicalize on the way in and restore on the way out:
-    $class      -> :concerto/class
-    $identifier -> :concerto/identifier
-    camelCase   -> kebab-case"
+  So we canonicalize on the way in and restore on the way out. Note that this
+  transform is the *reason* the library keeps a neutral EDN layer: at that
+  layer `:$class` and `:businessDays` are legal keywords that need no reverse
+  mapping at all. Everything below is the price of XTDB specifically, and no
+  other adapter should have to pay it."
   (:require [camel-snake-kebab.core :as csk]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [com.trustblocks.concerto.metamodel :as mm]))
 
 (def ^:private reserved
   {"$class"      :concerto/class
@@ -30,7 +35,9 @@
   (into {} (map (fn [[k v]] [v k])) reserved))
 
 (defn field->xt
-  "Concerto property name -> XTDB-safe keyword."
+  "Concerto property name -> XTDB-safe keyword. This is the `key-fn` handed to
+  `concerto-clj` so that compiled schemas are keyed the same way as the records
+  they validate."
   [field-name]
   (or (reserved field-name)
       (csk/->kebab-case-keyword field-name)))
@@ -44,6 +51,23 @@
    (or (reserved-inverse k)
        (get known k)
        (csk/->camelCaseString (name k)))))
+
+(defn property-names
+  "XTDB key -> exact declared property name, across the whole inheritance chain.
+
+  Required for a faithful read. Deriving the name back from the key with
+  ->camelCase is lossy for anything that is not plain camelCase: `vechileID`
+  would come back as `vechileId`, and `INITIAL_DUE` as `initialDue`. The model
+  is the only authority on the original spelling.
+
+  This function exists only because XTDB forces kebab-case on us -- an adapter
+  that can store `:businessDays` needs nothing of the sort."
+  [reg fqn]
+  (into {}
+        (for [f    (mm/super-chain reg fqn)
+              prop (get-in reg [f :declaration :properties])
+              :let [nm (:name prop)]]
+          [(field->xt nm) nm])))
 
 (defn- collisions
   "Concerto field names in `m` that would normalize onto the same XTDB key.
@@ -79,8 +103,11 @@
 
   `names-for` is an optional (fn [$class] -> {xt-key declared-name}). It is
   resolved per level from that level's own :concerto/class, so a nested concept
-  gets its own declared names rather than its parent's. Without it we fall back
-  to ->camelCase, which is lossy for names like `vechileID` or `INITIAL_DUE`."
+  gets its own declared names rather than its parent's.
+
+  Dropping the derived keys here is what lets the compiled schemas stay closed:
+  the library emits schemas over pure Concerto properties, and the adapter is
+  responsible for not handing it anything else."
   ([record] (<-xtdb record nil))
   ([record names-for]
    (let [known (when names-for
