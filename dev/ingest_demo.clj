@@ -59,8 +59,8 @@
         (println "\n== schema is queryable as data ==")
         (doseq [row (sort-by first
                              (xt/q node '(-> (from :concerto-declaration
-                                                   [{:xt/id fqn} :concerto/kind])
-                                             (return fqn :concerto/kind))))]
+                                                   [{:xt/id fqn} concerto/kind])
+                                             (return fqn concerto/kind))))]
           (printf "  %-60s %s\n"
                   (:fqn row)
                   (last (clojure.string/split (str (:concerto/kind row)) #"\.")))))
