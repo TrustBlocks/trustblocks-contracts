@@ -72,20 +72,29 @@
 
 ;; ---------------------------------------------------------------- vocabulary
 
+(def special-forms
+  "Special forms the permitted macros expand into.
+
+  `let` becomes `let*`, `fn` becomes `fn*`, and `cond`, `when` and the threading
+  macros become `if` and `do`. Allowing a macro without its expansion target
+  refuses the macro at the point of use, so these have to be named too."
+  '[if do fn fn* let* quote recur])
+
 (def core-vocabulary
   "The clojure.core names a clause may use.
 
   Listed rather than derived, so the surface is auditable by reading it. Note
-  what is not here: `/`, `rand`, `eval`, `require`, anything that reads a clock,
-  anything that touches a file, socket or the JVM."
+  what is not here: `/`, `rand`, `eval`, `require`, `def`, `atom`, anything that
+  reads a clock, anything that touches a file, socket or the JVM."
   '[+ - * < > <= >= = not= not
-    min max mod rem quot inc dec abs
-    if when when-not cond and or let if-let when-let
+    min max mod rem quot inc dec
+    when when-not cond and or let if-let when-let
     get get-in contains? keys vals
     count empty? seq first second last nth
     map filter remove reduce some every? sort-by
+    odd? even? pos? neg? zero?
     assoc dissoc merge select-keys update
-    str name keyword vector hash-map list conj into
+    str name keyword vector hash-map list conj into apply
     nil? some? true? false? string? number? boolean? map? vector?
     -> ->>])
 
@@ -104,35 +113,23 @@
 (defn context
   "An SCI context holding exactly the vocabulary and nothing else.
 
-  `extra` adds host functions for a deployment that needs them; adding one is a
-  deliberate widening of what every clause can do, so it should be rare and
-  reviewed."
+  `:allow` is the whitelist, and it is a real one: SCI refuses any symbol not
+  named, including special forms and including reached-for spellings like
+  `(apply / ...)` and `clojure.core//`. `:namespaces` supplies the host
+  functions; it does *not* restrict anything, which is the mistake an earlier
+  version of this made -- treating it as the whitelist left `/`, `rand`,
+  `rand-int` and `atom` reachable, patched afterwards with a `:deny` list. A
+  whitelist backed by a blacklist is weaker than one that stands alone, and
+  this one now stands alone.
+
+  `extra` adds host functions for a deployment that needs them; adding one
+  widens what every clause can do, so it should be rare and reviewed."
   [& {:keys [extra]}]
   (sci/init
-   {:namespaces {'clojure.core (merge (select-keys (ns-publics 'clojure.core) core-vocabulary)
-                                      contract-vocabulary
-                                      extra)}
-    ;; SCI provides some clojure.core bindings regardless of :namespaces, so the
-    ;; whitelist above is not by itself the whole surface. These have to be
-    ;; denied explicitly, and they are the ones that would silently break a
-    ;; contract rather than obviously break it:
-    ;;
-    ;;   /            exact ratio on the JVM, float in ClojureScript
-    ;;   rand         a clause that is not a function of its inputs
-    ;;   atom & co.   mutable state surviving across an evaluation
-    ;;
-    ;; Belt and braces. A whitelist that has to be backed by a blacklist is
-    ;; weaker than one that does not, and this list should be re-audited
-    ;; whenever SCI is upgraded.
-    :deny       '[eval require import ns in-ns def defn defmacro set! new .
-                  / rand rand-int shuffle random-uuid
-                  atom swap! reset! swap-vals! reset-vals! compare-and-set!
-                  ref alter ref-set dosync agent send send-off
-                  future promise deliver delay force
-                  read read-string load-string load-file with-open
-                  volatile! vswap! vreset!]
+   {:namespaces {'clojure.core (merge contract-vocabulary extra)}
+    :allow      (concat special-forms core-vocabulary
+                        (keys contract-vocabulary) (keys extra))
     :classes    {}}))
-
 
 ;; ---------------------------------------------------------------- analysis
 
