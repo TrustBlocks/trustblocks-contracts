@@ -27,6 +27,20 @@
             [com.trustblocks.xtdb.store :as store]
             [xtdb.api :as xt]))
 
+(defn- ->instant
+  "A Concerto DateTime is a string on the wire; XTDB's :valid-from needs an
+  instant. This is the one place the conversion happens, and it happens in the
+  adapter -- the clause layer never holds a platform date, which is what keeps
+  a clause's answer the same wherever it runs."
+  [dt]
+  (cond
+    (inst? dt) dt
+    (string? dt) (-> (try (java.time.OffsetDateTime/parse dt)
+                          (catch Exception _
+                            (java.time.OffsetDateTime/parse (str dt "Z"))))
+                     .toInstant)
+    :else (throw (ex-info "Cannot read as a date-time" {:value dt}))))
+
 (def clause-table    :clause)
 (def state-table     :contract-state)
 (def execution-table :execution)
@@ -136,7 +150,7 @@
          ;; point: a back-dated correction lands in valid time while system time
          ;; still records when we believed it.
          (:state result)
-         (conj [:put-docs {:into state-table :valid-from now}
+         (conj [:put-docs {:into state-table :valid-from (->instant now)}
                 (k/instance->doc (:state result)
                                  :identity-field (mm/identity-field
                                                   reg (get (:state result) "$class")))])))
