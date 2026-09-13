@@ -2,8 +2,7 @@
   "Sweep the whole Accord template library through the ingestion pipeline.
 
     bin/clj -M:xtdb-jvm-opts -i dev/audit_library.clj"
-  (:require [clojure.pprint :as pp]
-            [clojure.string :as str]
+  (:require [clojure.string :as str]
             [com.trustblocks.template.audit :as audit]
             [xtdb.node :as xt.node]))
 

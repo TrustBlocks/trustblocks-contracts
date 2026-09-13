@@ -7,7 +7,6 @@
             [clojure.pprint :as pp]
             [com.trustblocks.contract :as contract]
             [com.trustblocks.xtdb.store :as store]
-            [xtdb.api :as xt]
             [xtdb.node :as xt.node]))
 
 (def lib (str (System/getProperty "user.home")
@@ -21,6 +20,7 @@
 (def contracts
   [{:template "copyright-license"
     :valid-from #inst "2024-03-15T00:00:00.000-00:00"
+
     :instance
     {"$class" "org.accordproject.copyrightlicense@0.2.0.TemplateModel"
      "effectiveDate" "2024-03-15T00:00:00.000-05:00"
@@ -31,16 +31,19 @@
      "territory" "Wake County"
      "purposeDescription" "publication of municipal GIS basemaps"
      "workDescription" "the 2024 aerial orthoimagery dataset"
+
      "paymentClause"
      {"$class" "org.accordproject.copyrightlicense@0.2.0.PaymentClause"
       "amountText" "twelve thousand US Dollars"
       "amount" (money 12000 "USD")
       "paymentProcedure" "ACH transfer within 30 days"
       "clauseId" "cl-0001" "$identifier" "cl-0001"}
+
      "contractId" "raleigh-gis-license-2024" "$identifier" "raleigh-gis-license-2024"}}
 
    {:template "promissory-note"
     :valid-from #inst "2025-06-01T00:00:00.000-00:00"
+
     :instance
     {"$class" "org.accordproject.promissorynote@0.2.0.TemplateModel"
      "amount" (money 250000 "USD")
@@ -56,6 +59,7 @@
 
    {:template "acceptance-of-delivery"
     :valid-from #inst "2025-09-10T00:00:00.000-00:00"
+
     :instance
     {"$class" "org.accordproject.acceptanceofdelivery@0.1.0.TemplateModel"
      "shipper" "Piedmont Paving LLC" "receiver" "Tom Brooke"
