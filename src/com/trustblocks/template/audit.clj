@@ -6,9 +6,8 @@
   which stage failed and why, so failures are classified rather than fatal."
   (:require [cheshire.core :as json]
             [clojure.java.io :as io]
-            [com.trustblocks.concerto :as concerto]
-            [com.trustblocks.concerto.model :as model]
-            [com.trustblocks.store :as store]))
+            [com.trustblocks.concerto.metamodel :as mm]
+            [com.trustblocks.xtdb.store :as store]))
 
 (def stages
   "In dependency order -- a template must clear each to reach the next."
@@ -40,14 +39,19 @@
                   (nil? fqn)
                   (assoc (err :resolve-class "sample has no $class") :template t :ok? false)
 
-                  (empty? (model/super-chain reg fqn))
+                  (empty? (mm/super-chain reg fqn))
                   (assoc (err :resolve-class "$class not found in any loaded model"
                               {:$class fqn :namespaces (count reg)})
                          :template t :ok? false)
 
                   :else
-                  (let [schema (model/->malli reg fqn)   ; may throw
-                        errs   (store/validate reg sample)]
+                  ;; Compile the schema for its own sake first: a model the
+                  ;; library refuses -- an unhandled declaration kind, an
+                  ;; unresolved type, an unportable regex flag -- must be
+                  ;; reported as a compile failure rather than surfacing later
+                  ;; as a confusing validation error.
+                  (let [_    (store/schema reg fqn)
+                        errs (store/validate reg sample)]
                     (if errs
                       (assoc (err :validate "sample fails its own model" {:errors errs})
                              :template t :ok? false)
@@ -55,7 +59,7 @@
                             back (store/get-instance node id :reg reg)]
                         (if (= sample back)
                           {:template t :ok? true :stage :round-trip
-                           :chain (count (model/super-chain reg fqn))
+                           :chain (count (mm/super-chain reg fqn))
                            :declarations (count reg)}
                           (assoc (err :round-trip "round-trip differs from sample"
                                       {:only-original  (into {} (remove (fn [[k v]] (= v (get back k))) sample))

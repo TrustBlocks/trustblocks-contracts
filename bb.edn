@@ -1,0 +1,6 @@
+;; For the babashka half of docs/walkthrough.md -- the Concerto conversion,
+;; which needs no database. XTDB is a JVM library and does not run here; the
+;; storage half of the walkthrough uses `bin/clj -M:xtdb-jvm-opts`.
+{:paths ["src"]
+ :deps  {io.github.TrustBlocks/concerto-clj {:git/sha "d80655fb6b737765e60e66e0a8277e8b12daa4db"}
+         metosin/malli                      {:mvn/version "0.20.1"}}}

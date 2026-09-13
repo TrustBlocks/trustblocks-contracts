@@ -1,4 +1,4 @@
-(ns com.trustblocks.store
+(ns com.trustblocks.xtdb.store
   "Guarded ingestion into XTDB.
 
   XTDB is the source of truth, and it enforces nothing -- no required fields,
@@ -6,12 +6,15 @@
   every Concerto constraint. So all writes funnel through `put-instance!`,
   which resolves the Malli schema from $class and validates before insert.
 
-  Takes an XTDB node explicitly, so it works against a bare node in the REPL or
-  against Biff's (:biff.xtdb/node ctx)."
+  Schema compilation lives in `concerto-clj`; this namespace supplies the XTDB
+  key transform and the storage. Takes an XTDB node explicitly, so it works
+  against a bare node in the REPL or against Biff's (:biff.xtdb/node ctx)."
   (:require [cheshire.core :as json]
             [clojure.java.io :as io]
-            [com.trustblocks.concerto :as concerto]
-            [com.trustblocks.concerto.model :as model]
+            [com.trustblocks.concerto.cto :as cto]
+            [com.trustblocks.concerto.malli :as cm]
+            [com.trustblocks.concerto.metamodel :as mm]
+            [com.trustblocks.xtdb.keys :as k]
             [malli.core :as m]
             [malli.error :as me]
             [xtdb.api :as xt]))
@@ -27,26 +30,27 @@
   one record per declaration keyed by fully qualified name. Schemas then get
   XTDB's bitemporal history for free, exactly like the contracts they describe."
   [node cto-path & {:keys [concerto-cli]}]
-  (let [raw     (slurp cto-path)
-        parsed  (-> (model/parse-cto cto-path :concerto-cli concerto-cli)
-                    model/strip-locations)
-        ns-     (get parsed "namespace")
-        decls   (model/declarations parsed)]
+  (let [raw    (slurp cto-path)
+        parsed (cto/parse cto-path :cli concerto-cli)
+        ns-    (:namespace parsed)
+        decls  (mm/declarations parsed)]
     (xt/execute-tx
      node
      (into [[:put-docs model-table
-             {:xt/id            ns-
-              :concerto/source  raw
-              :concerto/path    (str cto-path)
-              :concerto/model   (concerto/->xtdb parsed)
+             {:xt/id             ns-
+              :concerto/source   raw
+              :concerto/path     (str cto-path)
+              ;; The parsed model is stored as EDN with Concerto's own key
+              ;; spelling, so it round-trips without the model to interpret it.
+              :concerto/model    (pr-str parsed)
               :declaration-count (count decls)}]]
            (for [{:keys [fqn name declaration]} decls]
              [:put-docs declaration-table
-              {:xt/id               fqn
-               :concerto/namespace  ns-
-               :concerto/name       name
-               :concerto/kind       (get declaration "$class")
-               :concerto/declaration (concerto/->xtdb declaration)}])))
+              {:xt/id                fqn
+               :concerto/namespace   ns-
+               :concerto/name        name
+               :concerto/kind        (:$class declaration)
+               :concerto/declaration (pr-str declaration)}])))
     {:namespace ns- :declarations (mapv :fqn decls)}))
 
 (defn load-registry
@@ -54,48 +58,53 @@
   an Accord template vendors its imports alongside model.cto, so pointing at the
   directory resolves inheritance chains that cross namespaces."
   [cto-paths & {:keys [concerto-cli]}]
-  (->> cto-paths
-       (map #(model/parse-cto % :concerto-cli concerto-cli))
-       (map model/strip-locations)
-       model/registry))
+  (mm/registry (map #(cto/parse % :cli concerto-cli) cto-paths)))
 
 (defn registry-from-xtdb
   "Rebuild the declaration registry from XTDB itself, with no filesystem access.
 
-  `put-model!` stores each parsed model whole, so reading it back and running it
-  through the same `model/registry` gives an identical registry. This is what
-  makes XTDB the source of truth in practice rather than just in principle: the
-  schema needed to interpret a record lives beside the record.
+  `put-model!` stores each parsed model whole, so reading it back gives an
+  identical registry. This is what makes XTDB the source of truth in practice
+  rather than just in principle: the schema needed to interpret a record lives
+  beside the record.
 
   Building this scans every stored model, so callers doing many reads should
   build it once and pass it as :reg."
   [node]
   (->> (xt/q node '(from :concerto-model [*]))
        (keep :concerto/model)
-       (map concerto/<-xtdb)
-       model/registry))
+       (map read-string)
+       mm/registry))
 
 (defn model-dir-files
   "Every .cto in a directory (a template's model/ folder)."
   [dir]
   (->> (file-seq (io/file dir))
-       (filter #(.endsWith (.getName %) ".cto"))
-       (sort-by #(.getName %))
+       (filter #(.endsWith (.getName ^java.io.File %) ".cto"))
+       (sort-by #(.getName ^java.io.File %))
        vec))
 
 ;; ---------------------------------------------------------------- instances
 
+(defn schema
+  "The Malli schema for a $class, keyed the way XTDB stores it."
+  [reg fqn]
+  (cm/->schema reg fqn :key-fn k/field->xt))
+
 (defn validate
   "Validate a Concerto instance against its $class. Returns nil when valid,
-  otherwise a humanized explanation."
+  otherwise a humanized explanation.
+
+  Validates the converted record *before* :xt/id and any derived keys are added,
+  which is what lets the compiled schema stay closed."
   [reg instance]
   (let [fqn (get instance "$class")]
     (when-not fqn
       (throw (ex-info "Concerto instance has no $class" {:instance instance})))
-    (let [schema (model/->malli reg fqn)
-          doc    (concerto/->xtdb instance)]
-      (when-not (m/validate schema doc)
-        (-> schema (m/explain doc) me/humanize)))))
+    (let [s   (schema reg fqn)
+          doc (k/->xtdb instance)]
+      (when-not (m/validate s doc)
+        (-> s (m/explain doc) me/humanize)))))
 
 (defn put-instance!
   "Validate a Concerto instance against its $class, then write it to XTDB.
@@ -109,9 +118,7 @@
     (when-let [errs (validate reg instance)]
       (throw (ex-info "Concerto instance failed validation"
                       {:$class fqn :errors errs})))
-    (let [doc (concerto/instance->doc
-               instance
-               :identity-field (model/identity-field reg fqn))]
+    (let [doc (k/instance->doc instance :identity-field (mm/identity-field reg fqn))]
       (xt/execute-tx node [[:put-docs table doc]])
       {:xt/id (:xt/id doc) :$class fqn})))
 
@@ -128,6 +135,6 @@
       ;; the name is lossy for anything not plain camelCase (vechileID,
       ;; INITIAL_DUE), so a faithful read must not be opt-in.
       (let [reg (or reg (registry-from-xtdb node))]
-        (concerto/<-xtdb record (memoize #(model/property-names reg %)))))))
+        (k/<-xtdb record (memoize #(k/property-names reg %)))))))
 
 (defn instance->json [instance] (json/generate-string instance {:pretty true}))

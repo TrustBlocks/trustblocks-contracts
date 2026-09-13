@@ -1,0 +1,42 @@
+namespace com.trustblocks.snow@1.0.0
+
+/**
+ * A small self-contained municipal contract, used by docs/walkthrough.md.
+ * No imports, so it parses without fetching anything.
+ */
+
+concept Money {
+  o Double amount
+  o String currency regex=/^[A-Z]{3}$/
+}
+
+enum Outcome {
+  o PAYABLE
+  o BELOW_TRIGGER
+}
+
+asset SnowRemoval identified by contractId {
+  o String contractId
+  o String contractor
+  o String route
+  o Double inchesTrigger range=[0.0,]
+  o Money ratePerVisit
+}
+
+transaction VisitReport identified by reportId {
+  o String reportId
+  o DateTime visitedAt
+  o Double inchesFallen
+}
+
+transaction VisitOutcome identified by outcomeId {
+  o String outcomeId
+  o Outcome outcome
+  o Money amountDue
+}
+
+asset PaymentState identified by contractId {
+  o String contractId
+  o Integer visitsPaid
+  o Money totalPaid
+}

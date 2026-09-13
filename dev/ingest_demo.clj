@@ -3,10 +3,10 @@
   and read back its sample contract. Run with:
 
     bin/clj -M:xtdb-jvm-opts -i dev/ingest_demo.clj"
-  (:require [cheshire.core :as json]
-            [com.trustblocks.concerto :as concerto]
-            [com.trustblocks.concerto.model :as model]
-            [com.trustblocks.store :as store]
+  (:require [clojure.string]
+            [cheshire.core :as json]
+            [com.trustblocks.concerto.metamodel :as mm]
+            [com.trustblocks.xtdb.store :as store]
             [xtdb.api :as xt]
             [xtdb.node :as xt.node]))
 
@@ -31,8 +31,8 @@
             fqn (get sample "$class")]
 
         (println "\n== inheritance chain for the contract ==")
-        (println " " (clojure.string/join "\n  -> " (model/super-chain reg fqn)))
-        (println "  identity field:" (model/identity-field reg fqn))
+        (println " " (clojure.string/join "\n  -> " (mm/super-chain reg fqn)))
+        (println "  identity field:" (mm/identity-field reg fqn))
 
         (println "\n== storing the contract ==")
         (println " " (store/put-instance! node reg sample))

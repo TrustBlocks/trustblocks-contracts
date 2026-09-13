@@ -4,8 +4,7 @@
     bin/clj -M:xtdb-jvm-opts -i dev/accord_probe.clj"
   (:require [cheshire.core :as json]
             [clojure.string :as str]
-            [com.trustblocks.store :as store]
-            [com.trustblocks.concerto.model :as model]
+            [com.trustblocks.xtdb.store :as store]
             [xtdb.node :as xt.node]))
 
 (def lib (str (System/getProperty "user.home")
