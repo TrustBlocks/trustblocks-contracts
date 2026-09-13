@@ -2,14 +2,14 @@
 
  :deps {org.clojure/clojure {:mvn/version "1.12.5"}
 
-        ;; Biff 2 libraries. Pinned to an exact release candidate on purpose --
-        ;; v2 is pre-release and Jacob has stated everything is subject to
-        ;; breaking changes. Upgrade deliberately, never track branch HEAD.
-        com.biffweb/core     {:mvn/version "2.0.0-rc14"}
-        com.biffweb/config   {:mvn/version "2.0.0-rc14"}
-        com.biffweb/ring     {:mvn/version "2.0.0-rc14"}
-        com.biffweb/xtdb     {:mvn/version "2.0.0-rc14"}
-        com.biffweb/datastar {:mvn/version "2.0.0-rc14"}
+        ;; Biff 2 libraries, pinned to the official 2.0.0 release (2026-09-10).
+        ;; Upgrade deliberately, never track branch HEAD.
+        com.biffweb/core     {:mvn/version "2.0.0"}
+        com.biffweb/config   {:mvn/version "2.0.0"}
+        com.biffweb/ring     {:mvn/version "2.0.0"}
+        com.biffweb/xtdb     {:mvn/version "2.0.0"}
+        com.biffweb/datastar {:mvn/version "2.0.0"}
+        com.biffweb/graph    {:mvn/version "2.0.0"}
 
         ;; Concerto models as EDN and Malli schemas compiled from them at
         ;; runtime. Not on Clojars yet -- see github.com/TrustBlocks/concerto-clj.
@@ -40,7 +40,7 @@
 
   :run
   {:extra-paths ["test"]
-   :extra-deps  {com.biffweb/tasks {:mvn/version "2.0.0-rc14"}}
+   :extra-deps  {com.biffweb/tasks {:mvn/version "2.0.0"}}
    :main-opts   ["-m" "com.biffweb.tasks.app"]
    :jvm-opts    ["--add-opens=java.base/java.nio=ALL-UNNAMED"
                  "--enable-native-access=ALL-UNNAMED"
@@ -56,7 +56,9 @@
                "-XX:+CrashOnOutOfMemoryError"]}
 
   ;; Develop against the sibling biff/ clone instead of the pinned releases,
-  ;; e.g. when preparing an upstream PR or using an unreleased lib.
+  ;; e.g. when preparing an upstream PR or using an unreleased lib. Now that
+  ;; 2.0.0 is released and every Biff 2 lib is published on Clojars, this is
+  ;; only needed to track master past the 2.0.0 tag.
   ;; Usage: clj -M:biff-local:run dev
   ;; :override-deps (not :extra-deps) so Biff's own inter-lib deps resolve
   ;; locally too.
@@ -69,15 +71,4 @@
     com.biffweb/datastar {:local/root "biff/libs/datastar"}
     com.biffweb/fx       {:local/root "biff/libs/fx"}
     com.biffweb/graph    {:local/root "biff/libs/graph"}
-    com.biffweb/stuff    {:local/root "biff/libs/stuff"}}}
-
-  ;; Not yet published to Clojars -- local-only until Jacob releases them.
-  ;; MUST be combined with :biff-local, e.g. clj -M:biff-local:biff-unreleased:run dev
-  ;; These libs depend on fx/core via :local/root inside the biff repo, and
-  ;; deps.edn cannot compare a :local/root against an :mvn/version -- so mixing
-  ;; them with the pinned releases fails to build a classpath.
-  :biff-unreleased
-  {:extra-deps
-   {com.biffweb/authenticate {:local/root "biff/libs/authenticate"}
-    com.biffweb/admin        {:local/root "biff/libs/admin"}
-    com.biffweb/background   {:local/root "biff/libs/background"}}}}}
+    com.biffweb/stuff    {:local/root "biff/libs/stuff"}}}}}

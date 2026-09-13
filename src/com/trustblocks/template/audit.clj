@@ -28,6 +28,7 @@
         (cond
           (not (.exists sample-file)) (assoc (err :read-sample "no sample.json") :template t :ok? false)
           (not (.exists model-dir))   (assoc (err :read-sample "no model/ directory") :template t :ok? false)
+
           :else
           (let [sample (json/parse-string (slurp sample-file))
                 ctos   (store/model-dir-files model-dir)]
