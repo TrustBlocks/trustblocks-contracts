@@ -15,6 +15,15 @@
   markup, and the page still looked broken because the CSS backing those
   classes had never been (re)compiled.
 
+  Each contract is only seeded if it isn't already there, so running this
+  again against storage/ left over from an earlier run is a no-op rather
+  than an error -- both contracts' clause logic reasonably reject their
+  own re-triggering (the Board can't approve the same contract twice;
+  re-reporting the same snow visit would silently double-count the
+  payout), which surfaces as a real crash or real data corruption here
+  if this script tries to redo work that's already recorded. Run
+  `rm -rf storage` first if you actually want a clean slate.
+
   late-delivery.cta is deliberately not seeded here: it's Accord's own
   reference example, kept as an engineering proof (dev/late_delivery_demo.clj
   cross-checks our Clojure clause runtime against a known-good APAP answer),
@@ -45,18 +54,23 @@
 (def node (:biff.xtdb/node @main/system))
 
 (println "\nSeeding the snow-removal contract into the running app...")
-(snow/populate! node)
+(if (store/get-instance node snow/contract-id)
+  (println "  already there, skipping")
+  (snow/populate! node))
 
 (println "Seeding the manager-employment contract into the running app...")
-(archive/ingest-dir! node "docs/examples/manager-employment-contract")
-(let [sample (-> (slurp "docs/examples/manager-employment-contract/sample.json")
-                 (json/parse-string)
-                 (assoc "$identifier" me/contract-id))]
-  (store/put-instance! node nil sample))
-(ex/put-clause! node me/contract-fqn me/clojure-clause)
-(ex/trigger! node me/contract-id
-             {"$class"      "com.trustblocks.municipal.manageremployment@1.0.0.BoardApprovalRequest"
-              "requestedAt" "2025-12-02T00:00:00.000Z"}
-             "2025-12-02T00:00:00.000Z")
+(if (store/get-instance node me/contract-id)
+  (println "  already there, skipping")
+  (do
+    (archive/ingest-dir! node "docs/examples/manager-employment-contract")
+    (let [sample (-> (slurp "docs/examples/manager-employment-contract/sample.json")
+                     (json/parse-string)
+                     (assoc "$identifier" me/contract-id))]
+      (store/put-instance! node nil sample))
+    (ex/put-clause! node me/contract-fqn me/clojure-clause)
+    (ex/trigger! node me/contract-id
+                 {"$class"      "com.trustblocks.municipal.manageremployment@1.0.0.BoardApprovalRequest"
+                  "requestedAt" "2025-12-02T00:00:00.000Z"}
+                 "2025-12-02T00:00:00.000Z")))
 
 (println "\nSeeded. Visit http://localhost:8080/contracts")
