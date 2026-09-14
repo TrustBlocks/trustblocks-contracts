@@ -15,14 +15,15 @@
   markup, and the page still looked broken because the CSS backing those
   classes had never been (re)compiled.
 
-  Each contract is only seeded if it isn't already there, so running this
-  again against storage/ left over from an earlier run is a no-op rather
-  than an error -- both contracts' clause logic reasonably reject their
-  own re-triggering (the Board can't approve the same contract twice;
+  Loading the model/instance/clause (each namespace's load!) always runs,
+  even against storage/ left over from an earlier run -- it's a plain
+  upsert of whatever's on disk, so a changed archive (a new grammar.tem.md,
+  say) still takes effect on an already-seeded contract without a full
+  rm -rf storage. Only the actual trigger events are guarded against
+  redoing: the Board can't approve the same contract twice, and
   re-reporting the same snow visit would silently double-count the
-  payout), which surfaces as a real crash or real data corruption here
-  if this script tries to redo work that's already recorded. Run
-  `rm -rf storage` first if you actually want a clean slate.
+  payout, so each is only triggered if its state/history isn't already
+  there. Run `rm -rf storage` first if you want a genuinely clean slate.
 
   late-delivery.cta is deliberately not seeded here: it's Accord's own
   reference example, kept as an engineering proof (dev/late_delivery_demo.clj
@@ -37,12 +38,9 @@
     bin/clj -M:xtdb-jvm-opts -i dev/seed.clj
 
   Leaves the app running afterward. Visit http://localhost:8080/contracts."
-  (:require [cheshire.core :as json]
-            [com.biffweb.tasks :as tasks]
+  (:require [com.biffweb.tasks :as tasks]
             [com.trustblocks :as main]
-            [com.trustblocks.template.archive :as archive]
             [com.trustblocks.xtdb.execute :as ex]
-            [com.trustblocks.xtdb.store :as store]
             [manager-employment-demo :as me]
             [snow-removal-demo :as snow]))
 
@@ -54,23 +52,18 @@
 (def node (:biff.xtdb/node @main/system))
 
 (println "\nSeeding the snow-removal contract into the running app...")
-(if (store/get-instance node snow/contract-id)
-  (println "  already there, skipping")
-  (snow/populate! node))
+(snow/load! node)
+(if (ex/current-state node snow/contract-id)
+  (println "  visits already recorded, skipping")
+  (snow/visits! node))
 
 (println "Seeding the manager-employment contract into the running app...")
-(if (store/get-instance node me/contract-id)
-  (println "  already there, skipping")
-  (do
-    (archive/ingest-dir! node "docs/examples/manager-employment-contract")
-    (let [sample (-> (slurp "docs/examples/manager-employment-contract/sample.json")
-                     (json/parse-string)
-                     (assoc "$identifier" me/contract-id))]
-      (store/put-instance! node nil sample))
-    (ex/put-clause! node me/contract-fqn me/clojure-clause)
-    (ex/trigger! node me/contract-id
-                 {"$class"      "com.trustblocks.municipal.manageremployment@1.0.0.BoardApprovalRequest"
-                  "requestedAt" "2025-12-02T00:00:00.000Z"}
-                 "2025-12-02T00:00:00.000Z")))
+(me/load! node)
+(if (ex/current-state node me/contract-id)
+  (println "  already approved, skipping trigger")
+  (ex/trigger! node me/contract-id
+               {"$class"      "com.trustblocks.municipal.manageremployment@1.0.0.BoardApprovalRequest"
+                "requestedAt" "2025-12-02T00:00:00.000Z"}
+               "2025-12-02T00:00:00.000Z"))
 
 (println "\nSeeded. Visit http://localhost:8080/contracts")

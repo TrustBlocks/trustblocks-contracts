@@ -35,6 +35,7 @@
                    true          (conj! (cond
                                           (str/starts-with? inner "#if")
                                           [:if-start (str/trim (subs inner 3))]
+
                                           (= inner "else") [:else]
                                           (= inner "/if")  [:if-end]
                                           :else            [:var inner])))))
@@ -149,7 +150,7 @@
            (let [bold? (if (pos? i) (not bold?) bold?)]
              {:bold? bold?
               :nodes (cond-> nodes (not (str/blank? piece))
-                       (conj (if bold? [:strong piece] piece)))}))
+                             (conj (if bold? [:strong piece] piece)))}))
          {:bold? bold? :nodes nodes}
          (map-indexed vector (str/split v #"\*\*" -1)))))
     {:bold? false :nodes []}

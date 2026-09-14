@@ -47,20 +47,29 @@
                 \"approvedAt\" approved-at
                 \"effectiveDate\" effective}}))")
 
+(defn load!
+  "Ingests the model + logic archive, and loads the contract instance and
+  its clause, into node -- a plain upsert of whatever's currently on disk,
+  safe to call repeatedly. dev/seed.clj relies on that: it calls this
+  unconditionally on every run, including against a china-grove-gover-2025
+  already sitting in storage/, so an archive change (a new grammar.tem.md,
+  say) still takes effect without a full rm -rf storage. Only trigger! --
+  the actual approval event -- is the part that isn't safe to redo."
+  [node]
+  (println "Ingesting docs/examples/manager-employment-contract ...")
+  (println (archive/ingest-dir! node "docs/examples/manager-employment-contract"))
+  (let [sample (-> (slurp "docs/examples/manager-employment-contract/sample.json")
+                   (json/parse-string)
+                   (assoc "$identifier" contract-id))]
+    (store/put-instance! node nil sample))
+  (ex/put-clause! node contract-fqn clojure-clause))
+
 (defn run []
   (let [node (xt.node/start-node)]
     (try
-      (println "Ingesting docs/examples/manager-employment-contract ...")
-      (println (archive/ingest-dir! node "docs/examples/manager-employment-contract"))
-
-      (let [sample (-> (slurp "docs/examples/manager-employment-contract/sample.json")
-                       (json/parse-string)
-                       (assoc "$identifier" contract-id))]
-        (store/put-instance! node nil sample))
+      (load! node)
 
       (println "\nBefore any trigger, state:" (ex/current-state node contract-id))
-
-      (ex/put-clause! node contract-fqn clojure-clause)
 
       (let [{:keys [response state]}
             (ex/trigger! node contract-id
