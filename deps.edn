@@ -35,6 +35,9 @@
   ;; runs on Java 21-24 only -- Java 25 will not work.
   :xtdb-jvm-opts
   {:extra-paths ["dev"]
+   ;; Lets dev/seed.clj build CSS once (com.biffweb.tasks/css) without going
+   ;; through the :run alias's :main-opts, which would hijack -i file loading.
+   :extra-deps  {com.biffweb/tasks {:mvn/version "2.0.0"}}
    :jvm-opts    ["--add-opens=java.base/java.nio=ALL-UNNAMED"
                  "--enable-native-access=ALL-UNNAMED"
                  "-Dio.netty.tryReflectionSetAccessible=true"]}
