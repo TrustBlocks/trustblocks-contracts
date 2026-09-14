@@ -47,25 +47,44 @@
 
 ;; ---------------------------------------------------------------- clauses
 
+(def runtimes
+  "Clause execution backends. Only :clojure runs anything today -- see
+  trigger! -- but the runtime is decided per stored clause (not per
+  process), because a contract type ingested from a .cta arrives with
+  TypeScript logic we may never rewrite, and a contract type authored here
+  never needs to be. Neither runtime is the platform; both are backends the
+  platform can pick between per clause."
+  #{:clojure :typescript})
+
 (defn put-clause!
   "Store the clause logic for a contract type, checked before it lands.
 
-  Keyed by the `$class` it applies to, so a contract finds its own logic. The
-  pre-flight check refuses a clause reaching for anything outside the
-  vocabulary at ingestion, rather than discovering it mid-execution."
-  [node fqn src & {:keys [valid-from ctx]}]
-  (when-let [why (clause/check (or ctx (clause/context)) src)]
-    (throw (ex-info (str "Clause refused by the vocabulary: " why)
-                    {:$class fqn :reason why})))
+  Keyed by the `$class` it applies to, so a contract finds its own logic.
+  `:runtime` (default :clojure) records which backend trigger! should use to
+  run it -- see `runtimes`. Only a :clojure clause is checked against the
+  sandbox vocabulary before it lands; a stored :typescript clause is an
+  inert, citable artifact until a TypeScript backend exists (see trigger!),
+  so there is nothing to check it against yet."
+  [node fqn src & {:keys [valid-from ctx runtime] :or {runtime :clojure}}]
+  (when-not (runtimes runtime)
+    (throw (ex-info "Unknown clause runtime" {:runtime runtime :known runtimes})))
+  (when (= runtime :clojure)
+    (when-let [why (clause/check (or ctx (clause/context)) src)]
+      (throw (ex-info (str "Clause refused by the vocabulary: " why)
+                      {:$class fqn :reason why}))))
   (xt/execute-tx node [[:put-docs (cond-> {:into clause-table}
                                     valid-from (assoc :valid-from valid-from))
-                        {:xt/id fqn :clause/source src}]])
-  {:$class fqn})
+                        {:xt/id fqn :clause/source src :clause/runtime (name runtime)}]])
+  {:$class fqn :runtime runtime})
 
-(defn get-clause [node fqn]
-  (-> (xt/q node (list 'from clause-table [{:xt/id fqn} (symbol "*")]))
-      first
-      :clause/source))
+(defn get-clause
+  "{:source :runtime}, or nil if no clause is stored for this $class.
+  :runtime defaults to :clojure for a record written before the column
+  existed, since every clause stored here originally was one."
+  [node fqn]
+  (when-let [record (first (xt/q node (list 'from clause-table [{:xt/id fqn} (symbol "*")])))]
+    {:source  (:clause/source record)
+     :runtime (keyword (or (:clause/runtime record) "clojure"))}))
 
 ;; ---------------------------------------------------------------- state
 
@@ -96,6 +115,22 @@
 
 ;; ---------------------------------------------------------------- trigger
 
+(defn- run-clause
+  "Runs one clause invocation, dispatching on its stored runtime. Only
+  :clojure is implemented -- a :typescript clause is refused with a clear
+  'not yet' error rather than attempting to eval TypeScript as Clojure or
+  silently doing nothing. See `runtimes`."
+  [runtime ctx src args]
+  (case runtime
+    :clojure (clause/evaluate ctx src args)
+    :typescript (throw (ex-info
+                        (str "TypeScript clause execution is not implemented "
+                             "yet. The clause is stored -- see put-clause! and "
+                             "com.trustblocks.template.archive -- but nothing "
+                             "runs it.")
+                        {:runtime runtime}))
+    (throw (ex-info "Unknown clause runtime" {:runtime runtime}))))
+
 (defn trigger!
   "Run a contract's clause against `request` and record what happened.
 
@@ -113,17 +148,19 @@
         contract (or (store/get-instance node contract-id :reg reg)
                      (throw (ex-info "No such contract" {:contract contract-id})))
         fqn      (get contract "$class")
-        src      (or (get-clause node fqn)
-                     (throw (ex-info "No clause stored for this contract type"
-                                     {:contract contract-id :$class fqn})))]
+
+        {src :source runtime :runtime}
+        (or (get-clause node fqn)
+            (throw (ex-info "No clause stored for this contract type"
+                            {:contract contract-id :$class fqn})))]
 
     (when-let [errs (store/validate reg request)]
       (throw (ex-info "Request failed validation"
                       {:$class (get request "$class") :errors errs})))
 
     (let [state  (current-state node contract-id :reg reg)
-          result (clause/evaluate ctx src {:data contract :request request
-                                           :state state :now now})
+          result (run-clause runtime ctx src {:data contract :request request
+                                              :state state :now now})
           response (:response result)]
 
       (when-not response
