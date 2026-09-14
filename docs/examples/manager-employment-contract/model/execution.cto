@@ -1,0 +1,34 @@
+namespace com.trustblocks.municipal.manageremployment@1.0.0
+
+/**
+ * Board-approval execution layer for us.nc.municipal.manageremployment --
+ * added by Trustblocks, not part of the source template. model.cto is data
+ * only: a completed contract's terms, with no notion of being drafted vs
+ * approved. This is deliberately a separate namespace rather than an edit
+ * to that one, so "their data model" and "our execution model" stay two
+ * things, not one -- the same boundary com.trustblocks.template.archive
+ * draws between a template's model (ingested) and its logic (never
+ * auto-translated).
+ */
+
+enum ContractStatus {
+  o DRAFTED
+  o APPROVED
+}
+
+concept ManagerEmploymentState identified by contractId {
+  o String contractId
+  o ContractStatus status
+  o DateTime approvedAt optional
+  o DateTime effectiveDate optional
+}
+
+transaction BoardApprovalRequest {
+  o DateTime requestedAt
+}
+
+transaction BoardApprovalResponse {
+  o ContractStatus status
+  o DateTime approvedAt
+  o DateTime effectiveDate
+}
