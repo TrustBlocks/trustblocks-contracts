@@ -138,3 +138,14 @@
         (k/<-xtdb record (memoize #(k/property-names reg %)))))))
 
 (defn instance->json [instance] (json/generate-string instance {:pretty true}))
+
+(defn list-instances
+  "Every stored instance's :xt/id and $class -- enough for a listing page
+  without paying for a full get-instance (name restoration, nested
+  recursion) per row. No ordering is requested; XTDB doesn't preserve
+  insertion order, so this is fine for the handful of contracts a listing
+  page shows today and worth revisiting (a valid-time or $class filter
+  pushed into the query) once that stops being true."
+  [node & {:keys [table] :or {table contract-table}}]
+  (->> (xt/q node (list 'from table [(symbol "*")]))
+       (mapv (fn [record] {:id (:xt/id record) :class (:concerto/class record)}))))
