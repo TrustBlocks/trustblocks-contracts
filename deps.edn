@@ -34,12 +34,13 @@
   ;; java.nio. Required on any JVM that starts the node. Also note XTDB 2.1.0
   ;; runs on Java 21-24 only -- Java 25 will not work.
   :xtdb-jvm-opts
-  {:jvm-opts ["--add-opens=java.base/java.nio=ALL-UNNAMED"
-              "--enable-native-access=ALL-UNNAMED"
-              "-Dio.netty.tryReflectionSetAccessible=true"]}
+  {:extra-paths ["dev"]
+   :jvm-opts    ["--add-opens=java.base/java.nio=ALL-UNNAMED"
+                 "--enable-native-access=ALL-UNNAMED"
+                 "-Dio.netty.tryReflectionSetAccessible=true"]}
 
   :run
-  {:extra-paths ["test"]
+  {:extra-paths ["test" "dev"]
    :extra-deps  {com.biffweb/tasks {:mvn/version "2.0.0"}}
    :main-opts   ["-m" "com.biffweb.tasks.app"]
    :jvm-opts    ["--add-opens=java.base/java.nio=ALL-UNNAMED"

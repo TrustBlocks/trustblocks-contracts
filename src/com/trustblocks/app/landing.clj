@@ -9,7 +9,9 @@
     [:div {:class ["max-w-prose space-y-2 p-8"]}
      [:h1 {:class ["text-2xl font-semibold"]} "Trustblocks"]
      [:p "Municipal contract management, built on Concerto-validated,
-          bitemporal XTDB storage."]]]))
+          bitemporal XTDB storage."]
+     [:p [:a {:href (routes/contracts) :class ["text-blue-600 hover:underline"]}
+          "View contracts →"]]]]))
 
 (def module
   {:biff.ring/routes

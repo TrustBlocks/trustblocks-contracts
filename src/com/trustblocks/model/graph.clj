@@ -61,12 +61,17 @@
 
 (declare instance->attrs)
 
-(defn- own-properties
+(defn own-properties
   "This class's properties, flattened over its supertype chain, parent first,
   a child's redeclaration overriding its parent's at the parent's position.
   Mirrors concerto-clj's own flattening rule for compiling Malli schemas --
   tracked explicitly rather than with an array-map, which silently becomes an
-  unordered hash-map once it passes eight entries."
+  unordered hash-map once it passes eight entries.
+
+  Public because it's also the ordered field list a page reaches for when
+  rendering an instance or a $class's schema -- the same declaration order
+  a lawyer reading the source contract would expect, not JSON key order
+  (unspecified) or alphabetical (meaningless)."
   [reg fqn]
   (let [props (mapcat #(:properties (:declaration (get reg %)))
                       (reverse (mm/super-chain reg fqn)))]
@@ -104,13 +109,13 @@
         (instance->attrs reg v)))
 
     ("StringProperty" "BooleanProperty" "IntegerProperty" "LongProperty"
-     "DoubleProperty" "DateTimeProperty" "RelationshipProperty")
+                      "DoubleProperty" "DateTimeProperty" "RelationshipProperty")
     v
 
     (throw (ex-info (str "Cannot generate a graph attribute for property kind "
-                        (pr-str (:$class prop)) ". No permissive default -- "
-                        "add it explicitly rather than silently dropping the "
-                        "field.")
+                         (pr-str (:$class prop)) ". No permissive default -- "
+                         "add it explicitly rather than silently dropping the "
+                         "field.")
                     {:property prop}))))
 
 (defn instance->attrs
@@ -170,6 +175,7 @@
    {:id     (keyword "com.trustblocks.model.graph" (str (attr-ns reg fqn) "-fields"))
     :input  [:contract/id]
     :output (class-output reg fqn)
+
     :resolve-fn
     (fn [{:keys [biff.xtdb/node]} {:contract/keys [id]}]
       (when-let [instance (fetch node id)]
