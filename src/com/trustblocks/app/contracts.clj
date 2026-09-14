@@ -1,6 +1,11 @@
 (ns com.trustblocks.app.contracts
   "Read-only pages over what's actually stored: a list, a search over it,
-  one contract's data/state/history, and its $class's own declaration.
+  one contract's data/state/history, and its $class's own declaration --
+  the last as three tabs: Fields (our own derived property table),
+  Concerto (the native .cto source), and Contract (the originating
+  template's prose, rendered against this instance's data -- see
+  model-contract-page and com.trustblocks.template.render).
+
   Nothing here writes -- ingestion and execution happen through the
   REPL/dev scripts today (dev/late_delivery_demo.clj,
   dev/manager_employment_demo.clj, dev/seed.clj); this is the warehouse's
@@ -10,6 +15,8 @@
             [com.trustblocks.lib.ui :as ui]
             [com.trustblocks.model.graph :as model.graph]
             [com.trustblocks.routes :as routes]
+            [com.trustblocks.template.archive :as archive]
+            [com.trustblocks.template.render :as render]
             [com.trustblocks.xtdb.execute :as execute]
             [com.trustblocks.xtdb.store :as store]))
 
@@ -190,6 +197,39 @@
         (:isArray prop) (str "[]"))]
      [:td {:class ["py-1.5 text-sm text-gray-500"]} (when (:isOptional prop) "optional")]]))
 
+(def ^:private model-tab-routes
+  [[:fields   routes/contract-model          "Fields"]
+   [:concerto routes/contract-model-concerto "Concerto"]
+   [:contract routes/contract-model-contract "Contract"]])
+
+(defn- model-tabs
+  "The Fields/Concerto/Contract tab strip shared by all three model pages.
+  Plain links to separate routes, not a JS tab widget -- every tab is a real
+  page, curl-able and bookmarkable on its own, matching how the rest of this
+  read-only app works."
+  [id active]
+  [:nav {:class ["flex gap-4 border-b mb-6"]}
+   (for [[tab route label] model-tab-routes]
+     [:a {:href  (route id)
+          :class (if (= tab active)
+                   ["px-1 pb-2 border-b-2 border-blue-600 text-blue-700 font-medium"]
+                   ["px-1 pb-2 border-b-2 border-transparent text-gray-500 hover:text-gray-700"])}
+      label])])
+
+(defn- model-shell
+  "The header + tab strip every model page shares; `body` is that tab's own
+  content."
+  [id fqn active body]
+  (ui/page
+   {:ui/title (str fqn " model")}
+   [:main {:class ["mx-auto max-w-3xl p-8"]}
+    [:div {:class ["mb-4"]}
+     [:a {:href (routes/contract id) :class ["text-sm text-blue-600 hover:underline"]}
+      (str "<- " id)]]
+    [:h1 {:class ["text-2xl font-semibold font-mono mb-6"]} fqn]
+    (model-tabs id active)
+    body]))
+
 (defn model-page [{:keys [biff.xtdb/node] :as ctx}]
   (let [id       (id-from-uri ctx)
         reg      (store/registry-from-xtdb node)
@@ -198,24 +238,68 @@
       (ui/on-error {:status 404})
       (let [fqn   (get instance "$class")
             chain (mm/super-chain reg fqn)]
-        (ui/page
-         {:ui/title (str fqn " model")}
-         [:main {:class ["mx-auto max-w-3xl p-8 space-y-6"]}
-          [:div
-           [:a {:href (routes/contract id) :class ["text-sm text-blue-600 hover:underline"]}
-            (str "<- " id)]]
-          [:div
-           [:h1 {:class ["text-2xl font-semibold font-mono"]} fqn]
-           [:p {:class ["text-gray-500"]}
-            (str "Supertype chain: " (str/join " -> " (reverse chain)))]]
+        (model-shell
+         id fqn :fields
+         [:div
+          [:p {:class ["text-gray-500 mb-4"]}
+           (str "Supertype chain: " (str/join " -> " (reverse chain)))]
           [:table {:class ["w-full"]}
            [:thead
             [:tr {:class ["text-left text-gray-500"]}
              [:th {:class ["pb-2"]} "Property"] [:th {:class ["pb-2"]} "Type"] [:th {:class ["pb-2"]} ""]]]
            [:tbody (map render-property (model.graph/own-properties reg fqn))]]])))))
 
+(defn- concerto-source-block [node ns]
+  [:div {:class ["mb-6"]}
+   [:p {:class ["text-xs text-gray-500 font-mono mb-1"]} ns]
+   [:pre {:class ["text-sm bg-gray-50 border rounded p-4 overflow-x-auto"]}
+    (or (store/model-source node ns) "(source not available)")]])
+
+(defn model-concerto-page
+  "The $class's own supertype chain, in native Concerto (.cto) syntax --
+  the same source put-model! read, not our own derived rendering of it."
+  [{:keys [biff.xtdb/node] :as ctx}]
+  (let [id       (id-from-uri ctx)
+        reg      (store/registry-from-xtdb node)
+        instance (store/get-instance node id :reg reg)]
+    (if-not instance
+      (ui/on-error {:status 404})
+      (let [fqn        (get instance "$class")
+            chain      (mm/super-chain reg fqn)
+            namespaces (distinct (map #(:namespace (get reg %)) chain))]
+        (model-shell
+         id fqn :concerto
+         [:div (map #(concerto-source-block node %) namespaces)])))))
+
+(defn model-contract-page
+  "The contract as prose: its originating template's grammar.tem.md (see
+  com.trustblocks.template.archive/by-namespace), rendered against this
+  instance's own data via com.trustblocks.template.render -- the terms a
+  reader signed, with what Concerto filled in highlighted rather than left
+  as bare {{fieldName}} tokens. Not every $class has a template on file
+  (docs/walkthrough.md's synthetic snow-removal example never had real
+  prose to begin with), in which case this says so rather than fabricating
+  one."
+  [{:keys [biff.xtdb/node] :as ctx}]
+  (let [id       (id-from-uri ctx)
+        reg      (store/registry-from-xtdb node)
+        instance (store/get-instance node id :reg reg)]
+    (if-not instance
+      (ui/on-error {:status 404})
+      (let [fqn     (get instance "$class")
+            ns      (:namespace (get reg fqn))
+            grammar (:archive/grammar (archive/by-namespace node ns))]
+        (model-shell
+         id fqn :contract
+         (if grammar
+           (into [:div] (render/render grammar instance))
+           [:p {:class ["text-gray-500"]}
+            "No contract template text on file for this model."]))))))
+
 (def module
   {:biff.ring/routes
    [[(routes/contracts) {:get list-page}]
     [(routes/contract) {:get show-page}]
-    [(routes/contract-model) {:get model-page}]]})
+    [(routes/contract-model) {:get model-page}]
+    [(routes/contract-model-concerto) {:get model-concerto-page}]
+    [(routes/contract-model-contract) {:get model-contract-page}]]})

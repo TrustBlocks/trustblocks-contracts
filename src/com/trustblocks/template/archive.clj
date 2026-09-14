@@ -5,11 +5,13 @@
   A .cta is a zip: model/*.cto (the template's own model plus every import
   vendored alongside it -- the same directory shape
   com.trustblocks.template.audit already resolves for validation),
-  text/grammar.tem.md (TemplateMark prose -- not consumed here; rendering it
-  is a JavaScript toolchain, see docs/walkthrough.md), logic/*.ts (the
-  template's clause logic, Ergo's successor), and package.json (name,
-  version, description, and the accordproject.{runtime,cicero} it was
-  authored against).
+  text/grammar.tem.md (TemplateMark prose, stored verbatim -- rendering it
+  *faithfully*, with Accord's full TemplateMark grammar, is a JavaScript
+  toolchain (see docs/walkthrough.md); com.trustblocks.template.render
+  implements a narrower {{var}}/{{#if}} substitution renderer for our own
+  Contract View, not that), logic/*.ts (the template's clause logic, Ergo's
+  successor), and package.json (name, version, description, and the
+  accordproject.{runtime,cicero} it was authored against).
 
   Ingestion here means every model/*.cto persisted individually via
   com.trustblocks.xtdb.store/put-model!, so the whole template's schema is
@@ -74,6 +76,10 @@
            (sort-by #(.getName ^File %))
            vec))))
 
+(defn- grammar-text [dir]
+  (let [f (io/file dir "text" "grammar.tem.md")]
+    (when (.exists f) (slurp f))))
+
 (defn ingest-dir!
   "Loads every model/*.cto in `dir` into XTDB and records the template's
   package.json metadata plus its logic source (unexecuted -- see ns
@@ -86,26 +92,46 @@
         ctos      (when (.exists model-dir) (store/model-dir-files model-dir))]
     (when (empty? ctos)
       (throw (ex-info "No model/*.cto files found" {:dir (str dir)})))
-    (let [loaded (mapv #(store/put-model! node %) ctos)
-          pkg    (package-metadata dir)
-          logic  (logic-files dir)
-          id     (or (:name pkg) (.getName dir))
-          record (cond-> {:xt/id id
-                          :archive/namespaces (mapv :namespace loaded)}
-                   pkg
-                   (merge {:archive/name        (:name pkg)
-                           :archive/version     (:version pkg)
-                           :archive/description (:description pkg)
-                           :archive/runtime     (get-in pkg [:accordproject :runtime])
-                           :archive/cicero      (get-in pkg [:accordproject :cicero])})
+    (let [loaded  (mapv #(store/put-model! node %) ctos)
+          pkg     (package-metadata dir)
+          logic   (logic-files dir)
+          id      (or (:name pkg) (.getName dir))
+          grammar (grammar-text dir)
+          record  (cond-> {:xt/id id
+                           :archive/namespaces (mapv :namespace loaded)}
+                    pkg
+                    (merge {:archive/name        (:name pkg)
+                            :archive/version     (:version pkg)
+                            :archive/description (:description pkg)
+                            :archive/runtime     (get-in pkg [:accordproject :runtime])
+                            :archive/cicero      (get-in pkg [:accordproject :cicero])})
 
-                   (seq logic)
-                   (assoc :archive/logic
-                          (mapv (fn [f] {:file (.getName ^File f) :source (slurp f)}) logic)))]
+                    (seq logic)
+                    (assoc :archive/logic
+                           (mapv (fn [f] {:file (.getName ^File f) :source (slurp f)}) logic))
+
+                    grammar
+                    (assoc :archive/grammar grammar))]
       (xt/execute-tx node [[:put-docs archive-table record]])
       {:name        id
        :namespaces  (:archive/namespaces record)
        :logic-files (mapv :file (:archive/logic record []))})))
+
+(defn by-namespace
+  "The archive record whose :archive/namespaces includes `ns`, or nil.
+
+  There's no explicit link recorded from a contract instance back to the
+  archive it was minted from -- only every namespace an archive's ingest
+  touched. A namespace belongs to at most one archive in practice (each
+  model/*.cto is ingested from exactly one template directory), so this
+  scan is how a $class's own template -- and its grammar, for Contract
+  View -- gets found. Loads every archive into memory to do it; fine at
+  the handful of templates this app knows about today, worth indexing if
+  that stops being true."
+  [node ns]
+  (->> (xt/q node (list 'from archive-table [(symbol "*")]))
+       (filter #(some #{ns} (:archive/namespaces %)))
+       first))
 
 (defn ingest-cta!
   "Unzips a .cta file to a temp directory and ingests it. See ingest-dir!."
