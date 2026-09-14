@@ -70,6 +70,22 @@
 (defn- before? [a b] (.isBefore (parse-dt a) (parse-dt b)))
 (defn- after?  [a b] (.isAfter  (parse-dt a) (parse-dt b)))
 
+(defn- duration-days
+  "An org.accordproject.time Duration ({\"amount\" n, \"unit\" u}) -> days, as
+  a double. The same unit table Accord's own TypeScript clause logic converts
+  through milliseconds; converting through days instead keeps every clause
+  computation on the axis `days-between` already returns."
+  [d]
+  (let [amount (get d "amount")
+        unit   (get d "unit")]
+    (case unit
+      "seconds" (/ amount 86400.0)
+      "minutes" (/ amount 1440.0)
+      "hours"   (/ amount 24.0)
+      "days"    (double amount)
+      "weeks"   (* amount 7.0)
+      (throw (ex-info "Unsupported duration unit" {:unit unit})))))
+
 ;; ---------------------------------------------------------------- vocabulary
 
 (def special-forms
@@ -77,15 +93,23 @@
 
   `let` becomes `let*`, `fn` becomes `fn*`, and `cond`, `when` and the threading
   macros become `if` and `do`. Allowing a macro without its expansion target
-  refuses the macro at the point of use, so these have to be named too."
-  '[if do fn fn* let* quote recur])
+  refuses the macro at the point of use, so these have to be named too.
+
+  `throw` lets a clause refuse to execute -- a certification that cannot be
+  granted yet, an authorization outside its window -- rather than every
+  clause being forced to return some default response for a request it
+  should reject outright."
+  '[if do fn fn* let* quote recur throw])
 
 (def core-vocabulary
   "The clojure.core names a clause may use.
 
   Listed rather than derived, so the surface is auditable by reading it. Note
   what is not here: `/`, `rand`, `eval`, `require`, `def`, `atom`, anything that
-  reads a clock, anything that touches a file, socket or the JVM."
+  reads a clock, anything that touches a file, socket or the JVM.
+
+  `ex-info`/`ex-message` pair with `throw` above -- constructing and reading
+  back a data-carrying refusal, never anything that inspects the JVM."
   '[+ - * < > <= >= = not= not
     min max mod rem quot inc dec
     when when-not cond and or let if-let when-let
@@ -96,6 +120,7 @@
     assoc dissoc merge select-keys update
     str name keyword vector hash-map list conj into apply
     nil? some? true? false? string? number? boolean? map? vector?
+    ex-info ex-message
     -> ->>])
 
 (def contract-vocabulary
@@ -104,11 +129,12 @@
   Every date operation takes and returns ISO-8601 strings, so a clause never
   holds a platform date object -- the same reason the schemas validate the wire
   form rather than a parsed value."
-  {'divide       divide
-   'plus-days    plus-days
-   'days-between days-between
-   'before?      before?
-   'after?       after?})
+  {'divide        divide
+   'plus-days     plus-days
+   'days-between  days-between
+   'before?       before?
+   'after?        after?
+   'duration-days duration-days})
 
 (defn context
   "An SCI context holding exactly the vocabulary and nothing else.
