@@ -43,10 +43,10 @@
 
 (defn visit! [node id at inches]
   (ex/trigger! node contract-id
-              {"$class" "com.trustblocks.snow@1.0.0.VisitReport"
-               "reportId" id "$identifier" id "$timestamp" at
-               "visitedAt" at "inchesFallen" inches}
-              at))
+               {"$class" "com.trustblocks.snow@1.0.0.VisitReport"
+                "reportId" id "$identifier" id "$timestamp" at
+                "visitedAt" at "inchesFallen" inches}
+               at))
 
 (defn populate!
   "Loads the contract, its clause, and three winter visits into node."

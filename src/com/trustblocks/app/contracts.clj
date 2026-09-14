@@ -90,8 +90,8 @@
 (defn list-page [{:keys [biff.xtdb/node] :as ctx}]
   (let [q         (or (query-param ctx "q") "")
         contracts (->> (store/list-instances node)
-                      (filter #(matches? q %))
-                      (sort-by :id))]
+                       (filter #(matches? q %))
+                       (sort-by :id))]
     (ui/page
      {:ui/title "Contracts"}
      [:main {:class ["mx-auto max-w-3xl p-8 space-y-6"]}
@@ -133,12 +133,12 @@
   [:div {:class ["border rounded p-3"]}
    [:p {:class ["text-xs text-gray-500 mb-2"]} (str at)]
    [:div {:class ["grid grid-cols-2 gap-4 text-sm"]}
-    [:div
+    [:div {:class ["min-w-0"]}
      [:p {:class ["text-gray-500"]} "request"]
-     [:pre {:class ["whitespace-pre-wrap"]} (pr-str request)]]
-    [:div
+     [:pre {:class ["whitespace-pre-wrap break-words"]} (pr-str request)]]
+    [:div {:class ["min-w-0"]}
      [:p {:class ["text-gray-500"]} "response"]
-     [:pre {:class ["whitespace-pre-wrap"]} (pr-str response)]]]])
+     [:pre {:class ["whitespace-pre-wrap break-words"]} (pr-str response)]]]])
 
 (defn show-page [{:keys [biff.xtdb/node] :as ctx}]
   (let [id       (id-from-uri ctx)

@@ -42,8 +42,8 @@
   (store/put-instance! node nil sample))
 (ex/put-clause! node me/contract-fqn me/clojure-clause)
 (ex/trigger! node me/contract-id
-            {"$class"      "com.trustblocks.municipal.manageremployment@1.0.0.BoardApprovalRequest"
-             "requestedAt" "2025-12-02T00:00:00.000Z"}
-            "2025-12-02T00:00:00.000Z")
+             {"$class"      "com.trustblocks.municipal.manageremployment@1.0.0.BoardApprovalRequest"
+              "requestedAt" "2025-12-02T00:00:00.000Z"}
+             "2025-12-02T00:00:00.000Z")
 
 (println "\nSeeded. Visit http://localhost:8080/contracts")
