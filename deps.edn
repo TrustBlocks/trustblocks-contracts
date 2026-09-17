@@ -15,6 +15,15 @@
         ;; provides -- see com.trustblocks.app.auth.
         com.biffweb/authenticate {:mvn/version "2.0.0"}
 
+        ;; LZ-String compression, for links out to Accord Project's own
+        ;; playgrounds -- see com.trustblocks.model.playground. Their share
+        ;; links encode a model/template as JSON, then LZ-String-compress it
+        ;; into the URL; this is the one JVM port confirmed byte-compatible
+        ;; with lz-string 1.5.0 (what both playgrounds ship), checked both
+        ;; ways -- Java-compressed decompresses correctly in Node's lz-string,
+        ;; and vice versa.
+        com.github.tommyettinger/blazingchain {:mvn/version "1.4.4.6"}
+
         ;; Concerto models as EDN and Malli schemas compiled from them at
         ;; runtime. Not on Clojars yet -- see github.com/TrustBlocks/concerto-clj.
         io.github.TrustBlocks/concerto-clj {:git/sha "d80655fb6b737765e60e66e0a8277e8b12daa4db"}

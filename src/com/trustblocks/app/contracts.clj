@@ -16,6 +16,7 @@
             [com.trustblocks.lib.middleware :as mid]
             [com.trustblocks.lib.ui :as ui]
             [com.trustblocks.model.graph :as model.graph]
+            [com.trustblocks.model.playground :as pg]
             [com.trustblocks.routes :as routes]
             [com.trustblocks.template.archive :as archive]
             [com.trustblocks.template.render :as render]
@@ -130,6 +131,28 @@
      [:p {:class ["text-gray-500"]} "response"]
      [:pre {:class ["whitespace-pre-wrap break-words"]} (pr-str response)]]]])
 
+(defn- external-link [href label]
+  [:a {:href href :target "_blank" :rel "noopener noreferrer"
+       :class ["text-blue-600 hover:underline"]}
+   (str label " \u2197")])
+
+(defn- playground-links
+  "Open in Concerto Playground / Open in Template Playground, the two
+  links Accord Project's own playgrounds give us for free -- see
+  com.trustblocks.model.playground. Concerto Playground always works;
+  Template Playground depends on the model fitting its share format, and
+  this says so in place of a link when it doesn't, rather than offering
+  one that is certain to fail."
+  [node reg instance]
+  (let [fqn (get instance "$class")
+        {:keys [url unavailable]} (pg/template-status node reg instance)]
+    [:span {:class ["space-x-4"]}
+     (external-link (pg/concerto-url node reg fqn) "Open in Concerto Playground")
+     (if url
+       (external-link url "Open in Template Playground")
+       [:span {:class ["text-sm text-gray-400"]}
+        (str "Template Playground: " unavailable)])]))
+
 (defn show-page [{:keys [biff.xtdb/node] :as ctx}]
   (let [id       (routes/contract-id ctx)
         reg      (store/registry-from-xtdb node)
@@ -152,7 +175,8 @@
             [:a {:href (routes/contract-document id) :class ["text-blue-600 hover:underline"]}
              "View Contract"]
             [:a {:href (routes/contract-model id) :class ["text-blue-600 hover:underline"]}
-             "View Model"]]]
+             "View Model"]]
+           [:p {:class ["mt-1"]} (playground-links node reg instance)]]
 
           [:section
            [:h2 {:class ["text-lg font-medium mb-2"]} "Data"]
