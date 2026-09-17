@@ -31,6 +31,20 @@
   (:xt/id (first (xt/q node (list 'from user-table
                                   [{:user/email email} (symbol "xt/id")])))))
 
+(defn user-email
+  "The email of the user with this id, or nil.
+
+  The inverse of get-user-id, and used where an execution records who
+  submitted it (com.trustblocks.app.trigger). The email rather than the id
+  goes into that record on purpose: an audit row should say what identified
+  the submitter at the time, not depend on a join against an account that
+  may later be renamed or deleted."
+  [{:keys [biff.xtdb/node]} user-id]
+  (when user-id
+    (:user/email (first (xt/q node (list 'from user-table
+                                         [{:xt/id user-id}
+                                          (symbol "user/email")]))))))
+
 (defn create-user!
   "Create a user for this email and return its id."
   [{:keys [biff.xtdb/node]} {:keys [email]}]

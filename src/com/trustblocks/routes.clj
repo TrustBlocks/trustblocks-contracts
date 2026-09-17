@@ -1,5 +1,8 @@
 (ns com.trustblocks.routes
-  (:require [com.biffweb.authenticate :as biff.auth]
+  "Every URL this app answers to, in one place, plus the one function that
+  reads a path back apart."
+  (:require [clojure.string :as str]
+            [com.biffweb.authenticate :as biff.auth]
             [com.biffweb.ring :refer [defpath]]))
 
 (defpath home "/")
@@ -16,3 +19,26 @@
 (defpath contract-document "/contracts/:id/document")
 (defpath contract-model "/contracts/:id/model")
 (defpath contract-model-concerto "/contracts/:id/model/concerto")
+(defpath contract-trigger "/contracts/:id/trigger")
+
+(defn contract-id
+  "The :id out of any /contracts/:id/... request -- the inverse of the paths
+  above, which is why it lives beside them.
+
+  Read from the raw request URI instead of :path-params. biff.ring's default
+  middleware stack includes wrap-path-param-uuids, which runs every
+  :path-params value through a UUID-decode attempt: strings of exactly 22
+  characters get base64-url-decoded, and if that happens to produce exactly
+  16 bytes, the decoded bytes are reinterpreted as a UUID and silently
+  replace the original string. 'china-grove-gover-2025' is exactly 22
+  characters of URL-safe-base64 alphabet and happens to decode to 16 bytes,
+  so it gets corrupted into an unrelated UUID before a handler ever sees it
+  -- while 'snow-2026-014' (13 chars) does not. This isn't specific to those
+  two ids; any future contract id landing on that 22-char/16-byte
+  coincidence would misfire the same way. Reading from :uri sidesteps that
+  middleware entirely, since it only touches :path-params."
+  [ctx]
+  (-> (:uri ctx)
+      (str/replace-first #"^/contracts/" "")
+      (str/split #"/")
+      first))

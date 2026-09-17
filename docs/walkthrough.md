@@ -3,15 +3,17 @@
 Forms to paste, one at a time, rather than a script that runs past you. Every
 output below was captured from an actual run.
 
-It comes in two halves, and the split is not arbitrary:
+It comes in halves, and the split is not arbitrary:
 
 | | runs where | why |
 |---|---|---|
 | **Concerto → EDN → Malli** | babashka | pure data; no database |
 | **storage and execution** | JVM REPL | XTDB is a JVM library and does not run under babashka |
+| **the same execution, over HTTP** | curl | Part 4, once the app is running |
 
 That is the same seam the code is built along: `concerto-clj` knows nothing about
-storage, and the XTDB adapter supplies the parts that are XTDB's problem.
+storage, and the XTDB adapter supplies the parts that are XTDB's problem. The
+web app adds nothing to the model — Part 4 is Part 3 reached through a URL.
 
 The example is a small self-contained municipal contract,
 [`docs/examples/snow-removal.cto`](examples/snow-removal.cto) — a plowing
@@ -315,7 +317,7 @@ on. And because the clause is stored as data, "what was the logic on February
 
 ```clojure
 (visit "v-4" "2026-03-01T06:00:00Z" "lots")
-;; Request failed validation  {:inches-fallen ["should be a number"]}
+;; Request failed validation  {"inchesFallen" ["should be a number"]}
 
 (ex/put-clause! node "x@1.0.0.Y" "(slurp \"/etc/passwd\")")
 ;; Clause refused by the vocabulary: Could not resolve symbol: slurp
@@ -337,6 +339,109 @@ allow-list is meant to be read.
 
 ---
 
+## Part 4 — the same trigger, over HTTP
+
+Everything above is the library. The app exposes one write endpoint over it:
+`POST /contracts/:id/trigger`.
+
+Start the app:
+
+```sh
+rm -rf storage && bin/clj -M:xtdb-jvm-opts -i dev/seed.clj
+```
+
+In a browser, sign in at <http://localhost:8080/signin> with any address; the
+six-digit code prints on the seed console, because no mail provider is
+configured. To get a cookie jar curl can use, do the same three requests by
+hand — the `_biff` paths belong to `com.biffweb/authenticate`:
+
+```sh
+curl -sc cookies.txt -o /dev/null http://localhost:8080/signin
+curl -sb cookies.txt -c cookies.txt -H 'Origin: http://localhost:8080' \
+     -d 'email=you@example.com' http://localhost:8080/_biff/auth/send-code
+curl -sb cookies.txt -c cookies.txt -H 'Origin: http://localhost:8080' \
+     -d 'email=you@example.com' -d 'code=123456' \
+     http://localhost:8080/_biff/auth/verify-code
+```
+
+The trigger body is an envelope around the Concerto request:
+
+```sh
+curl -b cookies.txt -H 'Content-Type: application/json' \
+     -H 'Origin: http://localhost:8080' \
+     -X POST http://localhost:8080/contracts/snow-2026-014/trigger \
+     -d '{"requestId": "visit-v-4",
+          "at":        "2026-03-01T06:00:00Z",
+          "request":   {"$class":       "com.trustblocks.snow@1.0.0.VisitReport",
+                        "reportId":     "v-4",
+                        "$identifier":  "v-4",
+                        "$timestamp":   "2026-03-01T06:00:00Z",
+                        "visitedAt":    "2026-03-01T06:00:00Z",
+                        "inchesFallen": 5.0}}'
+```
+
+```json
+{"contract":"snow-2026-014",
+ "requestId":"visit-v-4",
+ "at":"2026-03-01T06:00:00Z",
+ "response":{"$class":"com.trustblocks.snow@1.0.0.VisitOutcome",
+             "outcome":"PAYABLE",
+             "amountDue":{"amount":480.0,"currency":"USD", "...":"..."},
+             "...":"..."},
+ "state":{"$class":"com.trustblocks.snow@1.0.0.PaymentState",
+          "visitsPaid":3,
+          "totalPaid":{"amount":1440.0,"currency":"USD", "...":"..."},
+          "...":"..."}}
+```
+
+Neither of the two fields outside `request` could have gone inside it.
+Concerto is closed-world, so an instance carrying a `requestId` its model does
+not declare fails validation — and `at` is not a property of the request at
+all. It is when the execution takes effect, which is the contract's clock, not
+the server's. Both are required, and both are the caller's to decide:
+
+- `at` is the valid time the new state is written under. A server reading its
+  own clock here would record a back-dated approval as having happened today,
+  and would make the execution unreplayable — the same reason
+  `ex/trigger!` takes `now` rather than calling one.
+
+- `requestId` makes the execution at-most-once. Send it twice and the second
+  one is refused:
+
+  ```json
+  {"error":"duplicate-request",
+   "message":"This request has already been executed against this contract",
+   "contract":"snow-2026-014",
+   "requestId":"visit-v-4",
+   "executedAt":"2026-03-01T06:00:00Z"}
+  ```
+
+  A trigger is not safe to redo — this one pays the contractor another $480 —
+  and a caller whose POST timed out has no other way to find out whether the
+  first attempt landed. Ids are scoped to the contract, since the thing being
+  prevented is always one contract's action arriving twice.
+
+Failures are a code to branch on and a message to read:
+
+| | |
+|---|---|
+| `400 invalid-envelope` | no `requestId`, no usable `at`, no `request`, or a `request` with no `$class` |
+| `400 invalid-request` | the request is not a valid instance of its `$class` |
+| `404 no-such-contract` | |
+| `409 duplicate-request` | that `requestId` has already run on this contract |
+| `422 clause-refused` | the contract declined — *Already approved by the Board* is an answer, not a failure |
+| `422 no-clause` | no logic is stored for this contract's type |
+| `501 runtime-unavailable` | the clause's runtime is not implemented here (today: `:typescript`) |
+| `500 invalid-clause-output` | the clause produced a response or state that does not validate |
+
+Authentication is the session cookie the pages use, so a script signs in the
+way a person does and sends an `Origin` header with it — CSRF protection
+applies to every cookie-authenticated POST, which is right for as long as the
+credential is a cookie. A machine caller wants a bearer credential instead;
+that is not built yet.
+
+---
+
 ## What this does not do
 
 - **Render contract text.** Turning a template plus data into readable prose is
@@ -346,3 +451,6 @@ allow-list is meant to be read.
   computes the wrong amount with the right types passes.
 - **Parse CTO without Node.** `cto/load-registry` shells out to Accord's CLI.
   Everything downstream of the EDN needs neither Node nor network.
+- **Authenticate anything but a person.** Signin is passwordless email, and the
+  trigger endpoint rides the same session cookie. There is no API credential,
+  and no mail provider — the code prints to the console.
