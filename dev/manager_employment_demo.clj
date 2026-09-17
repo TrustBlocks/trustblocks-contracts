@@ -41,8 +41,7 @@
                    \"approvedAt\" approved-at
                    \"effectiveDate\" effective}
         :state {\"$class\" \"com.trustblocks.municipal.manageremployment@1.0.0.ManagerEmploymentState\"
-                \"contractId\" (get data \"$identifier\")
-                \"$identifier\" (get data \"$identifier\")
+                \"contractId\" (get data \"contractId\")
                 \"status\" \"APPROVED\"
                 \"approvedAt\" approved-at
                 \"effectiveDate\" effective}}))")
@@ -58,10 +57,13 @@
   [node]
   (println "Ingesting docs/examples/manager-employment-contract ...")
   (println (archive/ingest-dir! node "docs/examples/manager-employment-contract"))
-  (let [sample (-> (slurp "docs/examples/manager-employment-contract/sample.json")
-                   (json/parse-string)
-                   (assoc "$identifier" contract-id))]
-    (store/put-instance! node nil sample))
+  ;; No $identifier fixup any more: the model extends
+  ;; org.accordproject.contract.Contract, so it inherits `identified by
+  ;; contractId` and the sample carries a real contractId. Identity is the
+  ;; model's, not something the loader bolts on.
+  (store/put-instance!
+   node nil (json/parse-string
+             (slurp "docs/examples/manager-employment-contract/sample.json")))
   (ex/put-clause! node contract-fqn clojure-clause))
 
 (defn run []

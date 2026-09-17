@@ -1,5 +1,7 @@
 {
   "$class": "us.nc.municipal.manageremployment@0.1.0.ManagerEmployment",
+  "contractId": "china-grove-gover-2025",
+  "stateCode": "NC",
   "stateName": "NORTH CAROLINA",
   "countyName": "ROWAN",
   "municipalityName": "CHINA GROVE",

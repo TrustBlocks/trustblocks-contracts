@@ -1,5 +1,8 @@
 namespace us.nc.municipal.manageremployment@0.1.0
 
+import org.accordproject.contract@0.2.0.Contract from https://models.accordproject.org/accordproject/contract@0.2.0.cto
+import org.accordproject.usa.state@0.3.0.USState from https://models.accordproject.org/usa/state@0.3.0.cto
+
 /**
  * Municipal manager employment contract.
  *
@@ -20,12 +23,21 @@ namespace us.nc.municipal.manageremployment@0.1.0
  * requires exactly one such concept per template and refuses to load the
  * archive without it ("Failed to find a concept with the @template
  * decorator"), so it is load-bearing, not documentation.
+ *
+ * `asset ... extends Contract` follows Accord's own reference template, which
+ * declares `@template asset TemplateModel extends Clause`: Contract and Clause
+ * (org.accordproject.contract) are the registry's base types for a whole
+ * agreement and for a single clause respectively. Inheriting Contract is also
+ * where contractId comes from -- this model previously declared no identity
+ * field at all and relied on callers bolting $identifier on at ingest.
  */
 
 @template
-concept ManagerEmployment {
+asset ManagerEmployment extends Contract {
 
   // ---- Jurisdiction -------------------------------------------------------
+  @description("ISO/USPS state code; stateName is the prose form used in the text")
+  o USState stateCode
   o String stateName
   o String countyName
   o String municipalityName
