@@ -1,7 +1,6 @@
-namespace us.nc.municipal.manageremployment@0.1.0
+namespace com.trustblocks.municipal.employment@1.0.0
 
-import org.accordproject.contract@0.2.0.Contract from https://models.accordproject.org/accordproject/contract@0.2.0.cto
-import org.accordproject.usa.state@0.3.0.USState from https://models.accordproject.org/usa/state@0.3.0.cto
+import com.trustblocks.municipal.agreement@1.0.0.MunicipalAgreement
 
 /**
  * Municipal manager employment contract.
@@ -24,27 +23,17 @@ import org.accordproject.usa.state@0.3.0.USState from https://models.accordproje
  * archive without it ("Failed to find a concept with the @template
  * decorator"), so it is load-bearing, not documentation.
  *
- * `asset ... extends Contract` follows Accord's own reference template, which
- * declares `@template asset TemplateModel extends Clause`: Contract and Clause
- * (org.accordproject.contract) are the registry's base types for a whole
- * agreement and for a single clause respectively. Inheriting Contract is also
- * where contractId comes from -- this model previously declared no identity
- * field at all and relied on callers bolting $identifier on at ingest.
+ * See agreement.cto for why the jurisdiction fields are inherited rather than
+ * embedded, and for the chain up to Accord's own Contract -- which is where
+ * contractId comes from.
  */
 
 @template
-asset ManagerEmployment extends Contract {
+asset ManagerEmployment extends MunicipalAgreement {
 
-  // ---- Jurisdiction -------------------------------------------------------
-  @description("ISO/USPS state code; stateName is the prose form used in the text")
-  o USState stateCode
-  o String stateName
-  o String countyName
-  o String municipalityName
-  @description("Town, City, or Village")
-  o String municipalityType
-  @description("Town Council, Board of Aldermen, Board of Commissioners")
-  o String governingBodyName
+  // Jurisdiction (stateCode, stateName, countyName, municipalityName,
+  // municipalityType, governingBodyName) is inherited from
+  // com.trustblocks.municipal.agreement.MunicipalAgreement.
 
   // ---- Parties ------------------------------------------------------------
   o String employeeName

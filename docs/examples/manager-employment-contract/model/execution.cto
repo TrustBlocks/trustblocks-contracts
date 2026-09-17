@@ -1,9 +1,9 @@
-namespace com.trustblocks.municipal.manageremployment@1.0.0
+namespace com.trustblocks.municipal.employment.execution@1.0.0
 
 import org.accordproject.runtime@0.2.0.{Request, Response} from https://models.accordproject.org/accordproject/runtime@0.2.0.cto
 
 /**
- * Board-approval execution layer for us.nc.municipal.manageremployment --
+ * Board-approval execution layer for com.trustblocks.municipal.employment --
  * added by Trustblocks, not part of the source template. model.cto is data
  * only: a completed contract's terms, with no notion of being drafted vs
  * approved. This is deliberately a separate namespace rather than an edit

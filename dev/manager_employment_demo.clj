@@ -22,7 +22,7 @@
             [com.trustblocks.xtdb.store :as store]
             [xtdb.node :as xt.node]))
 
-(def contract-fqn "us.nc.municipal.manageremployment@0.1.0.ManagerEmployment")
+(def contract-fqn "com.trustblocks.municipal.employment@1.0.0.ManagerEmployment")
 (def contract-id  "china-grove-gover-2025")
 
 ;; A certification clause, not a calculation: it refuses a second approval
@@ -35,12 +35,12 @@
      (throw (ex-info \"Already approved by the Board\" {}))
      (let [approved-at (get data \"councilActionDate\")
            effective   (get data \"effectiveDate\")]
-       {:response {\"$class\" \"com.trustblocks.municipal.manageremployment@1.0.0.BoardApprovalResponse\"
+       {:response {\"$class\" \"com.trustblocks.municipal.employment.execution@1.0.0.BoardApprovalResponse\"
                    \"$timestamp\" now
                    \"status\" \"APPROVED\"
                    \"approvedAt\" approved-at
                    \"effectiveDate\" effective}
-        :state {\"$class\" \"com.trustblocks.municipal.manageremployment@1.0.0.ManagerEmploymentState\"
+        :state {\"$class\" \"com.trustblocks.municipal.employment.execution@1.0.0.ManagerEmploymentState\"
                 \"contractId\" (get data \"contractId\")
                 \"status\" \"APPROVED\"
                 \"approvedAt\" approved-at
@@ -75,7 +75,7 @@
 
       (let [{:keys [response state]}
             (ex/trigger! node contract-id
-                         {"$class"      "com.trustblocks.municipal.manageremployment@1.0.0.BoardApprovalRequest"
+                         {"$class"      "com.trustblocks.municipal.employment.execution@1.0.0.BoardApprovalRequest"
                           "requestedAt" "2025-12-02T00:00:00.000Z"}
                         ;; now = the Board's own meeting date, not wall-clock
                         ;; time -- see the ns docstring.
@@ -91,7 +91,7 @@
       (println "\nTriggering a second Board approval on the same contract...")
       (try
         (ex/trigger! node contract-id
-                     {"$class"      "com.trustblocks.municipal.manageremployment@1.0.0.BoardApprovalRequest"
+                     {"$class"      "com.trustblocks.municipal.employment.execution@1.0.0.BoardApprovalRequest"
                       "requestedAt" "2026-01-05T00:00:00.000Z"}
                      "2026-01-05T00:00:00.000Z")
         (println "BUG: a second approval should have been refused")
