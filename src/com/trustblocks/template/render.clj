@@ -19,11 +19,12 @@
 ;; ---------------------------------------------------------------- tokenize
 
 (def ^:private token-pattern
-  #"\{\{(#if\s+[\w.]+|else|/if|[\w.]+)\}\}")
+  #"\{\{(#if\s+[\w.]+|#optional\s+[\w.]+|else|/if|/optional|[\w.]+)\}\}")
 
 (defn- tokenize
   "Raw grammar text -> a flat seq of [:text s] / [:var name] / [:if-start
-  flag] / [:else] / [:if-end] tokens, in source order."
+  flag] / [:optional-start name] / [:else] / [:if-end] / [:optional-end]
+  tokens, in source order."
   [text]
   (let [m (re-matcher token-pattern text)]
     (loop [pos 0, tokens (transient [])]
@@ -36,9 +37,13 @@
                                           (str/starts-with? inner "#if")
                                           [:if-start (str/trim (subs inner 3))]
 
-                                          (= inner "else") [:else]
-                                          (= inner "/if")  [:if-end]
-                                          :else            [:var inner])))))
+                                          (str/starts-with? inner "#optional")
+                                          [:optional-start (str/trim (subs inner 9))]
+
+                                          (= inner "else")      [:else]
+                                          (= inner "/if")       [:if-end]
+                                          (= inner "/optional") [:optional-end]
+                                          :else                 [:var inner])))))
         (persistent!
          (cond-> tokens
            (< pos (count text)) (conj! [:text (subs text pos)])))))))
@@ -46,9 +51,10 @@
 ;; ------------------------------------------------------------------ parse
 
 (defn- parse-block
-  "tokens -> [nodes remaining-tokens], stopping at :else/:if-end (left for
-  the caller to consume) or end of input. Recurs into {{#if}} to build an
-  [:if flag then-nodes else-nodes] node."
+  "tokens -> [nodes remaining-tokens], stopping at a block terminator
+  (:else/:if-end/:optional-end, left for the caller to consume) or end of
+  input. Recurs into {{#if}} and {{#optional}} to build [:if flag then
+  else] and [:optional name body] nodes."
   [tokens]
   (loop [tokens tokens, nodes (transient [])]
     (if (empty? tokens)
@@ -62,19 +68,47 @@
                 [else-nodes rest2] (if at-else? (parse-block (rest rest1)) [[] rest1])
                 rest3              (rest rest2)] ; drop the :if-end
             (recur rest3 (conj! nodes [:if (second tok) then-nodes else-nodes])))
-          (:else :if-end) [(persistent! nodes) tokens])))))
+
+          :optional-start
+          (let [[body rest1] (parse-block more)
+                rest2        (rest rest1)] ; drop the :optional-end
+            (recur rest2 (conj! nodes [:optional (second tok) body])))
+
+          (:else :if-end :optional-end) [(persistent! nodes) tokens])))))
 
 ;; --------------------------------------------------------------- resolve
 
 (defn- resolve-conditionals
-  "Parsed nodes -> a flat seq of [:text s] / [:var name] runs, with each
-  {{#if}} replaced by whichever branch `data` selects."
-  [nodes data]
+  "Parsed nodes -> a flat seq of resolved runs: [:text s], [:value v] for a
+  variable that resolved, [:missing name] for one that didn't.
+
+  `scope` is what bare names resolve against, and {{this}} is the scope
+  itself. {{#optional x}} rebinds scope to x's value for its body and drops
+  the body entirely when x is absent -- TemplateMark's own semantics,
+  confirmed against Accord's engine (a sibling property referenced inside
+  an {{#optional}} block is an error there, because scope has moved).
+
+  {{#if}} is the one place we knowingly diverge: Accord rebinds scope there
+  too, so its body can only use {{this}} and plain text, while this keeps
+  the surrounding scope so the body can still name siblings. Our one real
+  grammar needs that -- its two conditional sections were written to
+  mustache semantics and reference several fields each -- and tightening
+  it here would only break the page without fixing the template. The fix
+  is to restructure those sections into nested concepts (which is what
+  TemplateMark's scoping is really asking for); until then the divergence
+  is here, named, rather than silent."
+  [nodes scope]
   (mapcat (fn [[kind a b c]]
             (case kind
               :text [[:text a]]
-              :var  [[:var a]]
-              :if   (resolve-conditionals (if (get data a) b c) data)))
+              :var  (cond
+                      (= a "this")                     [[:value scope]]
+                      (and (map? scope)
+                           (contains? scope a))        [[:value (get scope a)]]
+                      :else                            [[:missing a]])
+              :if   (resolve-conditionals (if (get scope a) b c) scope)
+              :optional (when-let [v (get scope a)]
+                          (resolve-conditionals b v))))
           nodes))
 
 ;; ------------------------------------------------------------------ blocks
@@ -124,26 +158,27 @@
 
 ;; ------------------------------------------------------------------ inline
 
-(defn- render-var
-  "A {{name}} reference, resolved against `data` and highlighted. A name
-  data doesn't have (a real gap, not a false/blank value) renders as the
-  bare token, dimmed, rather than silently vanishing."
-  [name data]
-  (if (contains? data name)
-    [:span {:class ["text-blue-700 font-medium"]} (str (get data name))]
-    [:span {:class ["italic text-gray-400"]} (str "{{" name "}}")]))
+(defn- render-value
+  "A resolved variable, highlighted. A name the data didn't have (a real
+  gap, not a false/blank value) renders as the bare token, dimmed, rather
+  than silently vanishing."
+  [kind v]
+  (if (= kind :value)
+    [:span {:class ["text-blue-700 font-medium"]} (str v)]
+    [:span {:class ["italic text-gray-400"]} (str "{{" v "}}")]))
 
 (defn- render-inline
-  "A block's runs -> inline hiccup children, resolving {{var}} highlighting
-  and **bold** -- the latter tracked as a single flag threaded across runs,
-  since a bold span can (and in this grammar's signature block, does) wrap
-  a {{var}} rather than sit entirely inside one text run."
-  [block data]
+  "A block's resolved runs -> inline hiccup children, highlighting values
+  and honouring **bold** -- the latter tracked as a single flag threaded
+  across runs, since a bold span can (and in this grammar's signature
+  block, does) wrap a variable rather than sit entirely inside one text
+  run."
+  [block]
   (:nodes
    (reduce
     (fn [{:keys [bold? nodes]} [kind v]]
-      (if (= kind :var)
-        (let [span (render-var v data)]
+      (if (not= kind :text)
+        (let [span (render-value kind v)]
           {:bold? bold? :nodes (conj nodes (if bold? [:strong span] span))})
         (reduce
          (fn [{:keys [bold? nodes]} [i piece]]
@@ -156,11 +191,11 @@
     {:bold? false :nodes []}
     block)))
 
-(defn- render-block [block data]
+(defn- render-block [block]
   (let [c (classify block)]
     (cond
       (= c :hr)        [:hr {:class ["my-4 border-gray-300"]}]
-      (= c :paragraph) (into [:p {:class ["mb-4 leading-relaxed"]}] (render-inline block data))
+      (= c :paragraph) (into [:p {:class ["mb-4 leading-relaxed"]}] (render-inline block))
       :else            (let [[_ level text] c]
                          [(keyword (str "h" (min 4 (inc level))))
                           {:class ["font-semibold mt-6 mb-2"]} text]))))
@@ -178,4 +213,4 @@
        (#(resolve-conditionals % data))
        split-blocks
        (remove block-blank?)
-       (mapv #(render-block % data))))
+       (mapv render-block)))

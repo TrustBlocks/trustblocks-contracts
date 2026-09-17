@@ -16,7 +16,7 @@ WHEREAS, it is the desire of the {{governingBodyName}} to (1) retain the service
 
 WHEREAS, Employee desires to maintain employment as {{positionTitle}} of the {{municipalityType}}; and,
 
-WHEREAS, at its regular meeting on {{councilActionDate}}, following a closed session held pursuant to {{closedSessionAuthority}}, the {{governingBodyName}} voted {{councilVoteDescription}} to process a cost-of-living adjustment for Employee with back pay to {{retroactiveDate}}, and to renew Employee's employment contract effective {{termStartDate}}, extending the contract for a term of {{termYearsWritten}} ({{termYears}}) years; and,
+WHEREAS, at its regular meeting on {{councilActionDate}}, following a closed session held pursuant to {{closedSessionAuthority}}, the {{governingBodyName}} voted {{councilVoteDescription}} to process a cost-of-living adjustment for Employee with back pay to {{#optional retroactiveDate}}{{this}}{{/optional}}, and to renew Employee's employment contract effective {{termStartDate}}, extending the contract for a term of {{termYearsWritten}} ({{termYears}}) years; and,
 
 WHEREAS, the parties desire to set forth the terms of that renewed employment in a single restated agreement that supersedes the Employment Contract between the parties dated {{priorContractDate}}.
 

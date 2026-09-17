@@ -15,8 +15,14 @@ namespace us.nc.municipal.manageremployment@0.1.0
  *
  * Pronoun fields exist because the source contract is written in the
  * masculine throughout. They are data so the template serves any officeholder.
+ *
+ * @template marks this as the template's root model. Accord's own cicero-core
+ * requires exactly one such concept per template and refuses to load the
+ * archive without it ("Failed to find a concept with the @template
+ * decorator"), so it is load-bearing, not documentation.
  */
 
+@template
 concept ManagerEmployment {
 
   // ---- Jurisdiction -------------------------------------------------------

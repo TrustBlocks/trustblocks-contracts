@@ -1,0 +1,10 @@
+{
+    "name": "manager-employment-contract",
+    "version": "0.1.0",
+    "description": "Municipal manager employment contract. Derived from the China Grove / Gover contract (2025-2029, restated): a council-manager form agreement with ICMA ethics code, without-cause severance with mitigation offsets, and a service-credit purchase provision.",
+    "accordproject": {
+        "runtime": "typescript",
+        "template": "contract",
+        "cicero": "^2.0.0"
+    }
+}
