@@ -7,21 +7,33 @@ uses. Everything below was established by probing the engine, not by reading
 the spec, because several of these behaviours are not what the syntax
 suggests.
 
-Run the check with:
+## Running the check
 
 ```sh
-cd ~/Code/Accord/apap/server && node -e "
-const {Template} = require('@accordproject/cicero-core');
-const {TemplateArchiveProcessor} = require('@accordproject/template-engine');
-const fs = require('fs');
-const dir = '<repo>/docs/examples/manager-employment-contract';
-const data = JSON.parse(fs.readFileSync(dir + '/sample.json','utf8'));
-(async () => {
-  const t = await Template.fromDirectory(dir);
-  console.log('LOAD OK:', t.getIdentifier());
-  console.log('DRAFT OK:', (await new TemplateArchiveProcessor(t).draft(data,'markdown',{})).length);
-})().catch(e => console.log('FAIL:', e.message));"
+npm install              # once; dev-only, node_modules is gitignored
+bin/template-conformance
 ```
+
+```
+Accord conformance: 1 template(s) under docs/examples
+  ok    manager-employment-contract@0.1.0  (18126 chars drafted)
+```
+
+Every template under `docs/examples` (any directory with a `package.json`)
+must load through cicero-core and draft through template-engine from its own
+`sample.json`. Non-zero exit on failure.
+
+The checker is `dev/conformance.cljs` -- nbb, i.e. Clojure on Node. The
+reference implementation is JavaScript with no JVM port, so the check has to
+run where it lives; writing it in Clojure keeps it readable alongside the rest
+of the repo. It is deliberately **not** part of `bin/clj -M:run code-quality`:
+a Clojure-only change shouldn't require an `npm install`.
+
+This exists because `com.trustblocks.template.render` implements a *subset* of
+TemplateMark, and a subset written to the wrong semantics still renders
+plausibly on the page. Everything in this document was found by probing the
+engine rather than reading the spec, because several behaviours are not what
+the syntax suggests.
 
 ## Load-time requirements
 

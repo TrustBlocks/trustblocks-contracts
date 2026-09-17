@@ -1,0 +1,5 @@
+;; dev/conformance.cljs runs under nbb, so promesa comes from the nbb runtime
+;; rather than from deps.edn -- clj-kondo has no way to discover p/let and
+;; reports every binding in it as an unresolved symbol. Teaching it the one
+;; macro keeps the file genuinely linted instead of excluded.
+{:lint-as {promesa.core/let clojure.core/let}}
