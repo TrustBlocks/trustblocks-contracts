@@ -36,7 +36,6 @@
 
   "annualBaseSalary": "$146,500.00",
   "annualBaseSalaryWritten": "One Hundred Forty-Six Thousand Five Hundred and 00/100",
-  "retroactiveSalary": true,
   "retroactiveDate": "2025-07-01T00:00:00.000Z",
 
   "retirementPlanName": "NC 401(k)",
@@ -52,7 +51,6 @@
   "ethicsCodeOrganization": "International City/County Management Association (ICMA)",
   "stateMunicipalLeagueName": "North Carolina League of Municipalities",
 
-  "automobileStipendProvided": true,
   "automobileStipend": "$350.00",
   "financeOfficerTitle": "Finance Director",
 

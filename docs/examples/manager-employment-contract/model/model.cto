@@ -94,8 +94,7 @@ asset ManagerEmployment extends Contract {
   o String annualBaseSalary
   @description("e.g. \"One Hundred Forty-Six Thousand Five Hundred and 00/100\"")
   o String annualBaseSalaryWritten
-  @description("True where salary is retroactive and back pay is owed")
-  o Boolean retroactiveSalary
+  @description("Set where salary is retroactive; its presence is what makes back pay owed")
   o DateTime retroactiveDate optional
 
   // ---- Benefits -----------------------------------------------------------
@@ -122,8 +121,7 @@ asset ManagerEmployment extends Contract {
   o String stateMunicipalLeagueName
 
   // ---- Allowances ---------------------------------------------------------
-  o Boolean automobileStipendProvided
-  @description("Monthly stipend, formatted, e.g. \"$350.00\"")
+  @description("Monthly stipend, formatted, e.g. \"$350.00\"; absent means a Employer-owned vehicle is provided instead")
   o String automobileStipend optional
   @description("Officer authorized to disburse expense reimbursements")
   o String financeOfficerTitle

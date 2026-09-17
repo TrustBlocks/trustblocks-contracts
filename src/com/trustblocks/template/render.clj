@@ -8,12 +8,18 @@
   (see docs/walkthrough.md) with loops, sub-clauses, formulas, and its own
   formatting directives. What's implemented here is only what the one real
   template this app has (docs/examples/manager-employment-contract) actually
-  uses: {{var}} substitution, {{#if flag}}...{{else}}...{{/if}} branching,
-  paragraph/heading/horizontal-rule block structure, and **bold** inline
-  markup. A grammar leaning on anything past that (loops, nested clauses,
-  computed values) will render those directives as literal text rather than
-  silently dropping or mis-rendering them -- see resolve/2's fallback for an
-  unresolved {{var}}."
+  uses: {{var}} substitution, {{#optional x}}...{{else}}...{{/optional}} and
+  {{#if x}}...{{else}}...{{/if}} blocks, paragraph/heading/horizontal-rule
+  block structure, and **bold** inline markup. A grammar leaning on anything
+  past that (loops, nested clauses, computed values) will render those
+  directives as literal text rather than silently dropping or mis-rendering
+  them -- see render-value's fallback for an unresolved {{var}}.
+
+  Where it does implement something, it follows TemplateMark's semantics
+  rather than mustache's -- notably scope rebinding inside blocks, which is
+  the difference that makes a grammar either draft or fail through Accord's
+  own engine. See resolve-conditionals, and docs/templatemark-conformance.md
+  for how those semantics were established."
   (:require [clojure.string :as str]))
 
 ;; ---------------------------------------------------------------- tokenize
@@ -70,9 +76,11 @@
             (recur rest3 (conj! nodes [:if (second tok) then-nodes else-nodes])))
 
           :optional-start
-          (let [[body rest1] (parse-block more)
-                rest2        (rest rest1)] ; drop the :optional-end
-            (recur rest2 (conj! nodes [:optional (second tok) body])))
+          (let [[body rest1]       (parse-block more)
+                at-else?           (= :else (first (first rest1)))
+                [else-nodes rest2] (if at-else? (parse-block (rest rest1)) [[] rest1])
+                rest3              (rest rest2)] ; drop the :optional-end
+            (recur rest3 (conj! nodes [:optional (second tok) body else-nodes])))
 
           (:else :if-end :optional-end) [(persistent! nodes) tokens])))))
 
@@ -83,20 +91,16 @@
   variable that resolved, [:missing name] for one that didn't.
 
   `scope` is what bare names resolve against, and {{this}} is the scope
-  itself. {{#optional x}} rebinds scope to x's value for its body and drops
-  the body entirely when x is absent -- TemplateMark's own semantics,
-  confirmed against Accord's engine (a sibling property referenced inside
-  an {{#optional}} block is an error there, because scope has moved).
+  itself. Both block forms rebind scope to the value they test, which is
+  TemplateMark's own behaviour rather than mustache's -- verified against
+  Accord's engine, where naming a sibling property inside either block is
+  an 'Unknown property' error because scope has moved. Matching it here
+  means a grammar that drafts through Accord renders the same way on this
+  page, and one that doesn't shows dimmed unresolved tokens instead of
+  quietly looking fine.
 
-  {{#if}} is the one place we knowingly diverge: Accord rebinds scope there
-  too, so its body can only use {{this}} and plain text, while this keeps
-  the surrounding scope so the body can still name siblings. Our one real
-  grammar needs that -- its two conditional sections were written to
-  mustache semantics and reference several fields each -- and tightening
-  it here would only break the page without fixing the template. The fix
-  is to restructure those sections into nested concepts (which is what
-  TemplateMark's scoping is really asking for); until then the divergence
-  is here, named, rather than silent."
+  {{#optional x}} drops its body entirely when x is absent and renders its
+  {{else}} branch instead; {{#if x}} picks a branch on truthiness."
   [nodes scope]
   (mapcat (fn [[kind a b c]]
             (case kind
@@ -106,9 +110,14 @@
                       (and (map? scope)
                            (contains? scope a))        [[:value (get scope a)]]
                       :else                            [[:missing a]])
-              :if   (resolve-conditionals (if (get scope a) b c) scope)
-              :optional (when-let [v (get scope a)]
-                          (resolve-conditionals b v))))
+              :if   (let [v (get scope a)]
+                      (if v
+                        (resolve-conditionals b v)
+                        (resolve-conditionals c scope)))
+              :optional (let [v (get scope a)]
+                          (if (some? v)
+                            (resolve-conditionals b v)
+                            (resolve-conditionals c scope)))))
           nodes))
 
 ;; ------------------------------------------------------------------ blocks

@@ -42,9 +42,9 @@ C. Employee agrees to remain in the exclusive employ of the {{municipalityType}}
 
 A. The {{municipalityType}} agrees to pay Employee for {{pronounPossessive}} services rendered pursuant hereto an annual base salary of {{annualBaseSalary}} ({{annualBaseSalaryWritten}}) dollars, payable in installments at the same time as other employees of the {{municipalityType}} are paid.
 
-{{#if retroactiveSalary}}
-B. Consistent with the action of the {{governingBodyName}} on {{councilActionDate}}, the annual base salary set forth in subpart A of this Section is effective retroactive to {{retroactiveDate}}. The {{municipalityType}} shall pay Employee, as back pay, the difference between the compensation actually paid to Employee and the compensation provided under subpart A for the period beginning {{retroactiveDate}} and continuing through the date of execution of this Agreement.
-{{/if}}
+{{#optional retroactiveDate}}
+B. Consistent with the action of the governing body recited above, the annual base salary set forth in subpart A of this Section is effective retroactive to {{this}}. Employer shall pay Employee, as back pay, the difference between the compensation actually paid to Employee and the compensation provided under subpart A for the period beginning on that date and continuing through the date of execution of this Agreement.
+{{/optional}}
 
 C. Employer may increase the annual base salary and all other benefits to the Employee in such amounts and to such extent as the {{governingBodyName}} may determine that it is desirable to do so, either based on an annual salary review of said Employee, or at any other time deemed appropriate by the {{governingBodyName}}. The {{municipalityType}} agrees not to reduce Employee's salary and benefits during the term of {{pronounPossessive}} employment except to the degree of such a reduction across-the-board for all employees of the Employer.
 
@@ -116,11 +116,11 @@ Employer shall bear the full cost of any fidelity or other bonds required of the
 
 # SECTION 14. AUTOMOBILE
 
-{{#if automobileStipendProvided}}
-Employer shall provide Employee with an automobile stipend in the amount of {{automobileStipend}} per month.
+{{#optional automobileStipend}}
+Employer shall provide Employee with an automobile stipend in the amount of {{this}} per month.
 {{else}}
-Employer shall provide Employee with the use of a vehicle owned by the {{municipalityType}} for the performance of {{pronounPossessive}} official duties.
-{{/if}}
+Employer shall provide Employee with the use of a vehicle owned by Employer for the performance of Employee's official duties.
+{{/optional}}
 
 # SECTION 15. CELL PHONE
 
