@@ -1,4 +1,6 @@
-namespace us.nc.municipal.manageremployment@0.1.0
+namespace com.trustblocks.municipal.employment@1.0.0
+
+import com.trustblocks.municipal.agreement@1.0.0.MunicipalAgreement
 
 /**
  * Municipal manager employment contract.
@@ -15,18 +17,23 @@ namespace us.nc.municipal.manageremployment@0.1.0
  *
  * Pronoun fields exist because the source contract is written in the
  * masculine throughout. They are data so the template serves any officeholder.
+ *
+ * @template marks this as the template's root model. Accord's own cicero-core
+ * requires exactly one such concept per template and refuses to load the
+ * archive without it ("Failed to find a concept with the @template
+ * decorator"), so it is load-bearing, not documentation.
+ *
+ * See agreement.cto for why the jurisdiction fields are inherited rather than
+ * embedded, and for the chain up to Accord's own Contract -- which is where
+ * contractId comes from.
  */
 
-concept ManagerEmployment {
+@template
+asset ManagerEmployment extends MunicipalAgreement {
 
-  // ---- Jurisdiction -------------------------------------------------------
-  o String stateName
-  o String countyName
-  o String municipalityName
-  @description("Town, City, or Village")
-  o String municipalityType
-  @description("Town Council, Board of Aldermen, Board of Commissioners")
-  o String governingBodyName
+  // Jurisdiction (stateCode, stateName, countyName, municipalityName,
+  // municipalityType, governingBodyName) is inherited from
+  // com.trustblocks.municipal.agreement.MunicipalAgreement.
 
   // ---- Parties ------------------------------------------------------------
   o String employeeName
@@ -76,8 +83,7 @@ concept ManagerEmployment {
   o String annualBaseSalary
   @description("e.g. \"One Hundred Forty-Six Thousand Five Hundred and 00/100\"")
   o String annualBaseSalaryWritten
-  @description("True where salary is retroactive and back pay is owed")
-  o Boolean retroactiveSalary
+  @description("Set where salary is retroactive; its presence is what makes back pay owed")
   o DateTime retroactiveDate optional
 
   // ---- Benefits -----------------------------------------------------------
@@ -104,8 +110,7 @@ concept ManagerEmployment {
   o String stateMunicipalLeagueName
 
   // ---- Allowances ---------------------------------------------------------
-  o Boolean automobileStipendProvided
-  @description("Monthly stipend, formatted, e.g. \"$350.00\"")
+  @description("Monthly stipend, formatted, e.g. \"$350.00\"; absent means a Employer-owned vehicle is provided instead")
   o String automobileStipend optional
   @description("Officer authorized to disburse expense reimbursements")
   o String financeOfficerTitle

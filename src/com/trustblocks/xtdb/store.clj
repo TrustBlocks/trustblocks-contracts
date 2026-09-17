@@ -76,6 +76,17 @@
        (map read-string)
        mm/registry))
 
+(defn model-source
+  "The original .cto text for a namespace, as put-model! stored it verbatim --
+  for showing a $class's declaration in native Concerto syntax rather than
+  our own derived rendering of it."
+  [node ns]
+  ;; Projected columns are symbols, not keywords -- see get-instance's
+  ;; (symbol "*") for the same reason: XTQL silently ignores a keyword here
+  ;; rather than projecting it, so the query still "succeeds" with an empty row.
+  (:concerto/source
+   (first (xt/q node (list 'from model-table [{:xt/id ns} (symbol "concerto/source")])))))
+
 (defn model-dir-files
   "Every .cto in a directory (a template's model/ folder)."
   [dir]

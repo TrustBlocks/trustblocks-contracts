@@ -22,7 +22,7 @@
             [com.trustblocks.xtdb.store :as store]
             [xtdb.node :as xt.node]))
 
-(def contract-fqn "us.nc.municipal.manageremployment@0.1.0.ManagerEmployment")
+(def contract-fqn "com.trustblocks.municipal.employment@1.0.0.ManagerEmployment")
 (def contract-id  "china-grove-gover-2025")
 
 ;; A certification clause, not a calculation: it refuses a second approval
@@ -35,36 +35,47 @@
      (throw (ex-info \"Already approved by the Board\" {}))
      (let [approved-at (get data \"councilActionDate\")
            effective   (get data \"effectiveDate\")]
-       {:response {\"$class\" \"com.trustblocks.municipal.manageremployment@1.0.0.BoardApprovalResponse\"
+       {:response {\"$class\" \"com.trustblocks.municipal.employment.execution@1.0.0.BoardApprovalResponse\"
                    \"$timestamp\" now
                    \"status\" \"APPROVED\"
                    \"approvedAt\" approved-at
                    \"effectiveDate\" effective}
-        :state {\"$class\" \"com.trustblocks.municipal.manageremployment@1.0.0.ManagerEmploymentState\"
-                \"contractId\" (get data \"$identifier\")
-                \"$identifier\" (get data \"$identifier\")
+        :state {\"$class\" \"com.trustblocks.municipal.employment.execution@1.0.0.ManagerEmploymentState\"
+                \"contractId\" (get data \"contractId\")
                 \"status\" \"APPROVED\"
                 \"approvedAt\" approved-at
                 \"effectiveDate\" effective}}))")
 
+(defn load!
+  "Ingests the model + logic archive, and loads the contract instance and
+  its clause, into node -- a plain upsert of whatever's currently on disk,
+  safe to call repeatedly. dev/seed.clj relies on that: it calls this
+  unconditionally on every run, including against a china-grove-gover-2025
+  already sitting in storage/, so an archive change (a new grammar.tem.md,
+  say) still takes effect without a full rm -rf storage. Only trigger! --
+  the actual approval event -- is the part that isn't safe to redo."
+  [node]
+  (println "Ingesting docs/examples/manager-employment-contract ...")
+  (println (archive/ingest-dir! node "docs/examples/manager-employment-contract"))
+  ;; No $identifier fixup any more: the model extends
+  ;; org.accordproject.contract.Contract, so it inherits `identified by
+  ;; contractId` and the sample carries a real contractId. Identity is the
+  ;; model's, not something the loader bolts on.
+  (store/put-instance!
+   node nil (json/parse-string
+             (slurp "docs/examples/manager-employment-contract/sample.json")))
+  (ex/put-clause! node contract-fqn clojure-clause))
+
 (defn run []
   (let [node (xt.node/start-node)]
     (try
-      (println "Ingesting docs/examples/manager-employment-contract ...")
-      (println (archive/ingest-dir! node "docs/examples/manager-employment-contract"))
-
-      (let [sample (-> (slurp "docs/examples/manager-employment-contract/sample.json")
-                       (json/parse-string)
-                       (assoc "$identifier" contract-id))]
-        (store/put-instance! node nil sample))
+      (load! node)
 
       (println "\nBefore any trigger, state:" (ex/current-state node contract-id))
 
-      (ex/put-clause! node contract-fqn clojure-clause)
-
       (let [{:keys [response state]}
             (ex/trigger! node contract-id
-                         {"$class"      "com.trustblocks.municipal.manageremployment@1.0.0.BoardApprovalRequest"
+                         {"$class"      "com.trustblocks.municipal.employment.execution@1.0.0.BoardApprovalRequest"
                           "requestedAt" "2025-12-02T00:00:00.000Z"}
                         ;; now = the Board's own meeting date, not wall-clock
                         ;; time -- see the ns docstring.
@@ -80,7 +91,7 @@
       (println "\nTriggering a second Board approval on the same contract...")
       (try
         (ex/trigger! node contract-id
-                     {"$class"      "com.trustblocks.municipal.manageremployment@1.0.0.BoardApprovalRequest"
+                     {"$class"      "com.trustblocks.municipal.employment.execution@1.0.0.BoardApprovalRequest"
                       "requestedAt" "2026-01-05T00:00:00.000Z"}
                      "2026-01-05T00:00:00.000Z")
         (println "BUG: a second approval should have been refused")

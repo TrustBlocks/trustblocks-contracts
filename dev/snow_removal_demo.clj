@@ -48,15 +48,28 @@
                 "visitedAt" at "inchesFallen" inches}
                at))
 
-(defn populate!
-  "Loads the contract, its clause, and three winter visits into node."
+(defn load!
+  "Loads the contract and its clause into node -- a plain upsert of
+  whatever's currently on disk, safe to call repeatedly. See
+  manager-employment-demo/load! for why dev/seed.clj cares about that
+  distinction."
   [node]
   (store/put-model! node "docs/examples/snow-removal.cto")
   (store/put-instance! node nil contract-data)
-  (ex/put-clause! node fqn clojure-clause)
+  (ex/put-clause! node fqn clojure-clause))
+
+(defn visits!
+  "The three winter visit reports, in order."
+  [node]
   (visit! node "v-1" "2026-01-15T06:00:00Z" 3.5)
   (visit! node "v-2" "2026-02-02T06:00:00Z" 1.0)
   (visit! node "v-3" "2026-02-20T06:00:00Z" 4.0))
+
+(defn populate!
+  "Loads the contract, its clause, and three winter visits into node."
+  [node]
+  (load! node)
+  (visits! node))
 
 (defn run []
   (let [node (xt.node/start-node)]
