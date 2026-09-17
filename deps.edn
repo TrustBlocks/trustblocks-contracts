@@ -10,6 +10,10 @@
         com.biffweb/xtdb     {:mvn/version "2.0.0"}
         com.biffweb/datastar {:mvn/version "2.0.0"}
         com.biffweb/graph    {:mvn/version "2.0.0"}
+        ;; Passwordless email signin. Needs :biff.core/kv-get and
+        ;; :biff.core/kv-set at runtime, which com.biffweb/xtdb already
+        ;; provides -- see com.trustblocks.app.auth.
+        com.biffweb/authenticate {:mvn/version "2.0.0"}
 
         ;; Concerto models as EDN and Malli schemas compiled from them at
         ;; runtime. Not on Clojars yet -- see github.com/TrustBlocks/concerto-clj.

@@ -4,6 +4,7 @@
             [com.biffweb.graph :as biff.graph]
             [com.biffweb.ring :as biff.ring]
             [com.biffweb.xtdb :as biff.xtdb]
+            [com.trustblocks.app.auth :as app.auth]
             [com.trustblocks.app.contracts :as app.contracts]
             [com.trustblocks.app.landing :as app.landing]
             [com.trustblocks.lib.ui :as ui]
@@ -17,6 +18,7 @@
    (biff.datastar/module)
    (biff.graph/module)
    model.contract/module
+   app.auth/module
    app.landing/module
    app.contracts/module])
 

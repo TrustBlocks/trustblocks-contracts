@@ -12,6 +12,7 @@
   front window, not its loading dock."
   (:require [clojure.string :as str]
             [com.trustblocks.concerto.metamodel :as mm]
+            [com.trustblocks.lib.middleware :as mid]
             [com.trustblocks.lib.ui :as ui]
             [com.trustblocks.model.graph :as model.graph]
             [com.trustblocks.routes :as routes]
@@ -305,8 +306,10 @@
 
 (def module
   {:biff.ring/routes
-   [[(routes/contracts) {:get list-page}]
-    [(routes/contract) {:get show-page}]
-    [(routes/contract-document) {:get document-page}]
-    [(routes/contract-model) {:get model-page}]
-    [(routes/contract-model-concerto) {:get model-concerto-page}]]})
+   ;; Every contract page is behind signin -- see lib.middleware/wrap-signed-in.
+   [["" {:middleware [mid/wrap-signed-in]}
+     [(routes/contracts) {:get list-page}]
+     [(routes/contract) {:get show-page}]
+     [(routes/contract-document) {:get document-page}]
+     [(routes/contract-model) {:get model-page}]
+     [(routes/contract-model-concerto) {:get model-concerto-page}]]]})
