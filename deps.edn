@@ -1,5 +1,13 @@
 {:paths ["src" "resources" "target/resources"]
 
+ ;; decentralized-identity/did-common-java (below) lives on Danube Tech's own
+ ;; repo, not Central -- see com.trustblocks.did.vc's namespace docstring
+ ;; for why we accepted that one extra repo but not com.danubetech/
+ ;; verifiable-credentials-java's, which needs this one *and* JitPack *and*
+ ;; a Bitcoin/Ethereum crypto stack we never call.
+ :mvn/repos {"danubetech-maven-public"
+             {:url "https://repo.danubetech.com/repository/maven-public/"}}
+
  :deps {org.clojure/clojure {:mvn/version "1.12.5"}
 
         ;; Biff 2 libraries, pinned to the official 2.0.0 release (2026-09-10).
@@ -10,6 +18,22 @@
         com.biffweb/xtdb     {:mvn/version "2.0.0"}
         com.biffweb/datastar {:mvn/version "2.0.0"}
         com.biffweb/graph    {:mvn/version "2.0.0"}
+
+        ;; DID documents (did:web, did:key) and W3C Verifiable Credentials --
+        ;; see com.trustblocks.did.interop and com.trustblocks.did.vc.
+        ;; did-common-java is the DID document object model; the VC side is
+        ;; hand-rolled on nimbus-jose-jwt rather than com.danubetech/
+        ;; verifiable-credentials-java (see deps.edn's :mvn/repos comment
+        ;; above and com.trustblocks.did.vc's docstring for why).
+        ;; Tink is not optional scaffolding: nimbus-jose-jwt's Ed25519Signer/
+        ;; Ed25519Verifier are Tink-backed in every version checked, with or
+        ;; without BouncyCastle installed as a provider. bcprov is pinned
+        ;; explicitly rather than left to whatever buddy-core resolves it to
+        ;; transitively.
+        decentralized-identity/did-common-java {:mvn/version "1.17.0"}
+        com.nimbusds/nimbus-jose-jwt           {:mvn/version "10.0.2"}
+        com.google.crypto.tink/tink            {:mvn/version "1.17.0"}
+        org.bouncycastle/bcprov-jdk18on        {:mvn/version "1.80"}
 
         ;; Concerto models as EDN and Malli schemas compiled from them at
         ;; runtime. Not on Clojars yet -- see github.com/TrustBlocks/concerto-clj.
