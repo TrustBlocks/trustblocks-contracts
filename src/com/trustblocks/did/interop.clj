@@ -13,11 +13,11 @@
   choice this namespace is making, just what actually runs underneath
   :biff.auth (see deps.edn)."
   (:require [clojure.walk :as walk])
-  (:import [com.nimbusds.jose JWSAlgorithm JWSHeader JWSHeader$Builder]
+  (:import [com.nimbusds.jose JWSAlgorithm JWSHeader$Builder]
            [com.nimbusds.jose.crypto Ed25519Signer Ed25519Verifier]
-           [com.nimbusds.jose.jwk Curve OctetKeyPair OctetKeyPair$Builder]
+           [com.nimbusds.jose.jwk Curve OctetKeyPair$Builder]
            [com.nimbusds.jose.util Base64URL]
-           [com.nimbusds.jwt JWTClaimsSet JWTClaimsSet$Builder SignedJWT]
+           [com.nimbusds.jwt JWTClaimsSet$Builder SignedJWT]
            [foundation.identity.did DIDDocument VerificationMethod]
            [java.net URI]
            [java.security KeyPairGenerator]
@@ -117,11 +117,10 @@
   assertionMethod -- the second is what matters here, since it is the
   role a resolver checks before trusting a credential `did` issued.
 
-  `public-key-multibase` is the same 'z...' multibase form did:key uses
-  for the key itself (com.trustblocks.did.key/from-public-key produces it
-  as a side effect: it's everything after 'did:key:'), reused here so a
-  did:web document's key and a did:key identifier for the same key are
-  visibly the same bytes."
+  `public-key-multibase` is com.trustblocks.did.key/multibase's output for
+  the same key -- the same 'z...' form did:key itself uses, so a did:web
+  document's key and a did:key identifier for the same key are visibly
+  the same bytes."
   [{:keys [did public-key-multibase]}]
   (let [id (URI/create did)
         vm (-> (VerificationMethod/builder)

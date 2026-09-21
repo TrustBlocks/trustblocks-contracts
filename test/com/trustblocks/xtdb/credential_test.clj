@@ -76,7 +76,7 @@
       (credential/revoke! node credential-id revoked-at)
       (testing "still valid just before the revocation"
         (is (= 1 (count (credential/as-of-for-subject node clerk-did
-                                                       (Instant/parse "2026-06-30T23:59:59Z"))))))
+                                                      (Instant/parse "2026-06-30T23:59:59Z"))))))
       (testing "gone as of the revocation instant"
         (is (empty? (credential/as-of-for-subject node clerk-did revoked-at))))
       (testing "gone for the rest of what would have been its validity"

@@ -56,6 +56,6 @@
             ;; is set, to keep the value from reading as negative. That
             ;; byte isn't part of the decoded data.
             magnitude (if (and (< 1 (alength magnitude)) (zero? (aget magnitude 0)))
-                       (java.util.Arrays/copyOfRange magnitude 1 (alength magnitude))
-                       magnitude)]
+                        (java.util.Arrays/copyOfRange magnitude 1 (alength magnitude))
+                        magnitude)]
         (byte-array (concat (repeat zeros (byte 0)) magnitude))))))

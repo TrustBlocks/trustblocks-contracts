@@ -18,12 +18,21 @@
   recognizes on sight."
   [(unchecked-byte 0xed) (unchecked-byte 0x01)])
 
-(defn from-public-key
-  "The did:key for a raw 32-byte Ed25519 public key."
+(defn multibase
+  "The multibase 'z...' form of a raw 32-byte Ed25519 public key, with no
+  `did:key:` prefix -- the same value did:web's own VerificationMethod
+  needs as `publicKeyMultibase` (see com.trustblocks.did.interop/
+  did-document), so a Town's did:web document and a did:key identifier
+  for the same key are visibly built from the same bytes."
   [^bytes public-key]
   (when-not (= 32 (alength public-key))
     (throw (ex-info "Ed25519 public key must be 32 bytes" {:length (alength public-key)})))
-  (str "did:key:z" (base58/encode (byte-array (concat ed25519-multicodec public-key)))))
+  (str "z" (base58/encode (byte-array (concat ed25519-multicodec public-key)))))
+
+(defn from-public-key
+  "The did:key for a raw 32-byte Ed25519 public key."
+  [public-key]
+  (str "did:key:" (multibase public-key)))
 
 (defn public-key
   "The raw 32-byte Ed25519 public key inside a did:key, or throws if `did`

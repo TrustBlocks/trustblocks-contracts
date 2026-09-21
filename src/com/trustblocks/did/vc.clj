@@ -76,12 +76,12 @@
    {:iss issuer
     :sub subject
     :vc  (cond-> {"@context"          [context]
-                 "type"              (into ["VerifiableCredential"] types)
-                 "issuer"            issuer
-                 "validFrom"         (rfc3339 valid-from)
-                 "validUntil"        (rfc3339 valid-until)
-                 "credentialSubject" credential-subject}
-            evidence (assoc "evidence" evidence))}))
+                  "type"              (into ["VerifiableCredential"] types)
+                  "issuer"            issuer
+                  "validFrom"         (rfc3339 valid-from)
+                  "validUntil"        (rfc3339 valid-until)
+                  "credentialSubject" credential-subject}
+           evidence (assoc "evidence" evidence))}))
 
 (defn- vc-problem
   "Why `vc` cannot be trusted as issued by `issuer` and about `subject`, or

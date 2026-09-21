@@ -25,8 +25,7 @@
   model/identity.cto, before it ever reaches com.trustblocks.did.vc/issue;
   the outer VC envelope stays outside Concerto entirely, per that model's
   own docstring."
-  (:require [com.trustblocks.concerto.metamodel :as mm]
-            [com.trustblocks.did.vc :as vc]
+  (:require [com.trustblocks.did.vc :as vc]
             [com.trustblocks.xtdb.store :as store]
             [xtdb.api :as xt]))
 
@@ -54,10 +53,10 @@
       (throw (ex-info "credentialSubject failed validation" {:$class fqn :errors errs})))
     (let [type (:name (:declaration (get reg fqn)))
           jwt  (vc/issue issuer-keypair
-                        {:issuer issuer :subject subject
-                         :credential-subject (dissoc credential-subject "$class")
-                         :valid-from valid-from :valid-until valid-until
-                         :types [type] :evidence evidence})]
+                         {:issuer issuer :subject subject
+                          :credential-subject (dissoc credential-subject "$class")
+                          :valid-from valid-from :valid-until valid-until
+                          :types [type] :evidence evidence})]
       (xt/execute-tx
        node
        [[:put-docs {:into credential-table :valid-from valid-from :valid-to valid-until}
@@ -70,16 +69,19 @@
 
 (defn for-subject
   "Every credential ever issued to `subject`, as stored -- {:issuer
-  :subject :concerto/class :jwt}, oldest first. Includes credentials outside
-  their own valid-time window (expired, or not yet in force); see
-  current-for-subject and as-of-for-subject for the questions that
+  :subject :concerto/class :jwt}, oldest first by the credential's own
+  valid-from (not :xt/id, which is a random UUID and so is no order at
+  all -- sorting by it produced a flaky test before this docstring's
+  claim of 'oldest first' was actually true). Includes credentials
+  outside their own valid-time window (expired, or not yet in force);
+  see current-for-subject and as-of-for-subject for the questions that
   answer 'is this one usable right now'."
   [node subject]
   (->> (xt/q node (list 'from credential-table
                         {:for-valid-time :all-time
-                         :bind           [{:subject subject} (symbol "*")]}))
-       (sort-by :xt/id)
-       vec))
+                         :bind           [{:subject subject} (symbol "*") 'xt/valid-from]}))
+       (sort-by :xt/valid-from)
+       (mapv #(dissoc % :xt/valid-from))))
 
 (defn as-of-for-subject
   "Every credential of `subject`'s that was in force at `instant`."

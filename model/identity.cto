@@ -57,4 +57,6 @@ concept Attestation {
   o String id
   o String documentHash
   o String statement
+  @description("Which contract this concerns, when it concerns one. A council vote and the minutes approving it are not themselves contract executions -- a proceeding like that has no parties and no mutual assent, so it is not a Contract -- but it usually happens about one.")
+  o String contractId optional
 }
