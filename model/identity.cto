@@ -1,0 +1,62 @@
+namespace com.trustblocks.identity@1.0.0
+
+/**
+ * credentialSubject shapes for the Verifiable Credentials this app issues
+ * -- see com.trustblocks.did.vc. Not a contract model: nothing here is
+ * `identified`, because nothing here is stored as a first-class asset in
+ * its own right. A credential's identity is the signed JWT itself
+ * (com.trustblocks.xtdb.credential keys its XTDB record by the same id
+ * the VC's own `id`/subject+type carries); these concepts only shape what
+ * one credential's `credentialSubject` may say.
+ *
+ * The outer W3C envelope ($id, issuer, validFrom/validUntil, proof) is
+ * not modeled here at all, deliberately -- it is JSON-LD, open-world by
+ * design, and it is what com.trustblocks.did.vc/issue builds directly.
+ * Concerto is closed-world (see docs/templatemark-conformance.md and the
+ * trigger endpoint's own request validation for two other places this
+ * project has already leaned on that), which is exactly right for a
+ * `credentialSubject` -- a specific, finite claim -- and exactly wrong
+ * for a spec whose whole point is that anyone can add a term.
+ *
+ * `id` on every concept below is the subject's own DID string --
+ * `credentialSubject.id` in W3C terms, spelled the same here as there on
+ * purpose, so nothing translates one name to another crossing that
+ * boundary.
+ */
+
+enum Authority {
+  o CERTIFY_MINUTES
+  o ATTEST_ORDINANCES
+}
+
+/**
+ * "Town Clerk" is not its own identity -- it is this claim, issued by the
+ * Town to a person's did:key. See docs/model-repository.md's own
+ * reuse-by-inheritance rule for why a role lives as data here rather than
+ * as a type: an OfficeGrant is not a MunicipalAgreement's concern, and an
+ * officeholder is not a party the way a contract's signatories are: they
+ * act *for* the town, not as a counterparty to it.
+ */
+concept OfficeGrant {
+  o String id
+  o String name
+  o String office
+  o Authority[] authority
+}
+
+/**
+ * What an officeholder produces by acting -- the Clerk certifying minutes,
+ * the Zoning Officer attesting an inspection. `documentHash` is what was
+ * certified, not the document itself: a VC is signed and meant to be
+ * shared, and the document it attests to may not be. The OfficeGrant that
+ * authorized this act is not a field here; it belongs in the VC's own
+ * `evidence`, a sibling of credentialSubject, since it is evidence *for*
+ * this claim rather than part of what is being claimed.
+ */
+concept Attestation {
+  o String id
+  o String documentHash
+  o String statement
+  @description("Which contract this concerns, when it concerns one. A council vote and the minutes approving it are not themselves contract executions -- a proceeding like that has no parties and no mutual assent, so it is not a Contract -- but it usually happens about one.")
+  o String contractId optional
+}
