@@ -13,7 +13,8 @@
 
   What's stored is the signed JWT verbatim -- the credential *is* that
   string, see com.trustblocks.did.vc -- plus enough plain columns
-  (issuer, subject, :concerto/class) to find it again without decoding
+  (issuer, subject, :concerto/class, and :contract-id when the
+  credentialSubject carries one) to find it again without decoding
   every row. :concerto/class rather than a bare :$class for the same
   reason com.trustblocks.xtdb.keys reserves that exact mapping: XTDB
   reads a bare `$` as a namespace separator and silently renames the
@@ -51,37 +52,63 @@
       (throw (ex-info "credentialSubject has no $class" {:credential-subject credential-subject})))
     (when-let [errs (store/validate reg credential-subject)]
       (throw (ex-info "credentialSubject failed validation" {:$class fqn :errors errs})))
-    (let [type (:name (:declaration (get reg fqn)))
-          jwt  (vc/issue issuer-keypair
-                         {:issuer issuer :subject subject
-                          :credential-subject (dissoc credential-subject "$class")
-                          :valid-from valid-from :valid-until valid-until
-                          :types [type] :evidence evidence})]
+    (let [type        (:name (:declaration (get reg fqn)))
+          contract-id (get credential-subject "contractId")
+          jwt         (vc/issue issuer-keypair
+                                {:issuer issuer :subject subject
+                                 :credential-subject (dissoc credential-subject "$class")
+                                 :valid-from valid-from :valid-until valid-until
+                                 :types [type] :evidence evidence})]
       (xt/execute-tx
        node
        [[:put-docs {:into credential-table :valid-from valid-from :valid-to valid-until}
-         {:xt/id            (random-uuid)
-          :issuer           issuer
-          :subject          subject
-          :concerto/class   fqn
-          :jwt              jwt}]])
+         (cond-> {:xt/id          (random-uuid)
+                  :issuer         issuer
+                  :subject        subject
+                  :concerto/class fqn
+                  :jwt            jwt}
+           contract-id (assoc :contract-id contract-id))]])
       jwt)))
+
+(defn- all-time
+  "Every stored version of every row matching `literal-binding` (e.g.
+  {:subject subject} or {:contract-id contract-id}), oldest first by the
+  credential's own valid-from -- not :xt/id, which is a random UUID and
+  so is no order at all; sorting by it produced a flaky test before this
+  function existed to fix that in one place. Renames the bound
+  xt/valid-from into a plain :valid-from on the way out, converted from
+  XTDB's own #xt/zdt (a ZonedDateTime) to a plain java.time.Instant --
+  the type every valid-from/valid-until this codebase passes around
+  already is, so a caller comparing this against one of those (see
+  com.trustblocks.xtdb.certification/attestations-for-contract) isn't
+  caught out by a ClassCastException between two clock types that both
+  print as an ISO-8601 instant."
+  [node literal-binding]
+  (->> (xt/q node (list 'from credential-table
+                        {:for-valid-time :all-time
+                         :bind           [literal-binding (symbol "*") 'xt/valid-from]}))
+       (sort-by :xt/valid-from)
+       (mapv #(-> % (assoc :valid-from (.toInstant ^java.time.ZonedDateTime (:xt/valid-from %)))
+                  (dissoc :xt/valid-from)))))
 
 (defn for-subject
   "Every credential ever issued to `subject`, as stored -- {:issuer
-  :subject :concerto/class :jwt}, oldest first by the credential's own
-  valid-from (not :xt/id, which is a random UUID and so is no order at
-  all -- sorting by it produced a flaky test before this docstring's
-  claim of 'oldest first' was actually true). Includes credentials
-  outside their own valid-time window (expired, or not yet in force);
-  see current-for-subject and as-of-for-subject for the questions that
-  answer 'is this one usable right now'."
+  :subject :concerto/class :jwt :valid-from}, oldest first. Includes
+  credentials outside their own valid-time window (expired, or not yet
+  in force); see current-for-subject and as-of-for-subject for the
+  questions that answer 'is this one usable right now'."
   [node subject]
-  (->> (xt/q node (list 'from credential-table
-                        {:for-valid-time :all-time
-                         :bind           [{:subject subject} (symbol "*") 'xt/valid-from]}))
-       (sort-by :xt/valid-from)
-       (mapv #(dissoc % :xt/valid-from))))
+  (all-time node {:subject subject}))
+
+(defn for-contract
+  "Every credential ever issued that names `contract-id` in its
+  credentialSubject -- the same shape and ordering as for-subject, just
+  bound by :contract-id instead of :subject. Only credentials whose
+  credentialSubject actually carries a contractId show up here (see
+  issue!); an OfficeGrant, which does not concern any one contract,
+  never will."
+  [node contract-id]
+  (all-time node {:contract-id contract-id}))
 
 (defn as-of-for-subject
   "Every credential of `subject`'s that was in force at `instant`."

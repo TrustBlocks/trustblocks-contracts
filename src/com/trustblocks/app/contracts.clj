@@ -12,6 +12,7 @@
   com.trustblocks.app.trigger; this is the warehouse's front window, not its
   loading dock."
   (:require [clojure.string :as str]
+            [com.trustblocks.app.auth :as auth]
             [com.trustblocks.concerto.metamodel :as mm]
             [com.trustblocks.lib.middleware :as mid]
             [com.trustblocks.lib.ui :as ui]
@@ -20,7 +21,9 @@
             [com.trustblocks.routes :as routes]
             [com.trustblocks.template.archive :as archive]
             [com.trustblocks.template.render :as render]
+            [com.trustblocks.xtdb.certification :as cert]
             [com.trustblocks.xtdb.execute :as execute]
+            [com.trustblocks.xtdb.identity :as identity]
             [com.trustblocks.xtdb.store :as store]))
 
 ;; ---------------------------------------------------------------- rendering
@@ -153,6 +156,85 @@
        [:span {:class ["text-sm text-gray-400"]}
         (str "Template Playground: " unavailable)])]))
 
+(defn- officeholder-label
+  "'Jane Clerk, Town Clerk', or the bare did if no identity is on file
+  for it -- a signature always verifies against a did (see
+  com.trustblocks.xtdb.certification/attestations-for-contract), so
+  this only falls back if that identity has since been removed."
+  [node did]
+  (if-let [officeholder (identity/by-did node did)]
+    (str (:identity/name officeholder) ", " (:identity/office officeholder))
+    did))
+
+(defn- attestation-row [node attestation]
+  (let [{:strs [statement documentHash evidence]} attestation
+        issuer     (get attestation "issuer")
+        valid-from (get attestation "valid-from")]
+    [:div {:class ["border rounded p-3"]}
+     [:p {:class ["text-xs text-gray-500 mb-1"]}
+      (str valid-from " -- " (officeholder-label node issuer))]
+     [:p {:class ["text-sm"]} statement]
+     [:p {:class ["text-xs text-gray-500 mt-1"]} (str "Document: " documentHash)]
+     (when evidence
+       [:p {:class ["text-xs text-gray-400 mt-1"]} "Based on an earlier certification."])]))
+
+(defn- certify-form
+  "The vote-then-minutes case's one form: statement, a document
+  reference, the meeting's own date, and -- once something has already
+  been certified about this contract -- a choice of which certification
+  this one rests on. required-authority is fixed to CERTIFY_MINUTES on
+  the server (com.trustblocks.app.certify); there is no picker for it
+  here because there is only the one act this project was built to
+  support."
+  [id attestations]
+  [:form {:method "post" :action (routes/contract-certify id)
+          :class ["space-y-3 border rounded p-4"]}
+   [:div
+    [:label {:class ["block text-sm text-gray-600"]} "Statement"]
+    [:textarea {:name "statement" :required true :rows 2
+                :class ["w-full border rounded px-2 py-1 text-sm"]}]]
+   [:div
+    [:label {:class ["block text-sm text-gray-600"]} "Document reference"]
+    [:input {:type "text" :name "documentHash" :required true
+             :class ["w-full border rounded px-2 py-1 text-sm"]}]]
+   [:div
+    [:label {:class ["block text-sm text-gray-600"]} "Meeting date"]
+    [:input {:type "datetime-local" :name "validFrom" :required true
+             :class ["border rounded px-2 py-1 text-sm"]}]]
+   (when (seq attestations)
+     [:div
+      [:label {:class ["block text-sm text-gray-600"]} "Evidence (optional)"]
+      [:select {:name "evidence" :class ["w-full border rounded px-2 py-1 text-sm"]}
+       [:option {:value ""} "(none)"]
+       (for [{:strs [statement jwt]} attestations]
+         [:option {:value jwt} (subs statement 0 (min 60 (count statement)))])]])
+   [:button {:type "submit" :class ["px-3 py-1.5 bg-blue-600 text-white rounded text-sm"]}
+    "Certify"]])
+
+(defn- certifications-section
+  "A contract's certification history (attestations naming it, see
+  com.trustblocks.xtdb.certification) plus, for a signed-in officeholder,
+  the form to add one. Anyone signed in can read this section -- the
+  page itself is already behind wrap-signed-in -- but only an email
+  registered as an officeholder (com.trustblocks.xtdb.identity/by-email)
+  sees the form; certify! re-checks their actual authority regardless,
+  this is only about whether to offer the form at all."
+  [{:keys [biff.xtdb/node session] :as ctx} id]
+  (let [attestations (cert/attestations-for-contract node id)
+        officeholder (some->> (:uid session) (auth/user-email ctx) (identity/by-email node))
+        error        (query-param ctx "certify-error")]
+    [:section
+     [:h2 {:class ["text-lg font-medium mb-2"]} (str "Certifications (" (count attestations) ")")]
+     (when error
+       [:p {:class ["text-sm text-red-600 mb-3"]} error])
+     (if (empty? attestations)
+       [:p {:class ["text-gray-500 mb-4"]} "No certifications recorded."]
+       [:div {:class ["space-y-3 mb-4"]} (map #(attestation-row node %) attestations)])
+     (if officeholder
+       (certify-form id attestations)
+       [:p {:class ["text-sm text-gray-400"]}
+        "This account is not registered as an officeholder, so it cannot certify anything here."])]))
+
 (defn show-page [{:keys [biff.xtdb/node] :as ctx}]
   (let [id       (routes/contract-id ctx)
         reg      (store/registry-from-xtdb node)
@@ -192,7 +274,9 @@
            [:h2 {:class ["text-lg font-medium mb-2"]} (str "History (" (count history) ")")]
            (if (empty? history)
              [:p {:class ["text-gray-500"]} "No executions recorded."]
-             [:div {:class ["space-y-4"]} (map history-entry history)])]])))))
+             [:div {:class ["space-y-4"]} (map history-entry history)])]
+
+          (certifications-section ctx id)])))))
 
 ;; ---------------------------------------------------------------- model
 

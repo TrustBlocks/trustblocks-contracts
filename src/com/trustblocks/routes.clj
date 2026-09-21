@@ -20,6 +20,7 @@
 (defpath contract-model "/contracts/:id/model")
 (defpath contract-model-concerto "/contracts/:id/model/concerto")
 (defpath contract-trigger "/contracts/:id/trigger")
+(defpath contract-certify "/contracts/:id/certify")
 
 (defn contract-id
   "The :id out of any /contracts/:id/... request -- the inverse of the paths

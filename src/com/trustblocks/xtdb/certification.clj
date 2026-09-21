@@ -24,10 +24,15 @@
   would model a fact as something it structurally is not. An
   Attestation VC already is the 'signed response, anchored at the
   moment it actually happened' that trigger! provides for contracts;
-  it does not need a second envelope on top."
-  (:require [com.trustblocks.xtdb.credential :as credential]
-            [com.trustblocks.xtdb.identity :as identity]
-            [com.trustblocks.did.vc :as vc]))
+  it does not need a second envelope on top.
+
+  certify!'s refusals carry a :trustblocks/error tag in their ex-data,
+  the same convention com.trustblocks.xtdb.execute/trigger! uses, so
+  com.trustblocks.app.certify can turn them into status codes without
+  matching on a message string."
+  (:require [com.trustblocks.did.vc :as vc]
+            [com.trustblocks.xtdb.credential :as credential]
+            [com.trustblocks.xtdb.identity :as identity]))
 
 (def office-grant-class "com.trustblocks.identity@1.0.0.OfficeGrant")
 (def attestation-class "com.trustblocks.identity@1.0.0.Attestation")
@@ -37,7 +42,8 @@
   valid from `valid-from` until `valid-until`. Returns the signed VC."
   [node town-did {:keys [officeholder-did name office authority valid-from valid-until]}]
   (let [town (or (identity/by-did node town-did)
-                 (throw (ex-info "No such town" {:did town-did})))]
+                 (throw (ex-info "No such town"
+                                 {:trustblocks/error :no-such-town :did town-did})))]
     (credential/issue!
      node (identity/keypair town)
      {:issuer town-did :subject officeholder-did
@@ -80,15 +86,16 @@
                 valid-from valid-until evidence]}]
   (let [officeholder (or (identity/by-email node email)
                          (throw (ex-info "No officeholder identity for this email"
-                                         {:email email})))
+                                         {:trustblocks/error :no-such-officeholder :email email})))
         did (:xt/id officeholder)
         grant (or (verified-office-grant node did valid-from)
                   (throw (ex-info "No office grant in force at that time"
-                                  {:did did :at valid-from})))
+                                  {:trustblocks/error :no-office-grant :did did :at valid-from})))
         authorities (set (get grant "authority"))]
     (when-not (contains? authorities required-authority)
       (throw (ex-info "This office grant does not include the required authority"
-                      {:did did :required required-authority :has authorities})))
+                      {:trustblocks/error :missing-authority
+                       :did did :required required-authority :has authorities})))
     (credential/issue!
      node (identity/keypair officeholder)
      {:issuer did :subject did
@@ -99,3 +106,33 @@
                             contract-id (assoc "contractId" contract-id))
       :valid-from valid-from :valid-until valid-until
       :evidence evidence})))
+
+(defn attestations-for-contract
+  "Every Attestation ever certified about `contract-id`, oldest first,
+  each verified and decoded rather than handed back as a raw stored row
+  -- this is for display (a contract page's own certification history),
+  so a caller gets credentialSubject content (statement, documentHash,
+  evidence, ...) plus 'issuer' (the officeholder's did), 'valid-from'
+  (when it was certified), and the attestation's own 'jwt' -- kept
+  because a caller building a form to certify something *else* about
+  the same contract needs it to offer this one back as `evidence`,
+  not just to display it.
+
+  Verified as of each credential's own valid-from, not now: an
+  Attestation correctly certified in 2025 should still display in 2027
+  even though nothing here re-checks whether that officeholder is
+  still in office today -- this shows what was certified, not who
+  could still certify it.
+
+  Skips (does not throw on) any record that fails to verify -- an
+  issuer with no identity on file, or a tampered row -- rather than
+  breaking the whole page over one bad entry."
+  [node contract-id]
+  (keep (fn [{:keys [issuer jwt valid-from]}]
+          (when-let [officeholder (identity/by-did node issuer)]
+            (let [subject (vc/verify (:identity/public-key officeholder) jwt
+                                     issuer issuer valid-from)]
+              (when-not (:error subject)
+                (assoc subject "issuer" issuer "valid-from" valid-from "jwt" jwt)))))
+        (filter #(= attestation-class (:concerto/class %))
+                (credential/for-contract node contract-id))))
