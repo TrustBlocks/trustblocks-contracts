@@ -35,10 +35,28 @@
     template-playground-bundled-namespaces) cannot be opened there at all
     -- not degraded, just wrong: feeding it only the leaf namespace throws
     'Namespace is not defined for type ...' before anything renders.
-    template-url below returns nil rather than a link that is certain to
-    fail. The real fix is a playground that accepts more than one model
-    file, which is exactly the kind of change this namespace's own
-    docstring already expects us to make by self-hosting."
+    template-status below returns an :unavailable reason naming exactly
+    how many namespaces are over the limit, rather than a link that is
+    certain to fail.
+
+    com.trustblocks.municipal.employment@1.0.0.ManagerEmployment is a real
+    case of this, not a hypothetical: it needs org.accordproject.usa.state
+    (an Accord Project namespace, just not one of the ones the playground
+    happens to bundle) and com.trustblocks.municipal.agreement (our own
+    shared jurisdiction base, reused by other municipal contracts on
+    purpose -- see agreement.cto's own docstring) on top of its own
+    namespace, three past the limit of one. Deliberately not worked
+    around by reshaping either model to fit -- flattening the shared base
+    back into every contract that uses it, or swapping the imported enum
+    for a bare string, would be a real, permanent loss of the reuse and
+    validation those choices exist for, made solely to satisfy an
+    external tool's link-size limit. Left as documented, known behaviour
+    instead: Concerto Playground already gives a complete, correct view
+    of such a model with no such limit, and Accord Project is actively
+    developing Template Playground -- worth checking again periodically
+    for either broader bundling or genuine multi-file support before
+    concluding the only fix is self-hosting one, which remains the real
+    fix if neither materializes."
   (:require [cheshire.core :as json]
             [clojure.string :as str]
             [com.trustblocks.concerto.metamodel :as mm]
@@ -107,7 +125,7 @@
   "Namespaces template-playground preloads into every session (see its
   src/utils/modelCache.ts) so a template importing them resolves without a
   network round trip. A model needing only these plus one namespace of its
-  own fits in a template-url link; anything more does not, because the
+  own fits in a template-status link; anything more does not, because the
   playground's own share format holds exactly one model string besides
   these. Checked against its current main -- not a stale clone -- while
   writing this."
