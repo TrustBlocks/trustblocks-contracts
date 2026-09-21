@@ -41,8 +41,10 @@
   so visit http://localhost:8080/signin, enter any email, and read the
   six-digit code off this console -- there is no mail provider configured
   (com.trustblocks.app.auth/send-email prints it instead)."
-  (:require [com.biffweb.tasks :as tasks]
+  (:require [certification-demo :as cert-demo]
+            [com.biffweb.tasks :as tasks]
             [com.trustblocks :as main]
+            [com.trustblocks.xtdb.certification :as cert]
             [com.trustblocks.xtdb.execute :as ex]
             [manager-employment-demo :as me]
             [snow-removal-demo :as snow]))
@@ -69,5 +71,12 @@
                 "requestedAt" "2025-12-02T00:00:00.000Z"}
                "2025-12-02T00:00:00.000Z"))
 
+(println "Seeding the China Grove Clerk and the vote-then-minutes certifications...")
+(cert-demo/load! node)
+(if (seq (cert/attestations-for-contract node cert-demo/contract-id))
+  (println "  already certified, skipping")
+  (cert-demo/certify! node))
+
 (println "\nSeeded. Sign in at http://localhost:8080/signin with any email;")
 (println "the six-digit code prints here, since no mail provider is configured.")
+(println (str "To certify something as the Town Clerk, sign in as " cert-demo/clerk-email " instead."))

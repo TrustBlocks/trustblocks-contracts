@@ -5,6 +5,7 @@
             [com.biffweb.ring :as biff.ring]
             [com.biffweb.xtdb :as biff.xtdb]
             [com.trustblocks.app.auth :as app.auth]
+            [com.trustblocks.app.certify :as app.certify]
             [com.trustblocks.app.contracts :as app.contracts]
             [com.trustblocks.app.landing :as app.landing]
             [com.trustblocks.app.trigger :as app.trigger]
@@ -22,7 +23,8 @@
    app.auth/module
    app.landing/module
    app.contracts/module
-   app.trigger/module])
+   app.trigger/module
+   app.certify/module])
 
 ;; Only modules with a :biff.core/start function need an entry here, in the
 ;; order they should start. biff.ring/module goes last so the HTTP listener

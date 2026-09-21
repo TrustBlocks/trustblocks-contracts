@@ -43,22 +43,30 @@
                          :valid-from year-start :valid-until year-end})
     {:town town :clerk clerk}))
 
+(defn- refusal
+  "The :trustblocks/error tag `f` throws, or nil if it doesn't throw at all
+  -- so a test can assert on the tag rather than a message string, the same
+  thing com.trustblocks.app.certify does to pick a status code."
+  [f]
+  (try (f) nil
+       (catch clojure.lang.ExceptionInfo e (:trustblocks/error (ex-data e)))))
+
 (deftest certify-refuses-when-not-authorized
   (with-open [node (xt.node/start-node)]
     (populate! node)
     (testing "an unknown email"
-      (is (thrown? clojure.lang.ExceptionInfo
-                   (cert/certify! node {:email "nobody@example.gov" :statement "x" :document-hash "h"
-                                        :required-authority "CERTIFY_MINUTES"
-                                        :valid-from vote-meeting :valid-until year-end}))))
+      (is (= :no-such-officeholder
+             (refusal #(cert/certify! node {:email "nobody@example.gov" :statement "x" :document-hash "h"
+                                            :required-authority "CERTIFY_MINUTES"
+                                            :valid-from vote-meeting :valid-until year-end})))))
 
     (testing "an officeholder with no office grant at all"
       (identity/provision-officeholder! node {:email "nobody@china-grove.example.gov"
                                               :name "No One" :office "Nobody"})
-      (is (thrown? clojure.lang.ExceptionInfo
-                   (cert/certify! node {:email "nobody@china-grove.example.gov" :statement "x"
-                                        :document-hash "h" :required-authority "CERTIFY_MINUTES"
-                                        :valid-from vote-meeting :valid-until year-end}))))
+      (is (= :no-office-grant
+             (refusal #(cert/certify! node {:email "nobody@china-grove.example.gov" :statement "x"
+                                            :document-hash "h" :required-authority "CERTIFY_MINUTES"
+                                            :valid-from vote-meeting :valid-until year-end})))))
 
     (testing "a grant that does not name the required authority"
       (let [{:keys [town]} (provision! node)
@@ -68,10 +76,10 @@
                             {:officeholder-did (:xt/id zoning) :name "Sam Zoning" :office "Zoning Officer"
                              :authority ["ATTEST_ORDINANCES"]
                              :valid-from year-start :valid-until year-end})
-        (is (thrown-with-msg? clojure.lang.ExceptionInfo #"does not include the required authority"
-                              (cert/certify! node {:email "zoning@china-grove.example.gov" :statement "x"
-                                                   :document-hash "h" :required-authority "CERTIFY_MINUTES"
-                                                   :valid-from vote-meeting :valid-until year-end})))))))
+        (is (= :missing-authority
+               (refusal #(cert/certify! node {:email "zoning@china-grove.example.gov" :statement "x"
+                                              :document-hash "h" :required-authority "CERTIFY_MINUTES"
+                                              :valid-from vote-meeting :valid-until year-end}))))))))
 
 (deftest certify-checks-authority-as-of-the-events-own-time-not-now
   (with-open [node (xt.node/start-node)]
@@ -126,4 +134,15 @@
       (testing "both attestations are recorded, alongside the office grant that authorized them"
         (let [records (credential/for-subject node did)]
           (is (= [cert/office-grant-class cert/attestation-class cert/attestation-class]
-                 (map :concerto/class records))))))))
+                 (map :concerto/class records)))))
+
+      (testing "attestations-for-contract shows both, decoded, oldest first, evidence intact"
+        (let [[vote minutes] (cert/attestations-for-contract node "china-grove-gover-2025")]
+          (is (= "The council voted 4-1 to approve the manager's contract" (get vote "statement")))
+          (is (= "Minutes of the March 4 meeting were approved as written" (get minutes "statement")))
+          (is (= vote-jwt (get minutes "evidence")))
+          (is (= did (get vote "issuer") (get minutes "issuer")))
+          (is (= vote-meeting (get vote "valid-from")))
+          (is (= next-meeting (get minutes "valid-from")))
+          (is (= vote-jwt (get vote "jwt")))
+          (is (= minutes-jwt (get minutes "jwt"))))))))

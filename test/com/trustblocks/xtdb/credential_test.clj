@@ -83,3 +83,22 @@
         (is (empty? (credential/current-for-subject node clerk-did))))
       (testing "for-subject (all valid time) still shows it existed"
         (is (= 1 (count (credential/for-subject node clerk-did))))))))
+
+(deftest for-contract-finds-only-credentials-naming-that-contract
+  (with-open [node (xt.node/start-node)]
+    (populate! node)
+    ;; The office grant names no contract at all -- it should never appear.
+    (issue-office-grant! node)
+    (credential/issue! node clerk-kp
+                       {:issuer clerk-did :subject clerk-did
+                        :credential-subject {"$class" "com.trustblocks.identity@1.0.0.Attestation"
+                                             "id" clerk-did "documentHash" "sha256:x"
+                                             "statement" "the vote happened"
+                                             "contractId" "china-grove-gover-2025"}
+                        :valid-from during :valid-until end})
+    (testing "the attestation shows up under its contract"
+      (let [[record] (credential/for-contract node "china-grove-gover-2025")]
+        (is (= "com.trustblocks.identity@1.0.0.Attestation" (:concerto/class record)))
+        (is (= during (:valid-from record)))))
+    (testing "an unrelated contract id finds nothing"
+      (is (empty? (credential/for-contract node "some-other-contract"))))))
