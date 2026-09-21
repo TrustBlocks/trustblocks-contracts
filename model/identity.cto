@@ -59,4 +59,6 @@ concept Attestation {
   o String statement
   @description("Which contract this concerns, when it concerns one. A council vote and the minutes approving it are not themselves contract executions -- a proceeding like that has no parties and no mutual assent, so it is not a Contract -- but it usually happens about one.")
   o String contractId optional
+  @description("When the officeholder actually performed this act -- wall-clock time. Distinct from validFrom on the outer VC envelope, which is the event's own time (the meeting the statement is about), not when it was typed in. The two coincide for a same-day certification and diverge for a Clerk certifying a months-old vote, which is the case this project was built around.")
+  o DateTime certifiedAt
 }

@@ -66,10 +66,7 @@
 (me/load! node)
 (if (ex/current-state node me/contract-id)
   (println "  already approved, skipping trigger")
-  (ex/trigger! node me/contract-id
-               {"$class"      "com.trustblocks.municipal.employment.execution@1.0.0.BoardApprovalRequest"
-                "requestedAt" "2025-12-02T00:00:00.000Z"}
-               "2025-12-02T00:00:00.000Z"))
+  (me/approve! node))
 
 (println "Seeding the China Grove Clerk and the vote-then-minutes certifications...")
 (cert-demo/load! node)

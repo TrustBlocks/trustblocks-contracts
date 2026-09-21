@@ -14,10 +14,11 @@
             [com.trustblocks.xtdb.certification :as cert]
             [com.trustblocks.xtdb.identity :as identity]
             [com.trustblocks.xtdb.store :as store]
+            [manager-employment-demo :as me]
             [xtdb.node :as xt.node])
   (:import [java.time Instant]))
 
-(def ^:private contract-id "china-grove-gover-2025")
+(def ^:private contract-id me/contract-id)
 (def ^:private clerk-email "clerk@china-grove.example.gov")
 
 (defn- provision-clerk! [node]
@@ -39,7 +40,13 @@
 
 (deftest certify-redirects-to-the-contract-page-either-way
   (with-open [node (xt.node/start-node)]
+    ;; certify runs execute/trigger! against contract-id now -- see
+    ;; com.trustblocks.xtdb.certification's own docstring -- so the real
+    ;; contract needs to be on file and already Board-approved.
+    (me/load! node)
+    (me/approve! node)
     (store/put-model! node "model/identity.cto")
+    (store/put-model! node "model/attestation.cto")
     (provision-clerk! node)
 
     (testing "a missing field redirects with a certify-error, not a 500"

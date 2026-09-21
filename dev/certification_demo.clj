@@ -5,22 +5,27 @@
   councilActionDate, then certifies the minutes approving it at the next
   meeting, naming the vote certification as evidence.
 
-  Provisions its own Town and officeholder identity rather than reusing
-  anything from manager-employment-demo -- an Attestation only names a
-  contract by id (see model/identity.cto's own docstring), it does not
-  require or read the contract instance itself, so this demo works even
-  run against a node manager-employment-demo has never touched.
+  certify! runs execute/trigger! against the contract itself now (see
+  com.trustblocks.xtdb.certification's own docstring), so unlike its
+  first version, this demo does depend on manager-employment-demo: the
+  contract has to actually exist, carry the attestation branch in its
+  own clause, and already be Board-approved -- 'I certify this was
+  approved' can't be true otherwise -- before certify! will do
+  anything. load! below ensures all of that, idempotently, whether run
+  standalone or as part of dev/seed.clj's larger sequence.
 
     bin/clj -M:xtdb-jvm-opts -i dev/certification_demo.clj"
   (:require [com.trustblocks.xtdb.certification :as cert]
+            [com.trustblocks.xtdb.execute :as ex]
             [com.trustblocks.xtdb.identity :as identity]
             [com.trustblocks.xtdb.store :as store]
+            [manager-employment-demo :as me]
             [xtdb.node :as xt.node])
   (:import [java.time Instant]))
 
 (def town-slug "china-grove")
 (def clerk-email "clerk@china-grove.example.gov")
-(def contract-id "china-grove-gover-2025")
+(def contract-id me/contract-id)
 
 ;; The vote's own date is the real councilActionDate from
 ;; docs/examples/manager-employment-contract/sample.json. The sample has
@@ -47,24 +52,30 @@
     clerk))
 
 (defn load!
-  "Provisions the Town and Clerk once -- safe to call repeatedly, since
-  identity/by-email is checked first. Unlike a contract instance's plain
-  upsert, provisioning twice would mint a second, different did for the
-  same person (a fresh keypair every time -- see
-  com.trustblocks.xtdb.identity), not the same identity re-saved."
+  "Ensures the contract exists and is already Board-approved (see the
+  ns docstring), then provisions the Town and Clerk once -- safe to
+  call repeatedly. Provisioning specifically, unlike a contract
+  instance's plain upsert, is not something to redo without the guard
+  above: it would mint a second, different did for the same person (a
+  fresh keypair every time -- see com.trustblocks.xtdb.identity), not
+  the same identity re-saved."
   [node]
+  (me/load! node)
+  (when-not (ex/current-state node me/contract-id)
+    (me/approve! node))
   (store/put-model! node "model/identity.cto")
+  (store/put-model! node "model/attestation.cto")
   (or (identity/by-email node clerk-email)
       (provision! node)))
 
 (defn certify!
-  "The vote, then the minutes approving it. Not redo-safe the way a
-  Concerto request/response trigger is (see com.trustblocks.xtdb.execute's
-  own duplicate-request guard) -- certify! has none, by design; see
-  com.trustblocks.app.certify's docstring. dev/seed.clj guards this the
-  same way it guards manager-employment-demo's own trigger, by checking
-  whether it has already run first, rather than by an operation that is
-  itself safe to repeat."
+  "The vote, then the minutes approving it. Redo-safe now the same way
+  every other trigger! call is (each certify! derives its own
+  request-id from its contract/authority/documentHash/valid-from), but
+  dev/seed.clj still checks whether this has already run first rather
+  than relying on that -- cert/certify!'s second call would otherwise
+  throw a :duplicate-request refusal (correct, but noisy) instead of
+  quietly doing nothing."
   [node]
   (let [vote-jwt (cert/certify! node {:email clerk-email
                                       :statement "The council voted to approve the manager's employment contract"

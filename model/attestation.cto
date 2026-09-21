@@ -1,0 +1,40 @@
+namespace com.trustblocks.attestation@1.0.0
+
+import org.accordproject.runtime@0.2.0.{Request, Response} from https://models.accordproject.org/accordproject/runtime@0.2.0.cto
+
+/**
+ * The standard trigger pair for "someone in office certifies something
+ * about this contract" -- com.trustblocks.xtdb.certification/certify!
+ * always calls execute/trigger! with an AttestationRequest, so any
+ * contract wanting attestation support imports these two types and adds
+ * one branch to its own stored clause, the same way
+ * com.trustblocks.municipal.employment.execution@1.0.0's
+ * BoardApprovalRequest/Response are one branch of that contract's clause.
+ *
+ * Deliberately generic and reusable, unlike a contract's own execution
+ * types: BoardApprovalRequest only ever means one thing, but
+ * AttestationRequest is the same shape whether the statement is "the
+ * council voted to approve this" or "the survey plat was recorded" --
+ * what makes an attestation valid is the officeholder's authority and
+ * the contract's own state at the time, checked by the caller
+ * (identity/OfficeGrant, before this ever runs) and the clause (this
+ * contract's own eligibility rule) respectively. Neither the DID that
+ * signs the resulting credential nor when it was actually signed
+ * appears here -- a clause has no identity or clock to supply them with
+ * (see com.trustblocks.clause's own docstring on why). The DID is
+ * already `id` on com.trustblocks.identity@1.0.0.Attestation (every
+ * VC's credentialSubject.id is its subject's DID, by that model's own
+ * convention); certify! adds the wall-clock moment itself, as that
+ * model's own certifiedAt, once the clause has answered.
+ */
+
+transaction AttestationRequest extends Request {
+  o String statement
+  o String documentHash
+  o String requiredAuthority
+}
+
+transaction AttestationResponse extends Response {
+  o String statement
+  o String documentHash
+}

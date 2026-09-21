@@ -22,6 +22,7 @@
             [com.trustblocks.xtdb.credential :as credential]
             [com.trustblocks.xtdb.identity :as identity]
             [com.trustblocks.xtdb.store :as store]
+            [manager-employment-demo :as me]
             [xtdb.node :as xt.node])
   (:import [java.time Instant]))
 
@@ -29,9 +30,18 @@
 (def ^:private year-end (Instant/parse "2027-01-01T00:00:00Z"))
 (def ^:private vote-meeting (Instant/parse "2026-03-04T19:00:00Z"))
 (def ^:private next-meeting (Instant/parse "2026-04-01T19:00:00Z"))
+(def ^:private contract-id me/contract-id)
 
 (defn- populate! [node]
-  (store/put-model! node "model/identity.cto"))
+  ;; certify! runs execute/trigger! against contract-id now (see
+  ;; com.trustblocks.xtdb.certification's own docstring), so this
+  ;; namespace's tests need the real employment contract on file and
+  ;; already Board-approved, not just the identity model -- 'the vote
+  ;; happened' can't be certified about a contract that doesn't exist.
+  (me/load! node)
+  (me/approve! node)
+  (store/put-model! node "model/identity.cto")
+  (store/put-model! node "model/attestation.cto"))
 
 (defn- provision! [node]
   (let [town (identity/provision-town! node {:slug "china-grove" :name "China Grove"})
@@ -57,7 +67,7 @@
     (testing "an unknown email"
       (is (= :no-such-officeholder
              (refusal #(cert/certify! node {:email "nobody@example.gov" :statement "x" :document-hash "h"
-                                            :required-authority "CERTIFY_MINUTES"
+                                            :contract-id contract-id :required-authority "CERTIFY_MINUTES"
                                             :valid-from vote-meeting :valid-until year-end})))))
 
     (testing "an officeholder with no office grant at all"
@@ -65,7 +75,8 @@
                                               :name "No One" :office "Nobody"})
       (is (= :no-office-grant
              (refusal #(cert/certify! node {:email "nobody@china-grove.example.gov" :statement "x"
-                                            :document-hash "h" :required-authority "CERTIFY_MINUTES"
+                                            :document-hash "h" :contract-id contract-id
+                                            :required-authority "CERTIFY_MINUTES"
                                             :valid-from vote-meeting :valid-until year-end})))))
 
     (testing "a grant that does not name the required authority"
@@ -78,7 +89,8 @@
                              :valid-from year-start :valid-until year-end})
         (is (= :missing-authority
                (refusal #(cert/certify! node {:email "zoning@china-grove.example.gov" :statement "x"
-                                              :document-hash "h" :required-authority "CERTIFY_MINUTES"
+                                              :document-hash "h" :contract-id contract-id
+                                              :required-authority "CERTIFY_MINUTES"
                                               :valid-from vote-meeting :valid-until year-end}))))))))
 
 (deftest certify-checks-authority-as-of-the-events-own-time-not-now
@@ -93,13 +105,13 @@
       (testing "a meeting before the revocation still checks out"
         (is (string? (cert/certify! node {:email "clerk@china-grove.example.gov"
                                           :statement "Vote certified" :document-hash "h1"
-                                          :required-authority "CERTIFY_MINUTES"
+                                          :contract-id contract-id :required-authority "CERTIFY_MINUTES"
                                           :valid-from vote-meeting :valid-until year-end}))))
       (testing "a meeting after the revocation does not"
         (is (thrown? clojure.lang.ExceptionInfo
                      (cert/certify! node {:email "clerk@china-grove.example.gov"
                                           :statement "Vote certified" :document-hash "h2"
-                                          :required-authority "CERTIFY_MINUTES"
+                                          :contract-id contract-id :required-authority "CERTIFY_MINUTES"
                                           :valid-from (Instant/parse "2026-09-01T00:00:00Z")
                                           :valid-until year-end})))))))
 
@@ -112,14 +124,14 @@
           vote-jwt (cert/certify! node {:email "clerk@china-grove.example.gov"
                                         :statement "The council voted 4-1 to approve the manager's contract"
                                         :document-hash "sha256:vote"
-                                        :contract-id "china-grove-gover-2025"
+                                        :contract-id contract-id
                                         :required-authority "CERTIFY_MINUTES"
                                         :valid-from vote-meeting :valid-until year-end})
 
           minutes-jwt (cert/certify! node {:email "clerk@china-grove.example.gov"
                                            :statement "Minutes of the March 4 meeting were approved as written"
                                            :document-hash "sha256:minutes"
-                                           :contract-id "china-grove-gover-2025"
+                                           :contract-id contract-id
                                            :required-authority "CERTIFY_MINUTES"
                                            :valid-from next-meeting :valid-until year-end
                                            :evidence vote-jwt})
@@ -128,7 +140,7 @@
           vote-subject (vc/verify clerk-public-key vote-jwt did did vote-meeting)
           minutes-subject (vc/verify clerk-public-key minutes-jwt did did next-meeting)]
       (testing "the vote certification"
-        (is (= "china-grove-gover-2025" (get vote-subject "contractId"))))
+        (is (= contract-id (get vote-subject "contractId"))))
       (testing "the minutes approval names the vote certification as evidence"
         (is (= vote-jwt (get minutes-subject "evidence"))))
       (testing "both attestations are recorded, alongside the office grant that authorized them"
@@ -137,7 +149,7 @@
                  (map :concerto/class records)))))
 
       (testing "attestations-for-contract shows both, decoded, oldest first, evidence intact"
-        (let [[vote minutes] (cert/attestations-for-contract node "china-grove-gover-2025")]
+        (let [[vote minutes] (cert/attestations-for-contract node contract-id)]
           (is (= "The council voted 4-1 to approve the manager's contract" (get vote "statement")))
           (is (= "Minutes of the March 4 meeting were approved as written" (get minutes "statement")))
           (is (= vote-jwt (get minutes "evidence")))
