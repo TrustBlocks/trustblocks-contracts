@@ -58,6 +58,18 @@ other by namespace with no `from` URL; that works because cicero-core loads
 every `model/*.cto` in the archive. Publishing becomes worthwhile when someone
 outside this repo needs to import them.
 
+**Decided, not yet built:** publishing is a separate standalone project, not
+part of this repo -- its own git history, the way `accordproject/models` is
+its own repo rather than a folder inside `accordproject/cicero`. Reasoning:
+some of what ends up there may eventually contribute back to Accord's own
+model library, which is easier from an independent repo than by extracting it
+out of ours later. Planned domains: `models.trustblocks.com` for the Concerto
+models (mirroring `models.accordproject.org`'s layout -- raw `.cto` at
+stable URLs, `Access-Control-Allow-Origin: *`, skip the multi-language
+codegen site until it earns its keep) and `templates.trustblocks.com` for
+packaged templates. Parked; revisit before the next template needs a model
+this one already declared.
+
 ## Checking
 
 `bin/template-conformance` -- every template must load and draft through

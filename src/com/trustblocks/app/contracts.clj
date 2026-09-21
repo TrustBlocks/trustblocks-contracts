@@ -6,14 +6,17 @@
   Fields/Concerto tabs -- our own derived property table, then the native
   .cto source).
 
-  Nothing here writes -- ingestion and execution happen through the
-  REPL/dev scripts today (dev/late_delivery_demo.clj,
-  dev/manager_employment_demo.clj, dev/seed.clj); this is the warehouse's
-  front window, not its loading dock."
+  Nothing here writes. Ingestion still happens through the REPL/dev scripts
+  (dev/late_delivery_demo.clj, dev/manager_employment_demo.clj,
+  dev/seed.clj), and execution has its own endpoint in
+  com.trustblocks.app.trigger; this is the warehouse's front window, not its
+  loading dock."
   (:require [clojure.string :as str]
             [com.trustblocks.concerto.metamodel :as mm]
+            [com.trustblocks.lib.middleware :as mid]
             [com.trustblocks.lib.ui :as ui]
             [com.trustblocks.model.graph :as model.graph]
+            [com.trustblocks.model.playground :as pg]
             [com.trustblocks.routes :as routes]
             [com.trustblocks.template.archive :as archive]
             [com.trustblocks.template.render :as render]
@@ -114,31 +117,12 @@
 
 ;; ---------------------------------------------------------------- viewer
 
-(defn- id-from-uri
-  "The :id path segment, read from the raw request URI instead of
-  :path-params.
-
-  biff.ring's default middleware stack includes wrap-path-param-uuids,
-  which runs every :path-params value through a UUID-decode attempt:
-  strings of exactly 22 characters get base64-url-decoded, and if that
-  happens to produce exactly 16 bytes, the decoded bytes are reinterpreted
-  as a UUID and silently replace the original string. 'china-grove-gover-2025'
-  is exactly 22 characters of URL-safe-base64 alphabet and happens to
-  decode to 16 bytes, so it gets corrupted into an unrelated UUID before a
-  handler ever sees it -- while 'snow-2026-014' (13 chars) does not. This
-  isn't specific to these two ids; any future contract id landing on that
-  22-char/16-byte coincidence would misfire the same way. Reading the id
-  from :uri sidesteps that middleware entirely, since it only touches
-  :path-params."
-  [ctx]
-  (-> (:uri ctx)
-      (str/replace-first #"^/contracts/" "")
-      (str/split #"/")
-      first))
-
-(defn- history-entry [{:keys [at request response]}]
+(defn- history-entry [{:keys [at by request-id request response]}]
   [:div {:class ["border rounded p-3"]}
-   [:p {:class ["text-xs text-gray-500 mb-2"]} (str at)]
+   [:p {:class ["text-xs text-gray-500 mb-2 space-x-3"]}
+    [:span (str at)]
+    (when by [:span (str "by " by)])
+    (when request-id [:span {:class ["font-mono"]} request-id])]
    [:div {:class ["grid grid-cols-2 gap-4 text-sm"]}
     [:div {:class ["min-w-0"]}
      [:p {:class ["text-gray-500"]} "request"]
@@ -147,8 +131,30 @@
      [:p {:class ["text-gray-500"]} "response"]
      [:pre {:class ["whitespace-pre-wrap break-words"]} (pr-str response)]]]])
 
+(defn- external-link [href label]
+  [:a {:href href :target "_blank" :rel "noopener noreferrer"
+       :class ["text-blue-600 hover:underline"]}
+   (str label " \u2197")])
+
+(defn- playground-links
+  "Open in Concerto Playground / Open in Template Playground, the two
+  links Accord Project's own playgrounds give us for free -- see
+  com.trustblocks.model.playground. Concerto Playground always works;
+  Template Playground depends on the model fitting its share format, and
+  this says so in place of a link when it doesn't, rather than offering
+  one that is certain to fail."
+  [node reg instance]
+  (let [fqn (get instance "$class")
+        {:keys [url unavailable]} (pg/template-status node reg instance)]
+    [:span {:class ["space-x-4"]}
+     (external-link (pg/concerto-url node reg fqn) "Open in Concerto Playground")
+     (if url
+       (external-link url "Open in Template Playground")
+       [:span {:class ["text-sm text-gray-400"]}
+        (str "Template Playground: " unavailable)])]))
+
 (defn show-page [{:keys [biff.xtdb/node] :as ctx}]
-  (let [id       (id-from-uri ctx)
+  (let [id       (routes/contract-id ctx)
         reg      (store/registry-from-xtdb node)
         instance (store/get-instance node id :reg reg)]
     (if-not instance
@@ -169,7 +175,8 @@
             [:a {:href (routes/contract-document id) :class ["text-blue-600 hover:underline"]}
              "View Contract"]
             [:a {:href (routes/contract-model id) :class ["text-blue-600 hover:underline"]}
-             "View Model"]]]
+             "View Model"]]
+           [:p {:class ["mt-1"]} (playground-links node reg instance)]]
 
           [:section
            [:h2 {:class ["text-lg font-medium mb-2"]} "Data"]
@@ -232,7 +239,7 @@
     body]))
 
 (defn model-page [{:keys [biff.xtdb/node] :as ctx}]
-  (let [id       (id-from-uri ctx)
+  (let [id       (routes/contract-id ctx)
         reg      (store/registry-from-xtdb node)
         instance (store/get-instance node id :reg reg)]
     (if-not instance
@@ -260,7 +267,7 @@
   "The $class's own supertype chain, in native Concerto (.cto) syntax --
   the same source put-model! read, not our own derived rendering of it."
   [{:keys [biff.xtdb/node] :as ctx}]
-  (let [id       (id-from-uri ctx)
+  (let [id       (routes/contract-id ctx)
         reg      (store/registry-from-xtdb node)
         instance (store/get-instance node id :reg reg)]
     (if-not instance
@@ -283,7 +290,7 @@
   one. A sibling of the model pages, not a tab under them -- View Contract
   and View Model are the two choices show-page offers, side by side."
   [{:keys [biff.xtdb/node] :as ctx}]
-  (let [id       (id-from-uri ctx)
+  (let [id       (routes/contract-id ctx)
         reg      (store/registry-from-xtdb node)
         instance (store/get-instance node id :reg reg)]
     (if-not instance
@@ -305,8 +312,10 @@
 
 (def module
   {:biff.ring/routes
-   [[(routes/contracts) {:get list-page}]
-    [(routes/contract) {:get show-page}]
-    [(routes/contract-document) {:get document-page}]
-    [(routes/contract-model) {:get model-page}]
-    [(routes/contract-model-concerto) {:get model-concerto-page}]]})
+   ;; Every contract page is behind signin -- see lib.middleware/wrap-signed-in.
+   [["" {:middleware [mid/wrap-signed-in]}
+     [(routes/contracts) {:get list-page}]
+     [(routes/contract) {:get show-page}]
+     [(routes/contract-document) {:get document-page}]
+     [(routes/contract-model) {:get model-page}]
+     [(routes/contract-model-concerto) {:get model-concerto-page}]]]})

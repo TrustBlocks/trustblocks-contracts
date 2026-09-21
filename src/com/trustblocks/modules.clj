@@ -4,8 +4,10 @@
             [com.biffweb.graph :as biff.graph]
             [com.biffweb.ring :as biff.ring]
             [com.biffweb.xtdb :as biff.xtdb]
+            [com.trustblocks.app.auth :as app.auth]
             [com.trustblocks.app.contracts :as app.contracts]
             [com.trustblocks.app.landing :as app.landing]
+            [com.trustblocks.app.trigger :as app.trigger]
             [com.trustblocks.lib.ui :as ui]
             [com.trustblocks.model.contract :as model.contract]))
 
@@ -17,8 +19,10 @@
    (biff.datastar/module)
    (biff.graph/module)
    model.contract/module
+   app.auth/module
    app.landing/module
-   app.contracts/module])
+   app.contracts/module
+   app.trigger/module])
 
 ;; Only modules with a :biff.core/start function need an entry here, in the
 ;; order they should start. biff.ring/module goes last so the HTTP listener

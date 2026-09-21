@@ -37,7 +37,10 @@
 
     bin/clj -M:xtdb-jvm-opts -i dev/seed.clj
 
-  Leaves the app running afterward. Visit http://localhost:8080/contracts."
+  Leaves the app running afterward. The contract pages are behind signin,
+  so visit http://localhost:8080/signin, enter any email, and read the
+  six-digit code off this console -- there is no mail provider configured
+  (com.trustblocks.app.auth/send-email prints it instead)."
   (:require [com.biffweb.tasks :as tasks]
             [com.trustblocks :as main]
             [com.trustblocks.xtdb.execute :as ex]
@@ -66,4 +69,5 @@
                 "requestedAt" "2025-12-02T00:00:00.000Z"}
                "2025-12-02T00:00:00.000Z"))
 
-(println "\nSeeded. Visit http://localhost:8080/contracts")
+(println "\nSeeded. Sign in at http://localhost:8080/signin with any email;")
+(println "the six-digit code prints here, since no mail provider is configured.")
