@@ -94,7 +94,8 @@
                         :credential-subject {"$class" "com.trustblocks.identity@1.0.0.Attestation"
                                              "id" clerk-did "documentHash" "sha256:x"
                                              "statement" "the vote happened"
-                                             "contractId" "china-grove-gover-2025"}
+                                             "contractId" "china-grove-gover-2025"
+                                             "certifiedAt" (str during)}
                         :valid-from during :valid-until end})
     (testing "the attestation shows up under its contract"
       (let [[record] (credential/for-contract node "china-grove-gover-2025")]

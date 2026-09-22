@@ -24,15 +24,43 @@
 
 (def contract-fqn "com.trustblocks.municipal.employment@1.0.0.ManagerEmployment")
 (def contract-id  "china-grove-gover-2025")
+;; The real councilActionDate from sample.json -- the Board's own meeting
+;; date, and so also this trigger's own valid time (see approve!'s
+;; docstring). Named here rather than left as a literal at each call site,
+;; since dev/certification_demo.clj now also needs the contract already
+;; approved before it can attest to that fact.
+(def board-meeting-date "2025-12-02T00:00:00.000Z")
 
 ;; A certification clause, not a calculation: it refuses a second approval
 ;; rather than computing anything, and it reads the request only for its
 ;; own sake -- the dates that matter (councilActionDate, effectiveDate) are
 ;; already on the contract itself, because this is a completed, signed
 ;; instrument, not a live workflow.
+;;
+;; Also the worked example of the "standard attestation clause"
+;; com.trustblocks.xtdb.certification/certify! calls execute/trigger!
+;; with (see model/attestation.cto): a contract wanting attestation
+;; support branches on the request's own $class and adds this one case.
+;; Its rule is simple and specific to this contract -- "I certify that
+;; this contract was approved by Board action" can only be true once
+;; the Board really has approved it, so it refuses until state says
+;; APPROVED, and otherwise echoes the statement back unchanged. Who is
+;; certifying and when they actually clicked to do it are not this
+;; clause's to know or decide -- see certify!'s own docstring for why.
 (def clojure-clause
-  "(if (and state (= (get state \"status\") \"APPROVED\"))
+  "(cond
+     (= (get request \"$class\") \"com.trustblocks.attestation@1.0.0.AttestationRequest\")
+     (if (and state (= (get state \"status\") \"APPROVED\"))
+       {:response {\"$class\" \"com.trustblocks.attestation@1.0.0.AttestationResponse\"
+                   \"$timestamp\" now
+                   \"statement\" (get request \"statement\")
+                   \"documentHash\" (get request \"documentHash\")}}
+       (throw (ex-info \"Cannot attest to a contract the Board has not yet approved\" {})))
+
+     (and state (= (get state \"status\") \"APPROVED\"))
      (throw (ex-info \"Already approved by the Board\" {}))
+
+     :else
      (let [approved-at (get data \"councilActionDate\")
            effective   (get data \"effectiveDate\")]
        {:response {\"$class\" \"com.trustblocks.municipal.employment.execution@1.0.0.BoardApprovalResponse\"
@@ -66,6 +94,19 @@
              (slurp "docs/examples/manager-employment-contract/sample.json")))
   (ex/put-clause! node contract-fqn clojure-clause))
 
+(defn approve!
+  "The one real Board-approval event this contract ever had. Its own
+  function, not just a call inlined at each site, because dev/seed.clj
+  and dev/certification_demo.clj (which needs the contract already
+  approved before certify! can attest to that fact -- see this file's
+  own clause, above) both need to trigger it, idempotently, without
+  each repeating the same literal date."
+  [node]
+  (ex/trigger! node contract-id
+               {"$class" "com.trustblocks.municipal.employment.execution@1.0.0.BoardApprovalRequest"
+                "requestedAt" board-meeting-date}
+               board-meeting-date))
+
 (defn run []
   (let [node (xt.node/start-node)]
     (try
@@ -73,13 +114,9 @@
 
       (println "\nBefore any trigger, state:" (ex/current-state node contract-id))
 
-      (let [{:keys [response state]}
-            (ex/trigger! node contract-id
-                         {"$class"      "com.trustblocks.municipal.employment.execution@1.0.0.BoardApprovalRequest"
-                          "requestedAt" "2025-12-02T00:00:00.000Z"}
-                        ;; now = the Board's own meeting date, not wall-clock
-                        ;; time -- see the ns docstring.
-                         "2025-12-02T00:00:00.000Z")]
+      ;; now = the Board's own meeting date, not wall-clock time -- see
+      ;; the ns docstring.
+      (let [{:keys [response state]} (approve! node)]
         (println "\nBoard-approval response:" response)
         (println "New state:" state))
 

@@ -16,13 +16,12 @@
   CERTIFY_MINUTES here. A second act needing a different authority is a
   second literal, not a redesign, once one actually exists.
 
-  No requestId/idempotency guard the way trigger! has one. A certify!
-  retried by a flaky connection could, in principle, record the same
-  vote twice; unlike a snow-removal payout this doesn't move money, and
-  a real guard needs a real answer to 'what makes two certifications
-  the same one' (same document reference? same officeholder + contract
-  + meeting date?) that the vote-then-minutes case alone doesn't
-  settle. Left open, deliberately, rather than guessed at."
+  certify! itself now runs as an execute/trigger! call against this
+  contract (see com.trustblocks.xtdb.certification's own docstring), so
+  a retried form post dedupes through trigger!'s own request-id guard
+  exactly like any other trigger, and a refusal from the contract's own
+  clause (e.g. attesting before the Board has approved anything) reaches
+  here the same way any other :trustblocks/error does."
   (:require [clojure.string :as str]
             [clojure.tools.logging :as log]
             [com.trustblocks.app.auth :as auth]
