@@ -162,6 +162,50 @@
         :valid-from valid-from :valid-until valid-until
         :evidence evidence}))))
 
+(defn signature-authorizations
+  "Every provisioned officeholder with every signed OfficeGrant ever issued
+  to their DID, suitable for the operator-facing authorization ledger.
+
+  Grants are signature-verified at their own valid-from before their claims
+  are exposed. A bad/missing issuer remains visible with :verified false and
+  an :error rather than disappearing from an administrative list -- silence
+  would make corrupted authorization data look like no authorization data."
+  [node]
+  (let [now (java.time.Instant/now)]
+    (mapv
+     (fn [officeholder]
+       (let [did (:xt/id officeholder)
+
+             grants
+             (->> (credential/for-subject node did)
+                  (filter #(= office-grant-class (:concerto/class %)))
+                  (mapv
+                   (fn [{:keys [issuer jwt valid-from valid-until]}]
+                     (let [issuer-record (identity/by-did node issuer)
+                           claim (when issuer-record
+                                   (vc/verify (:identity/public-key issuer-record) jwt
+                                              issuer did valid-from))
+                           verified (boolean (and claim (not (:error claim))))
+                           status (cond
+                                    (.isBefore now valid-from) :not-yet-valid
+                                    (and valid-until (.isAfter now valid-until)) :expired
+                                    :else :active)]
+                       {:issuer      issuer
+                        :authority   (vec (or (get claim "authority") []))
+                        :valid-from  valid-from
+                        :valid-until valid-until
+                        :status      status
+                        :verified    verified
+                        :error       (cond
+                                       (nil? issuer-record) "Issuer identity is not on file"
+                                       (:error claim) (:error claim))}))))]
+         {:did    did
+          :name   (:identity/name officeholder)
+          :email  (:identity/email officeholder)
+          :office (:identity/office officeholder)
+          :grants grants}))
+     (identity/officeholders node))))
+
 (defn attestations-for-contract
   "Every Attestation ever certified about `contract-id`, oldest first,
   each verified and decoded rather than handed back as a raw stored row

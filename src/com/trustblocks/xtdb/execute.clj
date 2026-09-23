@@ -116,6 +116,22 @@
     {:source  (:clause/source record)
      :runtime (keyword (or (:clause/runtime record) "clojure"))}))
 
+(defn list-clauses
+  "Every stored clause, ordered by the contract $class it applies to.
+
+  This is deliberately an execution-layer query rather than an app page
+  reaching into :clause directly: the default from a pre-runtime record to
+  :clojure is the same rule get-clause uses, and callers should not grow a
+  second interpretation of that storage shape."
+  [node]
+  (->> (xt/q node (list 'from clause-table [(symbol "*")]))
+       (map (fn [record]
+              {:class   (:xt/id record)
+               :source  (:clause/source record)
+               :runtime (keyword (or (:clause/runtime record) "clojure"))}))
+       (sort-by :class)
+       vec))
+
 ;; ---------------------------------------------------------------- state
 
 (defn current-state

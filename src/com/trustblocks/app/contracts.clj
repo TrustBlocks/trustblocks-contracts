@@ -1,16 +1,16 @@
 (ns com.trustblocks.app.contracts
-  "Read-only pages over what's actually stored, reached from a contract's
-  own page (show-page) as two choices: View Contract (document-page --
-  the originating template's prose, rendered against this instance's data,
-  see com.trustblocks.template.render) and View Model (model-page and its
-  Fields/Concerto tabs -- our own derived property table, then the native
-  .cto source).
+  "The contract warehouse UI: an action-oriented dashboard over stored
+  contracts, each contract's data/state/execution/certification record, its
+  originating prose (document-page), and its Concerto model (Fields/Concerto
+  tabs). Dashboard and record pages also link into Accord's external
+  Template Playground and Concerto Viewer when each tool can accept the
+  model.
 
-  Nothing here writes. Ingestion still happens through the REPL/dev scripts
-  (dev/late_delivery_demo.clj, dev/manager_employment_demo.clj,
-  dev/seed.clj), and execution has its own endpoint in
-  com.trustblocks.app.trigger; this is the warehouse's front window, not its
-  loading dock."
+  Page reads stay here; writes still have explicit handlers elsewhere:
+  com.trustblocks.app.trigger executes JSON requests and
+  com.trustblocks.app.certify handles the officeholder form rendered below.
+  Ingestion/provisioning remains a dev-script/REPL operation documented in
+  docs/operator-runbook.md."
   (:require [clojure.string :as str]
             [com.trustblocks.app.auth :as auth]
             [com.trustblocks.concerto.metamodel :as mm]
@@ -86,37 +86,80 @@
       (get-in ctx [:params k])
       (get-in ctx [:params (keyword k)])))
 
-(defn- contract-row [{:keys [id class]}]
-  [:tr {:class ["border-t"]}
-   [:td {:class ["py-2"]}
-    [:a {:href (routes/contract id) :class ["text-blue-600 hover:underline"]} id]]
-   [:td {:class ["py-2 text-gray-600"]} class]])
+(defn- type-name [fqn]
+  (-> fqn
+      (str/split #"\.")
+      last
+      (str/replace #"([a-z0-9])([A-Z])" "$1 $2")))
 
-(defn- contracts-table [contracts]
-  [:table {:class ["w-full text-sm"]}
-   [:thead
-    [:tr {:class ["text-left text-gray-500"]}
-     [:th {:class ["pb-2"]} "Id"]
-     [:th {:class ["pb-2"]} "Type"]]]
-   [:tbody (map contract-row contracts)]])
+(def ^:private action-link-class
+  ["inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:border-blue-400 hover:text-blue-700"])
+
+(defn- action-link [href label & {:keys [external]}]
+  [:a (cond-> {:href href :class action-link-class}
+        external (assoc :target "_blank" :rel "noopener noreferrer"))
+   label
+   (when external [:span {:aria-hidden "true" :class ["ml-1"]} "↗"])])
+
+(defn- disabled-action [label reason]
+  [:span {:title reason
+          :aria-disabled "true"
+          :class ["inline-flex cursor-not-allowed items-center justify-center rounded-md border border-slate-200 bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-400"]}
+   label])
+
+(defn- contract-actions
+  "The same primary actions on the dashboard and a contract's record page.
+  Template Playground's external limitation is represented as a disabled
+  action with the precise reason, never as a link known to fail."
+  [node reg instance id]
+  (let [fqn (get instance "$class")
+        {:keys [url unavailable]} (pg/template-status node reg instance)]
+    [:div {:class ["flex flex-wrap gap-2"]}
+     (action-link (routes/contract-document id) "View Contract")
+     (if url
+       (action-link url "View in Template Playground" :external true)
+       (disabled-action "View in Template Playground" unavailable))
+     (action-link (pg/concerto-url node reg fqn) "View in Concerto Viewer" :external true)]))
+
+(defn- contract-card [node reg {:keys [id class]}]
+  (let [instance (store/get-instance node id :reg reg)]
+    [:article {:class ["rounded-xl border border-slate-200 bg-white p-5 shadow-sm"]}
+     [:div {:class ["flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"]}
+      [:div {:class ["min-w-0"]}
+       [:p {:class ["text-xs font-semibold uppercase tracking-widest text-blue-700"]} "Available Contract"]
+       [:a {:href (routes/contract id)
+            :class ["mt-1 block text-xl font-semibold tracking-tight text-slate-950 hover:text-blue-700"]}
+        (type-name class)]
+       [:p {:class ["mt-1 font-mono text-xs text-slate-500"]} id]
+       [:p {:class ["mt-2 break-all text-xs text-slate-400"]} class]]
+      (contract-actions node reg instance id)]]))
 
 (defn list-page [{:keys [biff.xtdb/node] :as ctx}]
   (let [q         (or (query-param ctx "q") "")
+        reg       (store/registry-from-xtdb node)
         contracts (->> (store/list-instances node)
                        (filter #(matches? q %))
                        (sort-by :id))]
     (ui/page
-     {:ui/title "Contracts"}
-     [:main {:class ["mx-auto max-w-3xl p-8 space-y-6"]}
-      [:h1 {:class ["text-2xl font-semibold"]} "Contracts"]
-      [:form {:method "get" :action (routes/contracts)}
-       [:input {:type "search" :name "q" :value q
-                :placeholder "Search by id or type"
-                :class ["border rounded px-3 py-1.5 w-full max-w-sm"]}]]
+     {:ui/title "Municipal Contracts — Trustblocks"}
+     (ui/workspace-header :contracts)
+     [:main {:class ["mx-auto w-full max-w-6xl px-6 py-8"]}
+      [:div {:class ["flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between"]}
+       [:div
+        [:p {:class ["text-sm font-semibold uppercase tracking-widest text-blue-700"]} "Contract Warehouse"]
+        [:h1 {:class ["mt-1 text-3xl font-semibold tracking-tight text-slate-950"]} "Available Contracts"]
+        [:p {:class ["mt-2 max-w-2xl text-sm leading-6 text-slate-600"]}
+         "Open the signed agreement, inspect its source model, or continue into Accord Project's own viewers."]]
+       [:form {:method "get" :action (routes/contracts) :class ["w-full sm:w-80"]}
+        [:label {:for "contract-search" :class ["sr-only"]} "Search contracts"]
+        [:input {:id "contract-search" :type "search" :name "q" :value q
+                 :placeholder "Search contracts"
+                 :class ["w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"]}]]]
       (if (empty? contracts)
-        [:p {:class ["text-gray-500"]}
-         (if (str/blank? q) "No contracts stored yet." "No contracts match that search.")]
-        (contracts-table contracts))])))
+        [:div {:class ["mt-8 rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500"]}
+         (if (str/blank? q) "No contracts are stored yet." "No contracts match that search.")]
+        [:div {:class ["mt-8 space-y-5"]}
+         (map #(contract-card node reg %) contracts)])])))
 
 ;; ---------------------------------------------------------------- viewer
 
@@ -134,30 +177,8 @@
      [:p {:class ["text-gray-500"]} "response"]
      [:pre {:class ["whitespace-pre-wrap break-words"]} (pr-str response)]]]])
 
-(defn- external-link [href label]
-  [:a {:href href :target "_blank" :rel "noopener noreferrer"
-       :class ["text-blue-600 hover:underline"]}
-   (str label " \u2197")])
-
-(defn- playground-links
-  "Open in Concerto Playground / Open in Template Playground, the two
-  links Accord Project's own playgrounds give us for free -- see
-  com.trustblocks.model.playground. Concerto Playground always works;
-  Template Playground depends on the model fitting its share format, and
-  this says so in place of a link when it doesn't, rather than offering
-  one that is certain to fail."
-  [node reg instance]
-  (let [fqn (get instance "$class")
-        {:keys [url unavailable]} (pg/template-status node reg instance)]
-    [:span {:class ["space-x-4"]}
-     (external-link (pg/concerto-url node reg fqn) "Open in Concerto Playground")
-     (if url
-       (external-link url "Open in Template Playground")
-       [:span {:class ["text-sm text-gray-400"]}
-        (str "Template Playground: " unavailable)])]))
-
 (defn- officeholder-label
-  "'Jane Clerk, Town Clerk', or the bare did if no identity is on file
+  "'Pamela Mills, Town Clerk', or the bare did if no identity is on file
   for it -- a signature always verifies against a did (see
   com.trustblocks.xtdb.certification/attestations-for-contract), so
   this only falls back if that identity has since been removed."
@@ -223,16 +244,16 @@
   (let [attestations (cert/attestations-for-contract node id)
         officeholder (some->> (:uid session) (auth/user-email ctx) (identity/by-email node))
         error        (query-param ctx "certify-error")]
-    [:section
-     [:h2 {:class ["text-lg font-medium mb-2"]} (str "Certifications (" (count attestations) ")")]
+    [:section {:class ["rounded-xl border border-slate-200 bg-white p-6 shadow-sm"]}
+     [:h2 {:class ["mb-2 text-lg font-semibold text-slate-950"]} (str "Certifications (" (count attestations) ")")]
      (when error
-       [:p {:class ["text-sm text-red-600 mb-3"]} error])
+       [:p {:class ["mb-3 rounded-md bg-red-50 px-3 py-2 text-sm font-medium text-red-700"]} error])
      (if (empty? attestations)
-       [:p {:class ["text-gray-500 mb-4"]} "No certifications recorded."]
-       [:div {:class ["space-y-3 mb-4"]} (map #(attestation-row node %) attestations)])
+       [:p {:class ["mb-4 text-slate-500"]} "No certifications recorded."]
+       [:div {:class ["mb-5 space-y-3"]} (map #(attestation-row node %) attestations)])
      (if officeholder
        (certify-form id attestations)
-       [:p {:class ["text-sm text-gray-400"]}
+       [:p {:class ["text-sm text-slate-400"]}
         "This account is not registered as an officeholder, so it cannot certify anything here."])]))
 
 (defn show-page [{:keys [biff.xtdb/node] :as ctx}]
@@ -245,35 +266,35 @@
             state   (execute/current-state node id :reg reg)
             history (execute/history node id)]
         (ui/page
-         {:ui/title (str id " - Trustblocks")}
-         [:main {:class ["mx-auto max-w-3xl p-8 space-y-8"]}
+         {:ui/title (str id " — Trustblocks")}
+         (ui/workspace-header :contracts)
+         [:main {:class ["mx-auto w-full max-w-6xl space-y-8 px-6 py-8"]}
           [:div
-           [:a {:href (routes/contracts) :class ["text-sm text-blue-600 hover:underline"]}
-            "<- All contracts"]]
-          [:div
-           [:h1 {:class ["text-2xl font-semibold"]} id]
-           [:p {:class ["text-gray-500"]} fqn]
-           [:p {:class ["mt-1 space-x-4"]}
-            [:a {:href (routes/contract-document id) :class ["text-blue-600 hover:underline"]}
-             "View Contract"]
-            [:a {:href (routes/contract-model id) :class ["text-blue-600 hover:underline"]}
-             "View Model"]]
-           [:p {:class ["mt-1"]} (playground-links node reg instance)]]
+           [:a {:href (routes/contracts) :class ["text-sm font-medium text-blue-700 hover:underline"]}
+            "← All contracts"]]
+          [:div {:class ["flex flex-col gap-5 border-b border-slate-200 pb-7 lg:flex-row lg:items-end lg:justify-between"]}
+           [:div
+            [:p {:class ["text-sm font-semibold uppercase tracking-widest text-blue-700"]} "Contract Record"]
+            [:h1 {:class ["mt-1 text-3xl font-semibold tracking-tight text-slate-950"]} (type-name fqn)]
+            [:p {:class ["mt-2 font-mono text-sm text-slate-500"]} id]
+            [:a {:href (routes/contract-model id) :class ["mt-2 inline-block text-sm font-medium text-blue-700 hover:underline"]}
+             "Inspect stored model"]]
+           (contract-actions node reg instance id)]
 
-          [:section
-           [:h2 {:class ["text-lg font-medium mb-2"]} "Data"]
+          [:section {:class ["rounded-xl border border-slate-200 bg-white p-6 shadow-sm"]}
+           [:h2 {:class ["mb-2 text-lg font-semibold text-slate-950"]} "Contract Data"]
            (render-instance reg instance)]
 
-          [:section
-           [:h2 {:class ["text-lg font-medium mb-2"]} "Current state"]
+          [:section {:class ["rounded-xl border border-slate-200 bg-white p-6 shadow-sm"]}
+           [:h2 {:class ["mb-2 text-lg font-semibold text-slate-950"]} "Current State"]
            (if state
              (render-instance reg state)
-             [:p {:class ["text-gray-500"]} "Not yet executed."])]
+             [:p {:class ["text-slate-500"]} "Not yet executed."])]
 
-          [:section
-           [:h2 {:class ["text-lg font-medium mb-2"]} (str "History (" (count history) ")")]
+          [:section {:class ["rounded-xl border border-slate-200 bg-white p-6 shadow-sm"]}
+           [:h2 {:class ["mb-3 text-lg font-semibold text-slate-950"]} (str "Execution History (" (count history) ")")]
            (if (empty? history)
-             [:p {:class ["text-gray-500"]} "No executions recorded."]
+             [:p {:class ["text-slate-500"]} "No executions recorded."]
              [:div {:class ["space-y-4"]} (map history-entry history)])]
 
           (certifications-section ctx id)])))))
@@ -314,11 +335,12 @@
   [id fqn active body]
   (ui/page
    {:ui/title (str fqn " model")}
-   [:main {:class ["mx-auto max-w-3xl p-8"]}
+   (ui/workspace-header :contracts)
+   [:main {:class ["mx-auto w-full max-w-6xl px-6 py-8"]}
     [:div {:class ["mb-4"]}
-     [:a {:href (routes/contract id) :class ["text-sm text-blue-600 hover:underline"]}
-      (str "<- " id)]]
-    [:h1 {:class ["text-2xl font-semibold font-mono mb-6"]} fqn]
+     [:a {:href (routes/contract id) :class ["text-sm font-medium text-blue-700 hover:underline"]}
+      (str "← " id)]]
+    [:h1 {:class ["mb-6 break-all font-mono text-2xl font-semibold text-slate-950"]} fqn]
     (model-tabs id active)
     body]))
 
@@ -383,16 +405,23 @@
             ns      (:namespace (get reg fqn))
             grammar (:archive/grammar (archive/by-namespace node ns))]
         (ui/page
-         {:ui/title (str id " - Trustblocks")}
-         [:main {:class ["mx-auto max-w-3xl p-8"]}
-          [:div {:class ["mb-4"]}
-           [:a {:href (routes/contract id) :class ["text-sm text-blue-600 hover:underline"]}
-            (str "<- " id)]]
-          [:h1 {:class ["text-2xl font-semibold mb-6"]} id]
+         {:ui/title (str id " — Trustblocks")}
+         (ui/workspace-header :contracts)
+         [:main {:class ["mx-auto w-full max-w-5xl px-6 py-8"]}
+          [:div {:class ["mb-6 flex flex-col gap-4 border-b border-slate-200 pb-6 sm:flex-row sm:items-end sm:justify-between"]}
+           [:div
+            [:a {:href (routes/contract id) :class ["text-sm font-medium text-blue-700 hover:underline"]}
+             (str "← " id)]
+            [:h1 {:class ["mt-2 text-3xl font-semibold tracking-tight text-slate-950"]} "Contract Document"]]
+           [:button {:type "button" :disabled true
+                     :title "Word export is planned but not implemented yet"
+                     :class ["cursor-not-allowed rounded-md border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-400"]}
+            "Export to Word — Coming soon"]]
           (if grammar
-            (into [:div] (render/render grammar instance))
-            [:p {:class ["text-gray-500"]}
-             "No contract template text on file for this model."])])))))
+            (into [:article {:class ["rounded-xl border border-slate-200 bg-white p-7 shadow-sm"]}]
+                  (render/render grammar instance))
+            [:div {:class ["rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500"]}
+             "No contract template text is on file for this model."])])))))
 
 (def module
   {:biff.ring/routes

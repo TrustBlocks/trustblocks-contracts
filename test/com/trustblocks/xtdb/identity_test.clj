@@ -33,6 +33,18 @@
         (is (nil? (identity/by-did node "did:key:zNoSuchThing")))
         (is (nil? (identity/by-email node "nobody@example.gov")))))))
 
+(deftest officeholders-lists-public-identity-data-in-name-order
+  (with-open [node (xt.node/start-node)]
+    (identity/provision-town! node {:slug "china-grove" :name "China Grove"})
+    (identity/provision-officeholder! node {:email "rodney@example.gov"
+                                            :name "Rodney Phillips" :office "Mayor"})
+    (identity/provision-officeholder! node {:email "pamela@example.gov"
+                                            :name "Pamela Mills" :office "Town Clerk"})
+    (let [records (identity/officeholders node)]
+      (is (= ["Pamela Mills" "Rodney Phillips"] (mapv :identity/name records)))
+      (is (every? #(nil? (:identity/private-key %)) records))
+      (is (every? #(= :officeholder (:identity/kind %)) records)))))
+
 (deftest keypair-is-ready-for-interop-and-credential
   (with-open [node (xt.node/start-node)]
     (let [clerk (identity/provision-officeholder! node {:email "clerk@china-grove.example.gov"

@@ -80,6 +80,17 @@
   (first (xt/q node (list 'from identity-table
                           [{:identity/email email} (symbol "*")]))))
 
+(defn officeholders
+  "Every provisioned officeholder, ordered by name. Private key material is
+  intentionally removed: callers listing identities need the DID, email,
+  name, office, and public key, never the custodial signing secret."
+  [node]
+  (->> (xt/q node (list 'from identity-table
+                        [{:identity/kind :officeholder} (symbol "*")]))
+       (map #(dissoc % :identity/private-key))
+       (sort-by :identity/name)
+       vec))
+
 (defn keypair
   "An identity record's keypair, in the {:public :private} shape
   com.trustblocks.did.interop and com.trustblocks.xtdb.credential expect."

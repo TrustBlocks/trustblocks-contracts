@@ -93,6 +93,19 @@
                                               :required-authority "CERTIFY_MINUTES"
                                               :valid-from vote-meeting :valid-until year-end}))))))))
 
+(deftest signature-authorizations-verifies-and-decodes-office-grants
+  (with-open [node (xt.node/start-node)]
+    (populate! node)
+    (let [{:keys [clerk]} (provision! node)
+          [authorization] (cert/signature-authorizations node)
+          [grant] (:grants authorization)]
+      (is (= (:xt/id clerk) (:did authorization)))
+      (is (= "Jane Clerk" (:name authorization)))
+      (is (= ["CERTIFY_MINUTES"] (:authority grant)))
+      (is (true? (:verified grant)))
+      (is (= year-start (:valid-from grant)))
+      (is (= year-end (:valid-until grant))))))
+
 (deftest certify-checks-authority-as-of-the-events-own-time-not-now
   (with-open [node (xt.node/start-node)]
     (populate! node)
