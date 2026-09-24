@@ -10,6 +10,7 @@ It comes in halves, and the split is not arbitrary:
 | **Concerto → EDN → Malli** | babashka | pure data; no database |
 | **storage and execution** | JVM REPL | XTDB is a JVM library and does not run under babashka |
 | **the same execution, over HTTP** | curl | Part 4, once the app is running |
+| **who may attest, and signing what they attest** | JVM REPL, then curl | Part 5 — DIDs, Verifiable Credentials, and certification |
 
 That is the same seam the code is built along: `concerto-clj` knows nothing about
 storage, and the XTDB adapter supplies the parts that are XTDB's problem. The
@@ -448,6 +449,417 @@ that is not built yet.
 
 ---
 
+## Part 5 — who may say so: identity, credentials, attestation
+
+Parts 1–4 answer *what did we agree and what has happened under it*. Municipal
+work also needs *who says so, with what authority*: the Town Clerk certifying
+that the council voted, then that the minutes recording the vote were
+approved. Part 5 builds that on the real China Grove town-manager contract,
+[`docs/examples/manager-employment-contract`](examples/manager-employment-contract/).
+
+Three layers, each only knowing about the one below it:
+
+| layer | namespace | knows about |
+|---|---|---|
+| **DIDs and VCs** | `com.trustblocks.did.*` | keys, signatures, JWTs — no database, no app |
+| **identity and credential ledger** | `xtdb/identity.clj`, `xtdb/credential.clj` | who exists, what was issued to whom, over what valid time |
+| **authorization** | `xtdb/certification.clj` | whether this person may certify this, and whether the contract agrees it is true |
+
+Start a fresh REPL:
+
+```
+bin/clj -M:xtdb-jvm-opts
+```
+
+```clojure
+(require '[manager-employment-demo :as me]   ; runs its own demo on a throwaway node first
+         '[com.trustblocks.xtdb.identity :as identity]
+         '[com.trustblocks.xtdb.credential :as credential]
+         '[com.trustblocks.xtdb.certification :as cert]
+         '[com.trustblocks.xtdb.execute :as ex]
+         '[com.trustblocks.xtdb.store :as store]
+         '[com.trustblocks.did.key :as did-key]
+         '[com.trustblocks.did.interop :as interop]
+         '[com.trustblocks.did.vc :as vc]
+         '[xtdb.node :as xt.node])
+(import '[java.time Instant])
+
+(def node (xt.node/start-node))
+(me/load! node)                                 ; the contract, its model and its clause
+(store/put-model! node "model/identity.cto")    ; OfficeGrant, Attestation
+(store/put-model! node "model/attestation.cto") ; AttestationRequest/Response
+```
+
+The contract is loaded but **not yet approved by the Board**. That matters
+below.
+
+### Two kinds of identity
+
+A Town gets a `did:web` — an identifier that resolves to a document at a URL
+the Town controls, and so can move to the Town's own domain later:
+
+```clojure
+(def town (identity/provision-town! node {:slug "china-grove" :name "China Grove"}))
+(:xt/id town)
+;; => "did:web:trustblocks.com:towns:china-grove"
+```
+
+An officeholder gets a `did:key`, where the identifier *is* the public key and
+there is no document to host:
+
+```clojure
+(def clerk (identity/provision-officeholder!
+            node {:email "pmills@chinagrovenc.gov" :name "Pamela Mills" :office "Town Clerk"}))
+(:xt/id clerk)
+;; => "did:key:z6MkwbnnGGG3zME2S6dNiWrH7mVzZcpBBqt1TgnWzsByhqbf"
+;; (yours will differ: every provisioning generates a fresh keypair)
+
+(= (seq (:identity/public-key clerk))
+   (seq (did-key/public-key (:xt/id clerk))))
+;; => true
+```
+
+The raw 32-byte Ed25519 key decodes straight back out of the identifier. The
+`z6Mk` prefix is the multibase/multicodec marker for an Ed25519 key, the same
+in every `did:key` implementation. Base58 is hand-rolled
+([`did/base58.clj`](../src/com/trustblocks/did/base58.clj)) and tested against
+the spec's published vectors, rather than pulled in from a Bitcoin library.
+
+The email is how a signed-in session finds this identity again. There is no
+separate officeholder login: the session *is* the officeholder.
+
+Keys are **custodial and stored in plaintext** in XTDB. That is deliberate
+and scoped to town staff signing routine attestations, not a system meant to
+resist a hostile database operator — see `xtdb/identity.clj`.
+
+### Authority is a credential, not a role column
+
+Being provisioned grants nothing. Authority is an `OfficeGrant`, a Verifiable
+Credential the Town signs and issues to the Clerk's DID, valid for a term:
+
+```clojure
+(def grant
+  (cert/grant-office! node (:xt/id town)
+                      {:officeholder-did (:xt/id clerk)
+                       :name "Pamela Mills" :office "Town Clerk"
+                       :authority ["CERTIFY_MINUTES" "ATTEST_ORDINANCES"]
+                       :valid-from  (Instant/parse "2025-07-01T00:00:00Z")
+                       :valid-until (Instant/parse "2029-06-30T00:00:00Z")}))
+;; => "eyJhbGciOiJFZERTQSJ9.eyJpc3MiOiJkaWQ6d2ViOnRydXN0YmxvY2tz....jV5HF4dh..."
+```
+
+The credential *is* that string: a VC-JWT, signed EdDSA. Its claims:
+
+```clojure
+(interop/jws-claims grant)
+;; => {:iss "did:web:trustblocks.com:towns:china-grove",
+;;     :sub "did:key:z6MkwbnnGGG3zME2S6dNiWrH7mVzZcpBBqt1TgnWzsByhqbf",
+;;     :vc {"@context"   ["https://www.w3.org/ns/credentials/v2"],
+;;          "type"       ["VerifiableCredential" "OfficeGrant"],
+;;          "issuer"     "did:web:trustblocks.com:towns:china-grove",
+;;          "validFrom"  "2025-07-01T00:00:00Z",
+;;          "validUntil" "2029-06-30T00:00:00Z",
+;;          "credentialSubject" {"id"        "did:key:z6MkwbnnGGG3zME2S6dNiWrH7mVzZcpBBqt1TgnWzsByhqbf",
+;;                               "name"      "Pamela Mills",
+;;                               "office"    "Town Clerk",
+;;                               "authority" ["CERTIFY_MINUTES" "ATTEST_ORDINANCES"]}}}
+```
+
+Only `credentialSubject` is modeled in Concerto
+([`model/identity.cto`](../model/identity.cto)), and it is validated against
+that model before anything is signed. The W3C envelope around it is
+open-world JSON-LD by design, so it is built directly rather than forced into
+a closed-world schema.
+
+**Why VC-JWT rather than Linked-Data Proofs:** the obvious Java library's
+LD-Proof path pulls in bitcoinj, web3j, a native libsodium binding and a third
+Maven repository — a full blockchain stack for a project with no blockchain
+requirement. VC-JWT is a spec-recognized alternative built on
+`nimbus-jose-jwt` plus Google Tink, which Nimbus's Ed25519 signer requires. [`did/vc.clj`](../src/com/trustblocks/did/vc.clj)'s
+docstring has the full trace.
+
+Verifying needs the *issuer's* key, resolved independently. Never trust a
+key carried inside the credential itself:
+
+```clojure
+(vc/verify (:identity/public-key town) grant (:xt/id town) (:xt/id clerk)
+           (Instant/parse "2026-01-01T00:00:00Z"))
+;; => {"id" "did:key:z6Mkwbnn...", "name" "Pamela Mills", "office" "Town Clerk",
+;;     "authority" ["CERTIFY_MINUTES" "ATTEST_ORDINANCES"]}
+
+(vc/verify (:identity/public-key town) grant (:xt/id town) (:xt/id clerk)
+           (Instant/parse "2030-01-01T00:00:00Z"))
+;; => {:error "expired", :valid-until #xt/instant "2029-06-30T00:00:00Z"}
+
+(vc/verify (:identity/public-key clerk) grant (:xt/id town) (:xt/id clerk)
+           (Instant/parse "2026-01-01T00:00:00Z"))
+;; => {:error "signature does not verify"}
+```
+
+The last one is the Clerk's own key trying to pass as the Town's. The
+credential is also stored in XTDB, with its `validFrom`/`validUntil` as the
+row's **valid time** rather than as data columns. That makes "what authority
+did she hold on March 4th?" the same kind of query as Part 3's "what was the
+state on February 10th?".
+
+### Certifying: the contract decides, the host signs
+
+`cert/certify!` is the one place authority to act is decided. Four things
+happen, in this order:
+
+1. **Resolve** the officeholder from the session's email.
+2. **Authorize** against a verified `OfficeGrant` in force at `valid-from`,
+   *the event's own time*, not now. A Clerk certifying a months-old vote needs
+   to have held the office then; whether she holds it today is a different
+   question.
+3. **Ask the contract.** Run `ex/trigger!` with a standard
+   `AttestationRequest` ([`model/attestation.cto`](../model/attestation.cto)),
+   so the contract's own sandboxed clause decides whether the statement can be
+   true yet.
+4. **Sign** the clause's *response*, not the caller's input, as an
+   `Attestation` VC with the officeholder's key.
+
+Try it before the Board has approved anything:
+
+```clojure
+(def vote-meeting (Instant/parse "2025-12-02T00:00:00Z"))
+(def term-end     (Instant/parse "2029-06-30T00:00:00Z"))
+
+(defn attest
+  "The Clerk certifying the council's vote, unless `overrides` say otherwise."
+  [overrides]
+  (cert/certify! node (merge {:email "pmills@chinagrovenc.gov"
+                              :statement "The council voted to approve the manager's employment contract"
+                              :document-hash "sha256:china-grove-vote-2025-12-02"
+                              :contract-id me/contract-id
+                              :required-authority "CERTIFY_MINUTES"
+                              :valid-from vote-meeting :valid-until term-end}
+                             overrides)))
+
+(attest {})
+;; Cannot attest to a contract the Board has not yet approved
+;; {:trustblocks/error :clause-refused}
+```
+
+The Clerk's authority checked out; the *contract* refused. Its clause has one
+branch for `AttestationRequest`, and it will not attest to an approval that
+has not happened (see `clojure-clause` in
+[`dev/manager_employment_demo.clj`](../dev/manager_employment_demo.clj)).
+Adding attestation support to any contract means adding that one branch.
+
+Approve it, then certify:
+
+```clojure
+(me/approve! node)
+
+(def vote (attest {}))
+(:vc (interop/jws-claims vote))
+;; => {"type"       ["VerifiableCredential" "Attestation"],
+;;     "issuer"     "did:key:z6MkwbnnGGG3zME2S6dNiWrH7mVzZcpBBqt1TgnWzsByhqbf",
+;;     "validFrom"  "2025-12-02T00:00:00Z",
+;;     "validUntil" "2029-06-30T00:00:00Z",
+;;     "credentialSubject"
+;;     {"id"           "did:key:z6MkwbnnGGG3zME2S6dNiWrH7mVzZcpBBqt1TgnWzsByhqbf",
+;;      "documentHash" "sha256:china-grove-vote-2025-12-02",
+;;      "statement"    "The council voted to approve the manager's employment contract",
+;;      "contractId"   "china-grove-gover-2025",
+;;      "certifiedAt"  "2026-09-24T13:22:55.388622Z"}, ...}
+```
+
+The refused attempt did not consume its request id, so the retry succeeded.
+
+Two times appear, and they mean different things:
+
+- **`validFrom`** is when the vote happened. It is the credential's valid
+  time.
+- **`certifiedAt`** is when the Clerk actually clicked certify: wall-clock
+  time, added by host code.
+
+The clause could not have supplied either `certifiedAt` or the signer's DID:
+its sandbox has no clock and no identity (Part 3), and that is what keeps an
+attestation replayable. `documentHash` names the document without including
+it, so the credential can be shared when the minutes themselves cannot.
+
+The attestation is also an ordinary execution in the contract's audit trail,
+next to the Board approval:
+
+```clojure
+(mapv #(select-keys % [:at :request-id]) (ex/history node me/contract-id))
+;; => [{:at "2025-12-02T00:00:00.000Z"}
+;;     {:at "2025-12-02T00:00:00Z"
+;;      :request-id "attestation:china-grove-gover-2025:CERTIFY_MINUTES:sha256:china-grove-vote-2025-12-02:2025-12-02T00:00:00Z"}]
+```
+
+### Evidence: the minutes rest on the vote
+
+At the next meeting, the Clerk certifies that the minutes were approved,
+naming the vote certification as `evidence`:
+
+```clojure
+(attest {:statement "Minutes of the December 2 meeting were approved as written"
+         :document-hash "sha256:china-grove-minutes-2026-01-06"
+         :valid-from (Instant/parse "2026-01-06T00:00:00Z")
+         :evidence vote})
+
+(mapv #(select-keys % ["valid-from" "statement" "evidence"])
+      (cert/attestations-for-contract node me/contract-id))
+;; => [{"valid-from" #xt/instant "2025-12-02T00:00:00Z",
+;;      "statement"  "The council voted to approve the manager's employment contract"}
+;;     {"valid-from" #xt/instant "2026-01-06T00:00:00Z",
+;;      "statement"  "Minutes of the December 2 meeting were approved as written",
+;;      "evidence"   "eyJhbGciOiJFZERTQSJ9.eyJpc3MiOiJkaWQ6a2V5..."}]
+```
+
+`evidence` sits beside `credentialSubject` rather than inside it. The vote
+supports this claim; it is not part of what is being claimed. It carries the
+whole earlier JWT, so a verifier holding only the minutes credential can check
+the vote credential too.
+
+### Refusals
+
+Each refusal carries a `:trustblocks/error` tag to branch on, the same
+convention Part 4's HTTP codes come from:
+
+```clojure
+(attest {})                                   ; the same certification again
+;; This request has already been executed against this contract
+;; {:trustblocks/error :duplicate-request, ...}
+
+(attest {:required-authority "SIGN_CONTRACTS"})
+;; This office grant does not include the required authority
+;; {:trustblocks/error :missing-authority, :required "SIGN_CONTRACTS",
+;;  :has #{"ATTEST_ORDINANCES" "CERTIFY_MINUTES"}}
+
+(attest {:valid-from (Instant/parse "2025-03-01T00:00:00Z")})
+;; No office grant in force at that time
+;; {:trustblocks/error :no-office-grant, :at #xt/instant "2025-03-01T00:00:00Z"}
+
+(attest {:email "nobody@example.gov"})
+;; No officeholder identity for this email
+;; {:trustblocks/error :no-such-officeholder}
+```
+
+The duplicate is caught by the request id `certify!` derives from the contract,
+authority, document hash and event time: Part 3's at-most-once guard, reused.
+A retried form post cannot mint a second credential for the same act.
+
+### Revocation is bitemporal
+
+Suppose the Town revokes the Clerk's grant on June 1st, 2026, three years
+early:
+
+```clojure
+(def grant-id
+  (->> (credential/current-for-subject node (:xt/id clerk))
+       (filter #(= cert/office-grant-class (:concerto/class %)))
+       first :xt/id))
+
+(credential/revoke! node grant-id (Instant/parse "2026-06-01T00:00:00Z"))
+```
+
+The signed JWT still says `validUntil 2029-06-30`, and that cannot change
+without re-signing. What changes is the stored row's valid time, which
+`revoke!` closes with `:delete-docs` from June 1st. Nothing is re-written with
+an earlier end, so system time still shows the grant was believed valid until
+the revocation was recorded.
+
+```clojure
+(attest {:statement "Budget amendment minutes" :document-hash "sha256:y"
+         :valid-from (Instant/parse "2026-05-05T00:00:00Z")})
+;; => "eyJhbGciOiJFZERTQSJ9..."          ; May: before the revocation, still authorized
+
+(attest {:statement "Ordinance vote" :document-hash "sha256:x"
+         :valid-from (Instant/parse "2026-07-07T00:00:00Z")})
+;; No office grant in force at that time
+;; {:trustblocks/error :no-office-grant, :at #xt/instant "2026-07-07T00:00:00Z"}
+```
+
+Both calls happen *now*, well after June. Revoking authority going forward
+leaves the Clerk's past acts valid. The operator's ledger shows the difference
+between a revoked grant and one that simply ran out:
+
+```clojure
+(mapv #(select-keys % [:status :valid-until :verified])
+      (:grants (first (cert/signature-authorizations node))))
+;; => [{:status :revoked, :valid-until #xt/instant "2026-06-01T00:00:00Z", :verified true}]
+```
+
+```clojure
+(.close node)
+```
+
+### The same, from the app
+
+`dev/seed.clj` provisions China Grove, four officeholders with `OfficeGrant`s
+(only the Clerk, `pmills@chinagrovenc.gov`, holds `CERTIFY_MINUTES`), and
+the vote-then-minutes pair above. Start it as in Part 4, and wait for
+`Seeded.` on the console before signing in: the app answers requests before
+the seed has provisioned anyone.
+
+- **`/authorizations`** is the read-only ledger: each officeholder, their DID,
+  and each `OfficeGrant` verified against the Town's key and badged *Active*,
+  *Not yet valid*, *Expired*, *Revoked* or *Verification failed*.
+- **`/contracts/china-grove-gover-2025`** lists the contract's certifications
+  and, for a signed-in officeholder, a form that posts to
+  `POST /contracts/:id/certify`.
+
+Part 4's cookie jar belongs to `you@example.com`, who holds no office, so a
+certification posted with it is refused. Sign in again as the Clerk, the same
+three requests with her address and the new code from the console:
+
+```sh
+curl -sc clerk.txt -o /dev/null http://localhost:8080/signin
+curl -sb clerk.txt -c clerk.txt -H 'Origin: http://localhost:8080' \
+     -d 'email=pmills@chinagrovenc.gov' http://localhost:8080/_biff/auth/send-code
+curl -sb clerk.txt -c clerk.txt -H 'Origin: http://localhost:8080' \
+     -d 'email=pmills@chinagrovenc.gov' -d 'code=123456' \
+     http://localhost:8080/_biff/auth/verify-code
+```
+
+Then certify:
+
+```sh
+curl -b clerk.txt -H 'Origin: http://localhost:8080' \
+     --data-urlencode 'statement=The council adopted the FY2027 budget ordinance' \
+     -d 'documentHash=sha256:china-grove-budget-2026-06-02' \
+     -d 'validFrom=2026-06-02T19:00:00Z' \
+     -o /dev/null -w '%{http_code} %{redirect_url}\n' \
+     http://localhost:8080/contracts/china-grove-gover-2025/certify
+```
+
+```
+303 http://localhost:8080/contracts/china-grove-gover-2025
+```
+
+Unlike the JSON trigger endpoint, this is a browser form, so success and
+refusal are both a `303` back to the contract page. A refusal carries its
+message on the query string:
+
+```
+303 .../contracts/china-grove-gover-2025?certify-error=This+request+has+already+been+executed+against+this+contract
+303 .../contracts/china-grove-gover-2025?certify-error=No+office+grant+in+force+at+that+time
+```
+
+The form always asks for `CERTIFY_MINUTES`. The contract page now lists the
+new certification with the two seeded ones:
+
+```
+Certifications (3)
+2025-12-02T00:00:00Z -- Pamela Mills, Town Clerk
+  The council voted to approve the manager's employment contract
+2026-01-06T00:00:00Z -- Pamela Mills, Town Clerk
+  Minutes of the December 2 meeting were approved as written
+  Based on an earlier certification.
+2026-06-02T19:00:00Z -- Pamela Mills, Town Clerk
+  The council adopted the FY2027 budget ordinance
+```
+
+Provisioning a town, an officeholder or a grant has no page. It is a REPL
+procedure, written up in
+[`docs/operator-runbook.md`](operator-runbook.md).
+
+---
+
 ## What this does not do
 
 - **Render contract text.** Turning a template plus data into readable prose is
@@ -460,3 +872,12 @@ that is not built yet.
 - **Authenticate anything but a person.** Signin is passwordless email, and the
   trigger endpoint rides the same session cookie. There is no API credential,
   and no mail provider — the code prints to the console.
+- **Publish anything a verifier outside this database can check.** The Town's
+  `did:web` document is not served, and there is no `credentialStatus`
+  endpoint: revocation is real, but it is visible only to queries against this
+  XTDB node.
+- **Protect signing keys from the database.** Town and officeholder private
+  keys are custodial and stored in plaintext. The documented next step is
+  encrypting them at rest with a server-held secret.
+- **Walk evidence chains.** `evidence` is stored and displayed but never
+  verified recursively, and nothing checks a chain for depth or cycles.
