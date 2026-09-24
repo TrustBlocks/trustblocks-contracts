@@ -281,3 +281,16 @@
     (execute/trigger! node "snow-j" (visit-at "v-2" "2026-02-02T06:00:00Z" 3.5)
                       #inst "2026-02-02T06:00:00Z")
     (is (= 2 (visits-paid node "snow-j")))))
+
+(deftest a-retried-request-is-a-duplicate-even-behind-a-later-state-change
+  ;; A resent request that already landed is answered as a duplicate, with
+  ;; when it ran -- not as out of order, which would suggest it never did.
+  (with-open [node (xt.node/start-node)]
+    (populate! node ["snow-k"])
+    (execute/trigger! node "snow-k" (visit-at "v-1" "2026-01-15T06:00:00Z" 3.5)
+                      "2026-01-15T06:00:00Z" :request-id "r-1")
+    (execute/trigger! node "snow-k" (visit-at "v-2" "2026-02-02T06:00:00Z" 3.5)
+                      "2026-02-02T06:00:00Z" :request-id "r-2")
+    (is (= :duplicate-request
+           (error-tag #(execute/trigger! node "snow-k" (visit-at "v-1" "2026-01-15T06:00:00Z" 3.5)
+                                         "2026-01-15T06:00:00Z" :request-id "r-1"))))))

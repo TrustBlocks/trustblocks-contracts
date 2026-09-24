@@ -426,7 +426,7 @@ identity for this email".
 ```sh
 bin/clj -M:run test
 ```
-Currently 52 tests / 181 assertions, 0 failures. Focus a namespace or var
+Currently 53 tests / 182 assertions, 0 failures. Focus a namespace or var
 with `--focus <fully.qualified.name>`.
 
 **Lint + format + test together** (what to run before considering any change

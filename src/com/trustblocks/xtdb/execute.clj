@@ -311,6 +311,11 @@
   or ::stale if another execution wrote this contract's state in between --
   see assert-state-unchanged."
   [node reg ctx contract-id contract src runtime request now at request-id by]
+  ;; Asked again on every attempt, ahead of the order check: after a retry, a
+  ;; concurrent copy of this same request may be the write that moved the
+  ;; state, and its caller should hear "already executed", not "out of order".
+  (when-let [prior (execution-for-request node contract-id request-id)]
+    (duplicate! contract-id request-id prior))
   (let [version (state-version node contract-id)
         state   (current-state node contract-id :reg reg :at at)
         result (run-clause runtime ctx src {:data contract :request request
