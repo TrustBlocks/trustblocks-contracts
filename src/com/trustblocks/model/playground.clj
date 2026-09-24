@@ -128,10 +128,11 @@
   "The deployed Template Playground by default, or an explicitly configured
   compatible origin (principally a local `webmcp-poc` checkout). A function
   rather than a def so a REPL can change the system property without
-  reloading this namespace."
+  reloading this namespace. A blank setting counts as unset: an exported but
+  empty variable would otherwise yield relative links back into this app."
   []
-  (-> (or (System/getProperty "trustblocks.template-playground-origin")
-          (System/getenv "TRUSTBLOCKS_TEMPLATE_PLAYGROUND_ORIGIN")
+  (-> (or (not-empty (str/trim (or (System/getProperty "trustblocks.template-playground-origin") "")))
+          (not-empty (str/trim (or (System/getenv "TRUSTBLOCKS_TEMPLATE_PLAYGROUND_ORIGIN") "")))
           "https://playground.accordproject.org")
       (str/replace #"/+$" "")))
 
