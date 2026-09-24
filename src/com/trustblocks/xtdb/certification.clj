@@ -42,7 +42,8 @@
   contract) -- all carry a :trustblocks/error tag in their ex-data, the
   same convention throughout, so com.trustblocks.app.certify can turn
   them into status codes without matching on a message string."
-  (:require [com.trustblocks.did.vc :as vc]
+  (:require [com.trustblocks.did.interop :as interop]
+            [com.trustblocks.did.vc :as vc]
             [com.trustblocks.xtdb.credential :as credential]
             [com.trustblocks.xtdb.execute :as execute]
             [com.trustblocks.xtdb.identity :as identity]))
@@ -162,48 +163,75 @@
         :valid-from valid-from :valid-until valid-until
         :evidence evidence}))))
 
+(defn- micros
+  "`instant` at XTDB's own valid-time precision, so a stored bound and the
+  nanosecond-precise one signed into a credential compare equal."
+  [^java.time.Instant instant]
+  (.truncatedTo instant java.time.temporal.ChronoUnit/MICROS))
+
+(defn- office-grant-authorization
+  "One stored OfficeGrant row, verified and decoded for display. Verified at
+  the credential's own signed validFrom rather than the stored row's: XTDB
+  keeps valid time to the microsecond, so a grant issued at a
+  nanosecond-precise (Instant/now) would otherwise be checked a hair before
+  its own window opens and report 'not yet valid'.
+
+  :revoked rather than :expired when XTDB's valid time closed before the
+  credential's own signed validUntil -- the mark credential/revoke! leaves."
+  [node did now {:keys [issuer jwt valid-from valid-until]}]
+  (let [issuer-record (identity/by-did node issuer)
+
+        [claim signed-until]
+        (try
+          (let [signed      (:vc (interop/jws-claims jwt))
+                signed-from (java.time.Instant/parse (get signed "validFrom"))]
+            [(when issuer-record
+               (vc/verify (:identity/public-key issuer-record) jwt issuer did signed-from))
+             (java.time.Instant/parse (get signed "validUntil"))])
+          (catch Exception e
+            [{:error (str "Credential could not be read: " (ex-message e))} nil]))
+
+        verified (boolean (and claim (not (:error claim))))
+        status (cond
+                 (.isBefore now valid-from) :not-yet-valid
+
+                 (and valid-until (.isAfter now valid-until))
+                 (if (and signed-until (.isBefore (micros valid-until) (micros signed-until)))
+                   :revoked
+                   :expired)
+
+                 :else :active)]
+    {:issuer      issuer
+     :authority   (vec (or (get claim "authority") []))
+     :valid-from  valid-from
+     :valid-until valid-until
+     :status      status
+     :verified    verified
+     :error       (cond
+                    (:error claim) (:error claim)
+                    (nil? issuer-record) "Issuer identity is not on file")}))
+
 (defn signature-authorizations
   "Every provisioned officeholder with every signed OfficeGrant ever issued
   to their DID, suitable for the operator-facing authorization ledger.
 
-  Grants are signature-verified at their own valid-from before their claims
-  are exposed. A bad/missing issuer remains visible with :verified false and
-  an :error rather than disappearing from an administrative list -- silence
+  Grants are signature-verified before their claims are exposed (see
+  office-grant-authorization). A bad/missing issuer, or a stored credential
+  too malformed to parse, remains visible with :verified false and an
+  :error rather than disappearing from an administrative list -- silence
   would make corrupted authorization data look like no authorization data."
   [node]
   (let [now (java.time.Instant/now)]
     (mapv
      (fn [officeholder]
-       (let [did (:xt/id officeholder)
-
-             grants
-             (->> (credential/for-subject node did)
-                  (filter #(= office-grant-class (:concerto/class %)))
-                  (mapv
-                   (fn [{:keys [issuer jwt valid-from valid-until]}]
-                     (let [issuer-record (identity/by-did node issuer)
-                           claim (when issuer-record
-                                   (vc/verify (:identity/public-key issuer-record) jwt
-                                              issuer did valid-from))
-                           verified (boolean (and claim (not (:error claim))))
-                           status (cond
-                                    (.isBefore now valid-from) :not-yet-valid
-                                    (and valid-until (.isAfter now valid-until)) :expired
-                                    :else :active)]
-                       {:issuer      issuer
-                        :authority   (vec (or (get claim "authority") []))
-                        :valid-from  valid-from
-                        :valid-until valid-until
-                        :status      status
-                        :verified    verified
-                        :error       (cond
-                                       (nil? issuer-record) "Issuer identity is not on file"
-                                       (:error claim) (:error claim))}))))]
+       (let [did (:xt/id officeholder)]
          {:did    did
           :name   (:identity/name officeholder)
           :email  (:identity/email officeholder)
           :office (:identity/office officeholder)
-          :grants grants}))
+          :grants (->> (credential/for-subject node did)
+                       (filter #(= office-grant-class (:concerto/class %)))
+                       (mapv #(office-grant-authorization node did now %)))}))
      (identity/officeholders node))))
 
 (defn attestations-for-contract
