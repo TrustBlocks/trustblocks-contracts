@@ -264,9 +264,10 @@ not a starting point to improve on.**
   rely on manual verification alone.
 - **Coverage is uneven, intentionally not backfilled wholesale**: DID/
   identity/credential/certification/certify (the newest code) have real unit
-  tests. `template/render.clj`, `model/graph.clj`, `app/trigger.clj`,
-  `app/contracts.clj` do not — they're exercised by the `dev/*_demo.clj`
-  scripts and manual curl instead. Don't assume test presence maps to code
+  tests. `app/trigger.clj` has a handler test for its 409 refusals only.
+  `template/render.clj`, `model/graph.clj` and `app/contracts.clj` have
+  none — they're exercised by the `dev/*_demo.clj` scripts and manual curl
+  instead. Don't assume test presence maps to code
   age or importance.
 - **One PR per coherent increment**, each independently mergeable, each with
   its own "what/why/verification" description — this repo's entire history
@@ -354,13 +355,16 @@ not a starting point to improve on.**
   Display code (`attestations-for-contract`) doesn't walk the chain at all,
   so this is inert today, but a future feature that *does* walk evidence
   chains should treat this as unverified territory.
-- **`current-state`'s temporal semantics** (`execute.clj`) were not fully
-  traced this session — it's unclear from a quick read alone whether it
-  reads state as of real wall-clock "now" or some other point when a clause
-  consults `state`. Every real scenario tested so far only needed "state
-  after a permanent, never-revoked approval," which is insensitive to this
-  distinction; don't assume it's been verified for a case where state
-  changes and un-changes over time.
+- **Late-arriving state changes are refused, not replayed.** `trigger!`
+  hands a clause the state as of the request's own `now` (valid time), and
+  refuses with `:out-of-order` (HTTP 409) any trigger whose *new state* would
+  land before a state change already recorded — writing it would overwrite
+  later state in valid time (it had been doing exactly that before the fix).
+  Answer-only triggers (attestations) may still be back-dated. Accepting a
+  late report properly means replaying every later execution in valid-time
+  order — possible because clauses are pure — but a replay can change answers
+  already acted on (payouts), so it is a design decision still open, not a
+  missing guard. See `execute/assert-no-later-state`.
 - **`docs/walkthrough.md` promises every output came from a real run.**
   Part 5 (identity, DID/VC, attestation) was checked by executing its
   Clojure blocks verbatim. If you change what `certify!`, `grant-office!`,
@@ -419,7 +423,7 @@ identity for this email".
 ```sh
 bin/clj -M:run test
 ```
-Currently 45 tests / 151 assertions, 0 failures. Focus a namespace or var
+Currently 50 tests / 175 assertions, 0 failures. Focus a namespace or var
 with `--focus <fully.qualified.name>`.
 
 **Lint + format + test together** (what to run before considering any change
@@ -462,10 +466,12 @@ bin/template-conformance
    REPL path now exists in `docs/operator-runbook.md`; onboarding no longer
    requires reverse-engineering the seed script, but it is still manual and
    deliberately has no browser write surface.
-3. **Trace `current-state`'s exact temporal read semantics** (see §6) and
-   add a test that actually exercises a contract whose state changes more
-   than once, so the "as of now vs. as of the clause's own `now`" question
-   has a checked answer instead of an assumed one.
+3. **Design contract state beyond one snapshot** — replay of late-arriving
+   executions (see §6), and a data-driven statechart for multi-step contracts
+   (e.g. construction: inspections certified by an engineer or planning
+   director, progress payments, retainage). Align with Accord's proposed
+   `runtime@1.0.0.AgreementState` and `obligation@1.0.0.ObligationTransition`
+   (accordproject/models PR #200, open) rather than inventing new shapes.
 4. **If a second contract template is ever added, use it to pressure-test
    `MunicipalAgreement` reuse and the attestation-clause pattern** — both
    are currently proven against exactly one real contract type each. A
