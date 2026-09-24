@@ -231,16 +231,53 @@
           "the clause saw the state as of Jan 15 (nothing paid), not today's")
       (is (= 1 (visits-paid node "snow-g"))))))
 
-(deftest the-in-transaction-guard-catches-a-late-state-change-on-its-own
-  ;; trigger! checks for a later state change before writing, so the ASSERT
-  ;; is only reached when two triggers race. Exercise it directly, so a
-  ;; mistake in its SQL cannot hide behind the query that usually runs first.
+(deftest the-in-transaction-guard-catches-any-state-written-since-the-read
+  ;; trigger! checks the order before writing, so this ASSERT is only reached
+  ;; when triggers race. Exercise it directly, so a mistake in its SQL cannot
+  ;; hide behind the query that usually runs first.
   (with-open [node (xt.node/start-node)]
     (populate! node ["snow-h"])
-    (execute/trigger! node "snow-h" (visit-at "v-2" "2026-02-20T06:00:00Z" 3.5)
-                      "2026-02-20T06:00:00Z")
-    (let [guard #'execute/assert-no-later-state]
-      (is (thrown? Exception
-                   (xt/execute-tx node [(guard "snow-h" (java.time.Instant/parse "2026-01-15T06:00:00Z"))])))
-      (is (some? (xt/execute-tx node [(guard "snow-h" (java.time.Instant/parse "2026-02-20T06:00:00Z"))])))
-      (is (some? (xt/execute-tx node [(guard "snow-other" (java.time.Instant/parse "2026-01-15T06:00:00Z"))]))))))
+    (let [guard   #'execute/assert-state-unchanged
+          version #(#'execute/state-version node "snow-h")]
+      (testing "before any state, any state write since fails it"
+        (is (nil? (version)))
+        (is (some? (xt/execute-tx node [(guard "snow-h" nil)]))))
+      (execute/trigger! node "snow-h" (visit-at "v-2" "2026-02-20T06:00:00Z" 3.5)
+                        "2026-02-20T06:00:00Z")
+      (is (thrown? Exception (xt/execute-tx node [(guard "snow-h" nil)])))
+      (let [read-version (version)]
+        (is (some? (xt/execute-tx node [(guard "snow-h" read-version)])))
+        (testing "a write dated earlier than the latest still counts as a change"
+          (execute/trigger! node "snow-h" (visit-at "v-3" "2026-02-20T06:00:00Z" 3.5)
+                            "2026-02-20T06:00:00Z")
+          (is (thrown? Exception (xt/execute-tx node [(guard "snow-h" read-version)]))))))))
+
+(deftest concurrent-state-changes-are-never-lost
+  ;; Triggers dated at or before one another, all reading the same state at
+  ;; once: without a guard, several compute "one more than what I read" and
+  ;; the last write wins, dropping visits. Every execution that lands must be
+  ;; counted; the rest are refused as out of order, never silently lost.
+  (with-open [node (xt.node/start-node)]
+    (populate! node ["snow-i"])
+    (let [attempts (->> (range 8)
+                        (mapv (fn [i]
+                                (let [at (format "2026-02-%02dT06:00:00Z" (inc i))]
+                                  (future
+                                    (error-tag
+                                     #(execute/trigger! node "snow-i"
+                                                        (visit-at (str "v-" i) at 3.5)
+                                                        at :request-id (str "r-" i)))))))
+                        (mapv deref))
+          landed   (count (execute/history node "snow-i"))]
+      (is (every? #{:out-of-order} (filter some? attempts)) (pr-str attempts))
+      (is (= landed (count (remove some? attempts))))
+      (is (= landed (visits-paid node "snow-i"))))))
+
+(deftest a-java-util-date-is-accepted-as-now
+  (with-open [node (xt.node/start-node)]
+    (populate! node ["snow-j"])
+    (execute/trigger! node "snow-j" (visit-at "v-1" "2026-01-15T06:00:00Z" 3.5)
+                      #inst "2026-01-15T06:00:00Z")
+    (execute/trigger! node "snow-j" (visit-at "v-2" "2026-02-02T06:00:00Z" 3.5)
+                      #inst "2026-02-02T06:00:00Z")
+    (is (= 2 (visits-paid node "snow-j")))))

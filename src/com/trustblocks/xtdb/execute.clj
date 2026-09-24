@@ -40,7 +40,8 @@
   other way."
   [dt]
   (cond
-    (inst? dt) dt
+    (instance? java.time.Instant dt) dt
+    (inst? dt) (.toInstant ^java.util.Date dt)
     (string? dt) (-> (try (java.time.OffsetDateTime/parse dt)
                           (catch Exception _
                             (java.time.OffsetDateTime/parse (str dt "Z"))))
@@ -226,24 +227,49 @@
                    :at                (str at)
                    :later-state-from  (str later)})))
 
-(defn- assert-no-later-state
-  "A transaction op that aborts the whole transaction if this contract's state
-  already changed after `at` -- the in-transaction half of later-state-change,
-  closing the gap between reading and writing the way assert-unused does for
-  request ids.
+(defn- state-version
+  "The newest system-from among this contract's state rows, or nil before any
+  execution has written state. Any state write after it -- at whatever valid
+  time -- produces a row newer than this, so it identifies the state a clause
+  was handed."
+  [node contract-id]
+  (->> (xt/q node (list 'from state-table
+                        {:for-valid-time :all-time
+                         :bind           [{:xt/id contract-id} 'xt/system-from]}))
+       (map #(.toInstant ^java.time.ZonedDateTime (:xt/system-from %)))
+       sort
+       last))
 
-  Why refuse at all: a new state is written valid from `at` onward with no
-  end, so writing it behind a later change would overwrite that change in
-  valid time, and the later execution's own answer was computed from a state
-  that no longer includes this one. Accepting a late report properly means
+(defn- assert-state-unchanged
+  "A transaction op that aborts the whole transaction if any state has been
+  written for this contract since `version` (see state-version) -- the clause
+  ran against a state that is no longer the one on record, whether the new
+  write is dated before, at, or after this request. Optimistic concurrency:
+  trigger! runs the clause again against the new state, which is safe because
+  nothing was written and the clause is pure.
+
+  The order check (later-state-change, before the write) is separate and is
+  a refusal rather than a retry. A new state is written valid from `at`
+  onward with no end, so writing it behind a later change would overwrite
+  that change in valid time. Accepting a late report properly means
   re-running every later execution in valid-time order -- possible, since
   clauses are pure, but a replay can change answers already acted on (a
-  payout already made), which is a decision for a person, not a silent
-  side effect of a trigger."
-  [contract-id at]
-  [:sql (str "ASSERT NOT EXISTS (SELECT 1 FROM contract_state FOR ALL VALID_TIME "
-             "WHERE _id = ? AND _valid_from > ?)")
-   [contract-id at]])
+  payout already made), which is a decision for a person, not a silent side
+  effect of a trigger."
+  [contract-id version]
+  (if version
+    [:sql (str "ASSERT NOT EXISTS (SELECT 1 FROM contract_state FOR ALL VALID_TIME "
+               "WHERE _id = ? AND _system_from > ?)")
+     [contract-id version]]
+    [:sql (str "ASSERT NOT EXISTS (SELECT 1 FROM contract_state FOR ALL VALID_TIME "
+               "WHERE _id = ?)")
+     [contract-id]]))
+
+(def ^:private max-attempts
+  "How many times trigger! re-runs a clause whose state changed underneath it
+  before giving up. Each retry means another writer committed in between, so
+  exhausting this takes sustained contention on one contract."
+  5)
 
 (defn- assert-failed? [e]
   (= :xtdb/assert-failed (:xtdb.error/code (ex-data e))))
@@ -280,6 +306,85 @@
                     {:trustblocks/error :runtime-unavailable
                      :runtime           runtime}))))
 
+(defn- run-and-record!
+  "One attempt at trigger!'s clause run and write. Returns trigger!'s result,
+  or ::stale if another execution wrote this contract's state in between --
+  see assert-state-unchanged."
+  [node reg ctx contract-id contract src runtime request now at request-id by]
+  (let [version (state-version node contract-id)
+        state   (current-state node contract-id :reg reg :at at)
+        result (run-clause runtime ctx src {:data contract :request request
+                                            :state state :now now})
+        response (:response result)]
+
+    (when-not response
+      (throw (ex-info "Clause returned no :response"
+                      {:trustblocks/error :invalid-clause-output
+                       :contract          contract-id
+                       :returned          (keys result)})))
+    (doseq [[what instance] [[:response response] [:state (:state result)]]
+            :when instance]
+      (when-let [errs (store/validate reg instance)]
+        (throw (ex-info (str "Clause produced an invalid " (name what))
+                        {:trustblocks/error :invalid-clause-output
+                         :$class            (get instance "$class")
+                         :errors            (restate-errors
+                                             reg (get instance "$class") errs)}))))
+
+    ;; A clause that only answers -- an attestation, say -- may be dated
+    ;; before later state changes: it read the state as of its own time and
+    ;; writes none. Only a new state has to land after every earlier one.
+    (when (:state result)
+      (when-let [later (later-state-change node contract-id at)]
+        (out-of-order! contract-id at later)))
+
+    (let [written
+          (try
+            (xt/execute-tx
+             node
+             (cond-> []
+               request-id (conj (assert-unused contract-id request-id))
+
+               :always (conj (assert-state-unchanged contract-id version))
+
+               :always
+               (conj [:put-docs execution-table
+                      (cond-> {:xt/id     (random-uuid)
+                               :contract  contract-id
+                               :at        now
+                               :request   (k/->xtdb request)
+                               :response  (k/->xtdb response)
+                               :clause    src}
+                        request-id (assoc :request-id request-id)
+                        by         (assoc :by by))])
+
+         ;; The new state is valid from the moment the request took effect,
+         ;; not from when the database learned of it. That separation is the
+         ;; whole point: a back-dated execution lands in valid time while
+         ;; system time still records when we believed it -- provided it is
+         ;; not behind a later state change, see assert-state-unchanged.
+               (:state result)
+               (conj [:put-docs {:into state-table :valid-from at}
+                      (k/instance->doc (:state result)
+                                       :identity-field (mm/identity-field
+                                                        reg (get (:state result) "$class")))])))
+            (catch Exception e
+              (if (assert-failed? e)
+          ;; Two assertions can fail. A used request id is final; otherwise
+          ;; the state moved underneath the clause, and trigger! runs it
+          ;; again -- which also re-checks the order against the new state.
+                (if-let [prior (execution-for-request node contract-id request-id)]
+                  (duplicate! contract-id request-id prior)
+                  ::stale)
+                (throw e))))]
+
+      (if (= ::stale written)
+        ::stale
+        {:response   response
+         :state      (:state result)
+         :at         now
+         :request-id request-id}))))
+
 (defn trigger!
   "Run a contract's clause against `request` and record what happened.
 
@@ -302,8 +407,9 @@
 
   The clause sees the state as it stood at `now`, not as it stands today, and
   a trigger whose new state would land behind a state change already recorded
-  is refused as :out-of-order rather than overwriting it -- see
-  assert-no-later-state.
+  is refused as :out-of-order rather than overwriting it. If another execution
+  writes this contract's state while the clause runs, the clause is run again
+  against the new state -- see assert-state-unchanged.
 
   `:by` records who submitted it. Everything else here answers what happened
   and when; for a record that may be read in a dispute, who is the third
@@ -313,7 +419,12 @@
   a bad request from a refusal from a broken clause without reading messages.
   See com.trustblocks.app.trigger, which turns those tags into status codes."
   [node contract-id request now & {:keys [reg ctx request-id by]}]
-  (let [reg (or reg (store/registry-from-xtdb node))
+  (let [;; A clause receives DateTimes as wire strings, never a platform date
+        ;; (see com.trustblocks.clause), so an Instant or Date from a REPL is
+        ;; normalised here. A string passes through untouched, keeping the
+        ;; caller's own spelling of it.
+        now (if (string? now) now (str (->instant now)))
+        reg (or reg (store/registry-from-xtdb node))
         ctx (or ctx (clause/context))
         contract (or (store/get-instance node contract-id :reg reg)
                      (throw (ex-info "No such contract"
@@ -341,72 +452,17 @@
                        :errors            (restate-errors
                                            reg (get request "$class") errs)})))
 
-    (let [at     (->instant now)
-          state  (current-state node contract-id :reg reg :at at)
-          result (run-clause runtime ctx src {:data contract :request request
-                                              :state state :now now})
-          response (:response result)]
+    (let [at (->instant now)]
+      (loop [attempt 1]
+        (let [outcome (run-and-record! node reg ctx contract-id contract src runtime
+                                       request now at request-id by)]
+          (cond
+            (not= ::stale outcome) outcome
 
-      (when-not response
-        (throw (ex-info "Clause returned no :response"
-                        {:trustblocks/error :invalid-clause-output
-                         :contract          contract-id
-                         :returned          (keys result)})))
-      (doseq [[what instance] [[:response response] [:state (:state result)]]
-              :when instance]
-        (when-let [errs (store/validate reg instance)]
-          (throw (ex-info (str "Clause produced an invalid " (name what))
-                          {:trustblocks/error :invalid-clause-output
-                           :$class            (get instance "$class")
-                           :errors            (restate-errors
-                                               reg (get instance "$class") errs)}))))
+            (< attempt max-attempts) (recur (inc attempt))
 
-      ;; A clause that only answers -- an attestation, say -- may be dated
-      ;; before later state changes: it read the state as of its own time and
-      ;; writes none. Only a new state has to land after every earlier one.
-      (when (:state result)
-        (when-let [later (later-state-change node contract-id at)]
-          (out-of-order! contract-id at later)))
-
-      (try
-        (xt/execute-tx
-         node
-         (cond-> []
-           request-id (conj (assert-unused contract-id request-id))
-
-           (:state result) (conj (assert-no-later-state contract-id at))
-
-           :always
-           (conj [:put-docs execution-table
-                  (cond-> {:xt/id     (random-uuid)
-                           :contract  contract-id
-                           :at        now
-                           :request   (k/->xtdb request)
-                           :response  (k/->xtdb response)
-                           :clause    src}
-                    request-id (assoc :request-id request-id)
-                    by         (assoc :by by))])
-
-           ;; The new state is valid from the moment the request took effect,
-           ;; not from when the database learned of it. That separation is the
-           ;; whole point: a back-dated execution lands in valid time while
-           ;; system time still records when we believed it -- provided it is
-           ;; not behind a later state change, see assert-no-later-state.
-           (:state result)
-           (conj [:put-docs {:into state-table :valid-from at}
-                  (k/instance->doc (:state result)
-                                   :identity-field (mm/identity-field
-                                                    reg (get (:state result) "$class")))])))
-        (catch Exception e
-          (if (assert-failed? e)
-            ;; Two assertions can fail; whichever condition now holds says
-            ;; which one lost the race.
-            (if-let [prior (execution-for-request node contract-id request-id)]
-              (duplicate! contract-id request-id prior)
-              (out-of-order! contract-id at (later-state-change node contract-id at)))
-            (throw e))))
-
-      {:response   response
-       :state      (:state result)
-       :at         now
-       :request-id request-id})))
+            :else
+            (throw (ex-info "The contract's state kept changing while this request ran"
+                            {:trustblocks/error :state-conflict
+                             :contract          contract-id
+                             :attempts          attempt}))))))))

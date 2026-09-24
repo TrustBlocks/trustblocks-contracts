@@ -364,7 +364,10 @@ not a starting point to improve on.**
   late report properly means replaying every later execution in valid-time
   order — possible because clauses are pure — but a replay can change answers
   already acted on (payouts), so it is a design decision still open, not a
-  missing guard. See `execute/assert-no-later-state`.
+  missing guard. Concurrent triggers on one contract are optimistic: the
+  transaction asserts the state the clause read is still the latest, and
+  `trigger!` re-runs the (pure) clause if it is not. See
+  `execute/assert-state-unchanged`.
 - **`docs/walkthrough.md` promises every output came from a real run.**
   Part 5 (identity, DID/VC, attestation) was checked by executing its
   Clojure blocks verbatim. If you change what `certify!`, `grant-office!`,
@@ -423,7 +426,7 @@ identity for this email".
 ```sh
 bin/clj -M:run test
 ```
-Currently 50 tests / 175 assertions, 0 failures. Focus a namespace or var
+Currently 52 tests / 181 assertions, 0 failures. Focus a namespace or var
 with `--focus <fully.qualified.name>`.
 
 **Lint + format + test together** (what to run before considering any change

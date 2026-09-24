@@ -101,6 +101,7 @@
    :no-such-contract      404
    :duplicate-request     409
    :out-of-order          409
+   :state-conflict        409
    :no-clause             422
    :clause-refused        422
    :runtime-unavailable   501
