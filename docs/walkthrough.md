@@ -20,11 +20,17 @@ The example is a small self-contained municipal contract,
 agreement that pays a fixed rate per visit when snowfall clears a trigger depth.
 It imports nothing, so it parses without fetching anything.
 
-You need Accord's CLI on `$PATH` or in `$CONCERTO_CLI`:
+Install the package-lock-pinned Accord toolchain, then point bare babashka
+(the only command here that does not go through `bin/clj`) at its local CLI:
 
+```sh
+npm install
+export CONCERTO_CLI="$PWD/node_modules/.bin/concerto"
 ```
-npm i -g @accordproject/concerto-cli
-```
+
+`bin/clj` sets this automatically for every JVM command. The local CLI is
+4.2.x and uses Concerto Core/CTO 5; do not rely on an older globally installed
+`concerto` binary.
 
 ---
 

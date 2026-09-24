@@ -10,6 +10,7 @@
   this project does not otherwise depend on."
   (:require [cheshire.core :as json]
             [clojure.java.io :as io]
+            [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
             [com.trustblocks.model.playground :as pg]
             [com.trustblocks.template.archive :as archive]
@@ -20,8 +21,10 @@
            [java.nio.file.attribute FileAttribute]))
 
 (defn- decode [url]
-  (json/parse-string
-   (LZSEncoding/decompressFromEncodedURIComponent (subs url (inc (.indexOf ^String url "#"))))))
+  (let [fragment (subs url (inc (.indexOf ^String url "#")))
+        payload  (str/replace-first fragment #"^data=" "")]
+    (json/parse-string
+     (LZSEncoding/decompressFromEncodedURIComponent payload))))
 
 ;; A minimal single-namespace, single-file template -- everything
 ;; template-playground's share link can actually hold, so template-status
@@ -80,11 +83,23 @@ concept Greeting {
           {:keys [url unavailable]} (pg/template-status node reg instance)]
       (is (some? url))
       (is (nil? unavailable))
-      (is (.startsWith ^String url "https://playground.accordproject.org/#"))
+      (is (.startsWith ^String url "https://playground.accordproject.org/#data="))
       (let [payload (decode url)]
         (is (= greeting-template (get payload "templateMarkdown")))
         (is (= greeting-cto (get payload "modelCto")))
         (is (= instance (json/parse-string (get payload "data"))))))))
+
+(deftest template-status-can-target-a-local-webmcp-playground
+  (with-open [node (xt.node/start-node)]
+    (ingest-greeting! node)
+    (let [reg      (store/registry-from-xtdb node)
+          instance {"$class" "test.greeting@1.0.0.Greeting" "name" "Ada"}]
+      (System/setProperty "trustblocks.template-playground-origin" "http://localhost:5173/")
+      (try
+        (let [{:keys [url]} (pg/template-status node reg instance)]
+          (is (.startsWith ^String url "http://localhost:5173/#data=")))
+        (finally
+          (System/clearProperty "trustblocks.template-playground-origin"))))))
 
 (deftest template-status-explains-a-missing-template
   (with-open [node (xt.node/start-node)]

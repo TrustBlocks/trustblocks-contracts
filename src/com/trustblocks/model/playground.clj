@@ -13,7 +13,9 @@
   checked in both directions), then dropped straight into the URL fragment
   with no further escaping, since LZ-String's URI-safe mode only emits
   characters already legal there. No server, no account, no expiry -- the
-  link is the state.
+  link is the state. Template Playground's current contract prefixes its
+  payload with `#data=`; Concerto Playground still consumes the compressed
+  array directly after `#`, so these are deliberately two link builders.
 
   The two playgrounds do not accept the same shape of state, and the
   difference is load-bearing:
@@ -24,11 +26,12 @@
     property types touch -- fits in one link. concerto-url below always
     returns one.
 
-  - Template Playground takes exactly one .cto string, no more. Checked
-    directly against its own rebuild(), on its newest commit (pulled
-    fresh, not a stale clone, while writing this): it calls
-    modelManager.addCTOModel(model, undefined, true) exactly once, and a
-    model text can declare only one namespace -- confirmed by an actual
+  - Template Playground takes exactly one .cto string, no more. Re-checked
+    against the `webmcp-poc` branch at 8206dc1: rebuild() still calls
+    modelManager.addCTOModel(model, undefined, true) exactly once, and its
+    share state still has singular `modelCto`. WebMCP adds six in-page tools
+    (get/set template, model, and data); it does not add multi-model loading.
+    A model text can declare only one namespace -- confirmed by an actual
     Concerto parse error when every one of our namespaces was concatenated
     into one string. So a contract whose model needs more than one
     namespace beyond what the playground bundles (see
@@ -56,7 +59,13 @@
     developing Template Playground -- worth checking again periodically
     for either broader bundling or genuine multi-file support before
     concluding the only fix is self-hosting one, which remains the real
-    fix if neither materializes."
+    fix if neither materializes.
+
+    The WebMCP branch is source code, not a separately hosted deployment.
+    `TRUSTBLOCKS_TEMPLATE_PLAYGROUND_ORIGIN` can point links at a local
+    checkout running on port 5173 for exploration; see
+    docs/template-playground-webmcp.md. The default remains Accord's official
+    deployed playground."
   (:require [cheshire.core :as json]
             [clojure.string :as str]
             [com.trustblocks.concerto.metamodel :as mm]
@@ -109,8 +118,25 @@
 
 ;; ---------------------------------------------------------------- linking
 
+(defn- compressed-payload [payload]
+  (LZSEncoding/compressToEncodedURIComponent (json/generate-string payload)))
+
 (defn- share-link [origin payload]
-  (str origin "/#" (LZSEncoding/compressToEncodedURIComponent (json/generate-string payload))))
+  (str origin "/#" (compressed-payload payload)))
+
+(defn template-playground-origin
+  "The deployed Template Playground by default, or an explicitly configured
+  compatible origin (principally a local `webmcp-poc` checkout). A function
+  rather than a def so a REPL can change the system property without
+  reloading this namespace."
+  []
+  (-> (or (System/getProperty "trustblocks.template-playground-origin")
+          (System/getenv "TRUSTBLOCKS_TEMPLATE_PLAYGROUND_ORIGIN")
+          "https://playground.accordproject.org")
+      (str/replace #"/+$" "")))
+
+(defn- template-share-link [payload]
+  (str (template-playground-origin) "/#data=" (compressed-payload payload)))
 
 (defn concerto-url
   "A concerto-playground.accordproject.org link that opens with `fqn`'s
@@ -164,8 +190,8 @@
             "and its share link holds only one.")}
 
       :else
-      {:url (share-link "https://playground.accordproject.org"
-                        {:templateMarkdown grammar
-                         :modelCto         (store/model-source node (first custom))
-                         :data             (json/generate-string instance)
-                         :agreementHtml    ""})})))
+      {:url (template-share-link
+             {:templateMarkdown grammar
+              :modelCto         (store/model-source node (first custom))
+              :data             (json/generate-string instance)
+              :agreementHtml    ""})})))

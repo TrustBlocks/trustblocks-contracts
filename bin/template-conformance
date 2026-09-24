@@ -3,10 +3,10 @@
 # toolchain -- cicero-core must load the archive, template-engine must draft
 # it. See dev/conformance.cljs and docs/templatemark-conformance.md.
 #
-# Node-only, and dev-only: the reference implementation is JavaScript and has
-# no JVM port, so this is the one place the project needs Node. It is not on
-# any request path and not part of `bin/clj -M:run code-quality`, so a
-# Clojure-only change needs none of it.
+# This conformance check is dev-only: the reference implementation is
+# JavaScript and has no JVM port. Node is also used by concerto-clj during
+# model ingestion, but this full draft-through-the-reference-engine check is
+# not on any request path and is not part of `bin/clj -M:run code-quality`.
 #
 # Usage:  bin/template-conformance [dir]     (default: docs/examples)
 set -euo pipefail
