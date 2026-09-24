@@ -93,8 +93,8 @@ model/                     repo-root — cross-cutting Concerto models not owned
                              adopts for attestation support (see certification.clj)
 
 docs/
-  walkthrough.md             narrative tour, Parts 1-4 (Concerto as data -> storing -> executing -> HTTP trigger).
-                             STALE: predates identity/DID/certification entirely, has no "Part 5"
+  walkthrough.md             narrative tour, Parts 1-5 (Concerto as data -> storing -> executing -> HTTP trigger
+                             -> identity, DID/VC and attestation); every form is meant to be pasted and run
   operator-runbook.md         local operations: seed/signin, demo identities, REPL provisioning/revocation
   model-repository.md        municipal model namespace conventions, reuse-by-inheritance rule, parked publishing plan
   concerto-xtdb-mapping.md   original research notes on the Concerto<->XTDB mapping problem xtdb/keys.clj solves
@@ -320,10 +320,6 @@ not a starting point to improve on.**
   `dev/contract_queries.clj`. Its `party-roles`/`date-fields` tables are
   hand-keyed to a few Accord *reference* templates, not the municipal ones
   this app actually seeds, so it would need real data to be useful as-is.
-- **`docs/walkthrough.md`**: covers Parts 1-4 (model as data -> storage ->
-  execution -> HTTP trigger) in real depth, but was never extended to cover
-  identity, DID/VC, or attestation — a reader following it today would not
-  discover any of that surface exists.
 
 **Not started:**
 - Any UI for provisioning a Town, an officeholder, or an `OfficeGrant` —
@@ -365,9 +361,11 @@ not a starting point to improve on.**
   after a permanent, never-revoked approval," which is insensitive to this
   distinction; don't assume it's been verified for a case where state
   changes and un-changes over time.
-- **`docs/walkthrough.md` is stale** (see §5) — if you extend the
-  identity/certification surface further, either update it or explicitly
-  decide not to; don't let it silently drift further from what the app does.
+- **`docs/walkthrough.md` promises every output came from a real run.**
+  Part 5 (identity, DID/VC, attestation) was checked by executing its
+  Clojure blocks verbatim. If you change what `certify!`, `grant-office!`,
+  `revoke!` or `signature-authorizations` return or refuse, re-run those
+  blocks and update the captured output rather than letting it drift.
 - **The Accord Node toolchain currently reports npm audit findings.** After
   the Concerto 5 / Template Engine 5 upgrade, `npm audit` reports 22
   transitive findings (9 moderate, 13 high, 0 critical). Direct Accord
@@ -410,15 +408,18 @@ bin/clj -M:xtdb-jvm-opts -i dev/seed.clj
 ```
 Leaves the app running on `http://localhost:8080`. Sign in at `/signin` with
 any email to browse read-only; the six-digit code prints to this same
-console (no mail provider). Sign in as `clerk@china-grove.example.gov`
-specifically to see and use the certification form on
-`/contracts/china-grove-gover-2025`.
+console (no mail provider). Sign in as `pmills@chinagrovenc.gov` (the seeded
+Town Clerk) specifically to see and use the certification form on
+`/contracts/china-grove-gover-2025`. Wait for `Seeded.` on the console first:
+the server answers requests before the seed has provisioned any officeholder,
+and a certify POST made in that window is refused with "No officeholder
+identity for this email".
 
 **Run tests:**
 ```sh
 bin/clj -M:run test
 ```
-Currently 41 tests / 143 assertions, 0 failures. Focus a namespace or var
+Currently 45 tests / 151 assertions, 0 failures. Focus a namespace or var
 with `--focus <fully.qualified.name>`.
 
 **Lint + format + test together** (what to run before considering any change
@@ -452,29 +453,25 @@ bin/template-conformance
 
 ## 8. Recommended next steps
 
-1. **Update `docs/walkthrough.md` with a Part 5** covering identity, DID/VC,
-   and attestation — it's the single most misleading artifact in the repo
-   right now for anyone (human or agent) orienting from the docs rather than
-   the code, since it describes the app as if PRs #11-14 never happened.
-2. **Decide whether `com.trustblocks.contract` (party querying) and
+1. **Decide whether `com.trustblocks.contract` (party querying) and
    `model/graph.clj`'s field-level resolvers get a real caller, or get
    removed.** Both are complete, working code with zero production callers;
    left alone indefinitely they'll bit-rot against model/schema changes
    nothing exercises them against.
-3. **Decide whether provisioning warrants a guarded admin UI.** A concrete
+2. **Decide whether provisioning warrants a guarded admin UI.** A concrete
    REPL path now exists in `docs/operator-runbook.md`; onboarding no longer
    requires reverse-engineering the seed script, but it is still manual and
    deliberately has no browser write surface.
-4. **Trace `current-state`'s exact temporal read semantics** (see §6) and
+3. **Trace `current-state`'s exact temporal read semantics** (see §6) and
    add a test that actually exercises a contract whose state changes more
    than once, so the "as of now vs. as of the clause's own `now`" question
    has a checked answer instead of an assumed one.
-5. **If a second contract template is ever added, use it to pressure-test
+4. **If a second contract template is ever added, use it to pressure-test
    `MunicipalAgreement` reuse and the attestation-clause pattern** — both
    are currently proven against exactly one real contract type each. A
    second real template is the cheapest way to find out whether either
    generalizes as intended.
-6. Only after the above: revisit the explicitly-parked items (`:typescript`
+5. Only after the above: revisit the explicitly-parked items (`:typescript`
    clause runtime, model-publishing repo, bearer-token auth, mail provider,
    key encryption at rest) — none of them block anything else on this list,
    and none were asked for yet.
