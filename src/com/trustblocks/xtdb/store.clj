@@ -135,12 +135,18 @@
 
 (defn get-instance
   "Read an instance back out as Concerto JSON, restoring $class and the original
-  camelCase property names."
-  [node id & {:keys [table reg] :or {table contract-table}}]
+  camelCase property names.
+
+  `:at`, an Instant, reads the instance as it stood at that point in valid
+  time rather than as it stands now."
+  [node id & {:keys [table reg at] :or {table contract-table}}]
   ;; The id must be matched as a literal in the binding pattern. Writing
   ;; {:xt/id $id} with an :args param does NOT filter -- XTDB treats $id as
   ;; another column to project and returns the entire table.
-  (let [q (list 'from table [{:xt/id id} (symbol "*")])]
+  (let [bind [{:xt/id id} (symbol "*")]
+        q    (list 'from table (if at
+                                 {:for-valid-time (list 'at at) :bind bind}
+                                 bind))]
     (when-let [record (first (xt/q node q))]
       ;; Falls back to the stored schema rather than to ->camelCase: inferring
       ;; the name is lossy for anything not plain camelCase (vechileID,

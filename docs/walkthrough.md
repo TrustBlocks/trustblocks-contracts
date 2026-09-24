@@ -436,6 +436,7 @@ Failures are a code to branch on and a message to read:
 | `400 invalid-request` | the request is not a valid instance of its `$class` |
 | `404 no-such-contract` | |
 | `409 duplicate-request` | that `requestId` has already run on this contract |
+| `409 out-of-order` | the request would change state before a state change already recorded (`at` is too early) |
 | `422 clause-refused` | the contract declined — *Already approved by the Board* is an answer, not a failure |
 | `422 no-clause` | no logic is stored for this contract's type |
 | `501 runtime-unavailable` | the clause's runtime is not implemented here (today: `:typescript`) |
