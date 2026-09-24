@@ -20,4 +20,13 @@ fi
 export JAVA_HOME
 export PATH="$JAVA_HOME/bin:$PATH"
 
+# concerto-clj shells out to Accord's CLI whenever a .cto model is loaded.
+# Prefer this repo's package-lock-pinned CLI (Concerto 5 core) over whatever
+# older `concerto` happens to be installed globally. An explicit caller value
+# still wins, which is useful for compatibility probes.
+repo_dir="$(cd "$(dirname "$0")/.." && pwd)"
+if [[ -z "${CONCERTO_CLI:-}" && -x "$repo_dir/node_modules/.bin/concerto" ]]; then
+  export CONCERTO_CLI="$repo_dir/node_modules/.bin/concerto"
+fi
+
 exec clojure "$@"

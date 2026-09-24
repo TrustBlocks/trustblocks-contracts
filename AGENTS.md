@@ -38,7 +38,7 @@ bin/template-conformance  Node/Accord JS toolchain check that templates load+dra
 repl.clj                  REPL scratch: (get-node), (refresh)
 resources/config.edn      Biff config (port, cookie secret, css paths, main-ns, nrepl-port)
 tests.edn                 kaocha config
-package.json              dev-only Node deps (Accord's own JS toolchain), used by bin/template-conformance
+package.json              pinned Accord JS toolchain: local Concerto 5 CLI + template conformance
 
 src/com/trustblocks/
   trustblocks.clj          app entrypoint: start/stop/-main, boots `modules` in `start-order`, launches nREPL
@@ -99,6 +99,7 @@ docs/
   model-repository.md        municipal model namespace conventions, reuse-by-inheritance rule, parked publishing plan
   concerto-xtdb-mapping.md   original research notes on the Concerto<->XTDB mapping problem xtdb/keys.clj solves
   templatemark-conformance.md  the case for round-tripping templates through Accord's own JS toolchain
+  template-playground-webmcp.md  local exploration of Accord's experimental webmcp-poc branch
   examples/
     snow-removal.cto           synthetic, walkthrough-only contract — deliberately zero imports
     manager-employment-contract/  the REAL China Grove contract: model/ (6 namespaces), sample.json, text/grammar.tem.md
@@ -367,6 +368,12 @@ not a starting point to improve on.**
 - **`docs/walkthrough.md` is stale** (see §5) — if you extend the
   identity/certification surface further, either update it or explicitly
   decide not to; don't let it silently drift further from what the app does.
+- **The Accord Node toolchain currently reports npm audit findings.** After
+  the Concerto 5 / Template Engine 5 upgrade, `npm audit` reports 22
+  transitive findings (9 moderate, 13 high, 0 critical). Direct Accord
+  packages are current; npm's advertised remediations are semver-major
+  downgrades to obsolete package lines, so do not run `npm audit fix --force`
+  blindly. Re-check upstream releases and the actual dependency paths.
 - **No CI.** There's no `.github/workflows` or equivalent — `bin/clj -M:run
   code-quality` and the test suite are run manually, by a human or an agent,
   before merging. Nothing enforces that on GitHub itself.
@@ -391,8 +398,10 @@ new machine):
   `bin/template-conformance`: `com.trustblocks.concerto.cto/parse` (in the
   external `concerto-clj` dependency) shells out to Accord's own JS tooling
   to parse `.cto` files, and that runs every time `put-model!`/`load-registry`
-  is called — including inside most of the test suite. If tests fail with
-  something about spawning a process or finding a CLI, check Node first.
+  is called — including inside most of the test suite. `bin/clj` automatically
+  prefers the lockfile-pinned `node_modules/.bin/concerto` (CLI 4.2 backed by
+  Concerto Core/CTO 5) over an older global installation. If tests fail with
+  something about spawning a process or finding a CLI, check Node/npm first.
 
 **Run the app locally:**
 ```sh
@@ -409,7 +418,7 @@ specifically to see and use the certification form on
 ```sh
 bin/clj -M:run test
 ```
-Currently 40 tests / 142 assertions, 0 failures. Focus a namespace or var
+Currently 41 tests / 143 assertions, 0 failures. Focus a namespace or var
 with `--focus <fully.qualified.name>`.
 
 **Lint + format + test together** (what to run before considering any change

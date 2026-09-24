@@ -1,16 +1,16 @@
 # TemplateMark conformance: what Accord's engine actually requires
 
 Findings from running our manager-employment template against Accord's own
-toolchain -- `@accordproject/cicero-core` 2.1.1 and
-`@accordproject/template-engine` 4.0.0, the same libraries the APAP server
-uses. Everything below was established by probing the engine, not by reading
+toolchain. The current lockfile resolves `@accordproject/cicero-core` 2.2.0,
+`@accordproject/template-engine` 5.1.0, and Concerto Core/CTO 5.0.0.
+Everything below was established by probing the engine, not by reading
 the spec, because several of these behaviours are not what the syntax
 suggests.
 
 ## Running the check
 
 ```sh
-npm install              # once; dev-only, node_modules is gitignored
+npm install              # once; node_modules is gitignored
 bin/template-conformance
 ```
 
@@ -40,7 +40,7 @@ the syntax suggests.
 | Requirement | Symptom if missing |
 | --- | --- |
 | Exactly one concept carries `@template` | `Failed to find a concept with the @template decorator` |
-| `package.json` exists, with `accordproject.cicero` satisfied by the installed cicero | `The template targets Cicero version ^0.25.0 but the current Cicero version is 2.1.1` |
+| `package.json` exists, with `accordproject.cicero` satisfied by the installed cicero | `The template targets Cicero version ^0.25.0 but the current Cicero version is 2.2.0` |
 | Optional properties are guarded by **their own name** | `Optional properties used without guards: retroactiveDate` |
 
 The cicero range is a real gate: the vendored `late-delivery.cta` declares

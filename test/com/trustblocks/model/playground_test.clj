@@ -10,6 +10,7 @@
   this project does not otherwise depend on."
   (:require [cheshire.core :as json]
             [clojure.java.io :as io]
+            [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
             [com.trustblocks.model.playground :as pg]
             [com.trustblocks.template.archive :as archive]
@@ -20,8 +21,10 @@
            [java.nio.file.attribute FileAttribute]))
 
 (defn- decode [url]
-  (json/parse-string
-   (LZSEncoding/decompressFromEncodedURIComponent (subs url (inc (.indexOf ^String url "#"))))))
+  (let [fragment (subs url (inc (.indexOf ^String url "#")))
+        payload  (str/replace-first fragment #"^data=" "")]
+    (json/parse-string
+     (LZSEncoding/decompressFromEncodedURIComponent payload))))
 
 ;; A minimal single-namespace, single-file template -- everything
 ;; template-playground's share link can actually hold, so template-status
@@ -72,19 +75,55 @@ concept Greeting {
       (is (.startsWith ^String url "https://concerto-playground.accordproject.org/#"))
       (is (= [original] sources)))))
 
+(defn- with-origin-property
+  "Runs `f` with the origin system property set to `origin`, restoring
+  whatever value the JVM had before. The property outranks the
+  TRUSTBLOCKS_TEMPLATE_PLAYGROUND_ORIGIN variable, so pinning it keeps these
+  tests independent of a shell that exported the WebMCP override."
+  [origin f]
+  (let [k    "trustblocks.template-playground-origin"
+        prev (System/getProperty k)]
+    (System/setProperty k origin)
+    (try
+      (f)
+      (finally
+        (if prev
+          (System/setProperty k prev)
+          (System/clearProperty k))))))
+
 (deftest template-status-succeeds-for-a-self-contained-template
   (with-open [node (xt.node/start-node)]
     (ingest-greeting! node)
     (let [reg      (store/registry-from-xtdb node)
           instance {"$class" "test.greeting@1.0.0.Greeting" "name" "Ada"}
-          {:keys [url unavailable]} (pg/template-status node reg instance)]
+          {:keys [url unavailable]} (with-origin-property
+                                      "https://playground.accordproject.org"
+                                      #(pg/template-status node reg instance))]
       (is (some? url))
       (is (nil? unavailable))
-      (is (.startsWith ^String url "https://playground.accordproject.org/#"))
+      (is (.startsWith ^String url "https://playground.accordproject.org/#data="))
       (let [payload (decode url)]
         (is (= greeting-template (get payload "templateMarkdown")))
         (is (= greeting-cto (get payload "modelCto")))
         (is (= instance (json/parse-string (get payload "data"))))))))
+
+(deftest template-status-can-target-a-local-webmcp-playground
+  (with-open [node (xt.node/start-node)]
+    (ingest-greeting! node)
+    (let [reg      (store/registry-from-xtdb node)
+          instance {"$class" "test.greeting@1.0.0.Greeting" "name" "Ada"}
+          {:keys [url]} (with-origin-property "http://localhost:5173/"
+                          #(pg/template-status node reg instance))]
+      (is (.startsWith ^String url "http://localhost:5173/#data=")))))
+
+(deftest blank-origin-property-is-treated-as-unset
+  ;; Falls through to the environment variable, if this shell exported one,
+  ;; and otherwise to the deployed playground -- never to "".
+  (let [env (System/getenv "TRUSTBLOCKS_TEMPLATE_PLAYGROUND_ORIGIN")]
+    (is (= (if (str/blank? env)
+             "https://playground.accordproject.org"
+             (str/replace (str/trim env) #"/+$" ""))
+           (with-origin-property "  " pg/template-playground-origin)))))
 
 (deftest template-status-explains-a-missing-template
   (with-open [node (xt.node/start-node)]
