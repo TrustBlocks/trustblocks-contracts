@@ -50,7 +50,9 @@ src/com/trustblocks/
   app/                     HTTP handlers + Biff modules
     auth.clj                 passwordless email signin (com.biffweb/authenticate); no mail provider, prints codes
     landing.clj               "/"
-    contracts.clj             read-only contract UI (list/show/model/document) + the Certifications section/form
+    contracts.clj             contract dashboard + show/model/document views + Certifications section/form
+    clauses.clj               read-only inventory of stored clause logic and runtimes
+    authorizations.clj        read-only DID identity + verified OfficeGrant credential ledger
     trigger.clj               POST /contracts/:id/trigger — JSON envelope, for scripts/machines
     certify.clj               POST /contracts/:id/certify — HTML form, for a signed-in officeholder
 
@@ -93,6 +95,7 @@ model/                     repo-root — cross-cutting Concerto models not owned
 docs/
   walkthrough.md             narrative tour, Parts 1-4 (Concerto as data -> storing -> executing -> HTTP trigger).
                              STALE: predates identity/DID/certification entirely, has no "Part 5"
+  operator-runbook.md         local operations: seed/signin, demo identities, REPL provisioning/revocation
   model-repository.md        municipal model namespace conventions, reuse-by-inheritance rule, parked publishing plan
   concerto-xtdb-mapping.md   original research notes on the Concerto<->XTDB mapping problem xtdb/keys.clj solves
   templatemark-conformance.md  the case for round-tripping templates through Accord's own JS toolchain
@@ -282,9 +285,10 @@ not a starting point to improve on.**
   Clojure/SCI, bitemporal state, at-most-once via request-id, full audit
   trail. Proven on two real contracts (snow-removal's visit-report/payout
   cycle; the employment contract's Board-approval).
-- Read-only contract UI: list, show (data/current-state/history/
-  certifications), model (fields + native Concerto source), document
-  (TemplateMark-subset rendered prose) — all behind signin.
+- Signed-in operations UI: contract dashboard and show (data/current-state/
+  history/certifications), model (fields + native Concerto source), document
+  (TemplateMark-subset prose + Word-export stub), stored clause inventory,
+  and a signature-authorization ledger that verifies OfficeGrant VCs.
 - Passwordless email signin (console-printed codes; no real mail provider).
 - DID (`did:key`, minimal `did:web`) + Verifiable Credentials (VC-JWT):
   issue, verify, revoke (bitemporal), evidence-chaining. Tested against real
@@ -322,8 +326,9 @@ not a starting point to improve on.**
 
 **Not started:**
 - Any UI for provisioning a Town, an officeholder, or an `OfficeGrant` —
-  today this is exclusively `dev/certification_demo.clj`/REPL calls. There is
-  no admin page.
+  today this is exclusively `dev/certification_demo.clj`/REPL calls. The
+  exact operator procedure is in `docs/operator-runbook.md`, but there is no
+  write-capable admin page.
 - A bearer-token/API credential for machine callers — `trigger`/`certify`
   both ride the session cookie; a script has to sign in like a person.
 - A real mail provider for signin codes.
@@ -404,7 +409,7 @@ specifically to see and use the certification form on
 ```sh
 bin/clj -M:run test
 ```
-Currently 36 tests / 121 assertions, 0 failures. Focus a namespace or var
+Currently 40 tests / 142 assertions, 0 failures. Focus a namespace or var
 with `--focus <fully.qualified.name>`.
 
 **Lint + format + test together** (what to run before considering any change
@@ -447,10 +452,10 @@ bin/template-conformance
    removed.** Both are complete, working code with zero production callers;
    left alone indefinitely they'll bit-rot against model/schema changes
    nothing exercises them against.
-3. **Build a minimal provisioning UI** (or a documented CLI/REPL runbook, if
-   a UI isn't worth it yet) for creating a Town/officeholder/OfficeGrant —
-   right now onboarding a *second* real town requires hand-editing a script
-   like `dev/certification_demo.clj`, which won't scale past one demo town.
+3. **Decide whether provisioning warrants a guarded admin UI.** A concrete
+   REPL path now exists in `docs/operator-runbook.md`; onboarding no longer
+   requires reverse-engineering the seed script, but it is still manual and
+   deliberately has no browser write surface.
 4. **Trace `current-state`'s exact temporal read semantics** (see §6) and
    add a test that actually exercises a contract whose state changes more
    than once, so the "as of now vs. as of the clause's own `now`" question

@@ -27,6 +27,8 @@ namespace com.trustblocks.identity@1.0.0
 enum Authority {
   o CERTIFY_MINUTES
   o ATTEST_ORDINANCES
+  o SIGN_CONTRACTS
+  o ATTEST_FINANCIALS
 }
 
 /**

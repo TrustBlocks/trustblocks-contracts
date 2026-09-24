@@ -69,6 +69,12 @@
 (defn- error-tag [f]
   (try (f) nil (catch clojure.lang.ExceptionInfo e (:trustblocks/error (ex-data e)))))
 
+(deftest list-clauses-exposes-the-stored-runtime-and-source
+  (with-open [node (xt.node/start-node)]
+    (populate! node ["snow-list"])
+    (is (= [{:class fqn :runtime :clojure :source clause}]
+           (execute/list-clauses node)))))
+
 (deftest a-used-request-id-is-refused
   (with-open [node (xt.node/start-node)]
     (populate! node ["snow-a" "snow-b"])

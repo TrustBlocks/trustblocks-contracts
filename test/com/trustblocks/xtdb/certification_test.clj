@@ -23,6 +23,7 @@
             [com.trustblocks.xtdb.identity :as identity]
             [com.trustblocks.xtdb.store :as store]
             [manager-employment-demo :as me]
+            [xtdb.api :as xt]
             [xtdb.node :as xt.node])
   (:import [java.time Instant]))
 
@@ -92,6 +93,69 @@
                                               :document-hash "h" :contract-id contract-id
                                               :required-authority "CERTIFY_MINUTES"
                                               :valid-from vote-meeting :valid-until year-end}))))))))
+
+(deftest signature-authorizations-verifies-and-decodes-office-grants
+  (with-open [node (xt.node/start-node)]
+    (populate! node)
+    (let [{:keys [clerk]} (provision! node)
+          [authorization] (cert/signature-authorizations node)
+          [grant] (:grants authorization)]
+      (is (= (:xt/id clerk) (:did authorization)))
+      (is (= "Jane Clerk" (:name authorization)))
+      (is (= ["CERTIFY_MINUTES"] (:authority grant)))
+      (is (true? (:verified grant)))
+      (is (= year-start (:valid-from grant)))
+      (is (= year-end (:valid-until grant))))))
+
+(deftest signature-authorizations-verifies-a-nanosecond-precise-grant
+  ;; XTDB stores valid time to the microsecond; the signed credential keeps
+  ;; the full nanosecond Instant. Verifying at the stored bound would check
+  ;; a hair before the credential's own window opens.
+  (with-open [node (xt.node/start-node)]
+    (populate! node)
+    (let [town  (identity/provision-town! node {:slug "china-grove" :name "China Grove"})
+          clerk (identity/provision-officeholder! node {:email "clerk@china-grove.example.gov"
+                                                        :name "Jane Clerk" :office "Town Clerk"})]
+      (cert/grant-office! node (:xt/id town)
+                          {:officeholder-did (:xt/id clerk) :name "Jane Clerk" :office "Town Clerk"
+                           :authority ["CERTIFY_MINUTES"]
+                           :valid-from (Instant/parse "2026-01-01T00:00:00.123456789Z")
+                           :valid-until year-end})
+      (let [[grant] (:grants (first (cert/signature-authorizations node)))]
+        (is (true? (:verified grant)))
+        (is (nil? (:error grant)))))))
+
+(deftest signature-authorizations-distinguishes-revoked-from-expired
+  (with-open [node (xt.node/start-node)]
+    (populate! node)
+    (let [{:keys [town clerk]} (provision! node)
+          [{grant-id :xt/id}] (credential/current-for-subject node (:xt/id clerk))]
+      (credential/revoke! node grant-id (Instant/parse "2026-06-01T00:00:00Z"))
+      ;; A second grant that simply ran out on its own signed validUntil.
+      (cert/grant-office! node (:xt/id town)
+                          {:officeholder-did (:xt/id clerk) :name "Jane Clerk" :office "Town Clerk"
+                           :authority ["CERTIFY_MINUTES"]
+                           :valid-from (Instant/parse "2024-01-01T00:00:00Z")
+                           :valid-until (Instant/parse "2025-01-01T00:00:00Z")})
+      (let [grants (:grants (first (cert/signature-authorizations node)))]
+        (is (= [:expired :revoked] (mapv :status grants)))
+        (is (every? :verified grants))))))
+
+(deftest signature-authorizations-survives-a-malformed-credential
+  (with-open [node (xt.node/start-node)]
+    (populate! node)
+    (let [{:keys [town clerk]} (provision! node)]
+      (xt/execute-tx node [[:put-docs {:into credential/credential-table
+                                       :valid-from year-start :valid-to year-end}
+                            {:xt/id          (random-uuid)
+                             :issuer         (:xt/id town)
+                             :subject        (:xt/id clerk)
+                             :concerto/class cert/office-grant-class
+                             :jwt            "not-a-jwt"}]])
+      (let [grants (:grants (first (cert/signature-authorizations node)))]
+        (is (= 2 (count grants)))
+        (is (= 1 (count (filter :verified grants))))
+        (is (some #(re-find #"could not be read" (or (:error %) "")) grants))))))
 
 (deftest certify-checks-authority-as-of-the-events-own-time-not-now
   (with-open [node (xt.node/start-node)]

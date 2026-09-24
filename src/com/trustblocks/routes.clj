@@ -15,6 +15,8 @@
 ;; is how the first attempt at this ended up pointing at nothing.
 (def signout (constantly biff.auth/signout-path))
 (defpath contracts "/contracts")
+(defpath clauses "/clauses")
+(defpath authorizations "/authorizations")
 (defpath contract "/contracts/:id")
 (defpath contract-document "/contracts/:id/document")
 (defpath contract-model "/contracts/:id/model")

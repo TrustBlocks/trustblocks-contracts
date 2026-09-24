@@ -16,6 +16,7 @@
 
     bin/clj -M:xtdb-jvm-opts -i dev/certification_demo.clj"
   (:require [com.trustblocks.xtdb.certification :as cert]
+            [com.trustblocks.xtdb.credential :as credential]
             [com.trustblocks.xtdb.execute :as ex]
             [com.trustblocks.xtdb.identity :as identity]
             [com.trustblocks.xtdb.store :as store]
@@ -24,8 +25,33 @@
   (:import [java.time Instant]))
 
 (def town-slug "china-grove")
-(def clerk-email "clerk@china-grove.example.gov")
+(def town-did "did:web:trustblocks.com:towns:china-grove")
+(def clerk-email "pmills@chinagrovenc.gov")
 (def contract-id me/contract-id)
+
+(def officeholders
+  "The email-linked demo authorization ledger requested for China Grove.
+
+  These authorities are test policy, not a claim that the titles alone confer
+  these powers under North Carolina law. They make each role visible through
+  the signed OfficeGrant UI while preserving the one real application rule in
+  use today: only the Town Clerk receives CERTIFY_MINUTES."
+  [{:email "fgover@chinagrovenc.gov"
+    :name "Franklin Gover"
+    :office "Town Manager"
+    :authority ["SIGN_CONTRACTS"]}
+   {:email clerk-email
+    :name "Pamela Mills"
+    :office "Town Clerk"
+    :authority ["CERTIFY_MINUTES" "ATTEST_ORDINANCES"]}
+   {:email "rnewsome@chinagrovenc.gov"
+    :name "Rebekah Newsome"
+    :office "Finance Director"
+    :authority ["ATTEST_FINANCIALS"]}
+   {:email "rphillips@chinagrovenc.gov"
+    :name "Rodney Phillips"
+    :office "Mayor"
+    :authority ["SIGN_CONTRACTS" "ATTEST_ORDINANCES"]}])
 
 ;; The vote's own date is the real councilActionDate from
 ;; docs/examples/manager-employment-contract/sample.json. The sample has
@@ -41,15 +67,26 @@
 (def grant-valid-from (Instant/parse "2025-07-01T00:00:00Z"))
 (def grant-valid-until (Instant/parse "2029-06-30T00:00:00Z"))
 
-(defn- provision! [node]
-  (let [town  (identity/provision-town! node {:slug town-slug :name "China Grove"})
-        clerk (identity/provision-officeholder! node {:email clerk-email :name "Jane Clerk"
-                                                      :office "Town Clerk"})]
-    (cert/grant-office! node (:xt/id town)
-                        {:officeholder-did (:xt/id clerk) :name "Jane Clerk" :office "Town Clerk"
-                         :authority ["CERTIFY_MINUTES"]
-                         :valid-from grant-valid-from :valid-until grant-valid-until})
-    clerk))
+(defn- ensure-town! [node]
+  (or (identity/by-did node town-did)
+      (identity/provision-town! node {:slug town-slug :name "China Grove"})))
+
+(defn- office-grant? [record]
+  (= cert/office-grant-class (:concerto/class record)))
+
+(defn- ensure-officeholder! [node town {:keys [email name office authority]}]
+  (let [officeholder (or (identity/by-email node email)
+                         (identity/provision-officeholder!
+                          node {:email email :name name :office office}))]
+    (when-not (some office-grant? (credential/for-subject node (:xt/id officeholder)))
+      (cert/grant-office! node (:xt/id town)
+                          {:officeholder-did (:xt/id officeholder)
+                           :name name
+                           :office office
+                           :authority authority
+                           :valid-from grant-valid-from
+                           :valid-until grant-valid-until}))
+    officeholder))
 
 (defn load!
   "Ensures the contract exists and is already Board-approved (see the
@@ -65,8 +102,10 @@
     (me/approve! node))
   (store/put-model! node "model/identity.cto")
   (store/put-model! node "model/attestation.cto")
-  (or (identity/by-email node clerk-email)
-      (provision! node)))
+  (let [town (ensure-town! node)]
+    (doseq [officeholder officeholders]
+      (ensure-officeholder! node town officeholder))
+    (identity/by-email node clerk-email)))
 
 (defn certify!
   "The vote, then the minutes approving it. Redo-safe now the same way

@@ -4,8 +4,9 @@
   hiccup -> HTTP response conversion that `defroute` used to do for us lives
   instead."
   (:require [clojure.java.io :as io]
-            [dev.onionpancakes.chassis.core :as chassis]
             [com.biffweb.datastar :as biff.datastar]
+            [com.trustblocks.routes :as routes]
+            [dev.onionpancakes.chassis.core :as chassis]
             [ring.util.response :as ring-response]))
 
 (def default-page-opts
@@ -17,6 +18,37 @@
 
 (def ^:private datastar-script-url
   "https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js")
+
+(def ^:private workspace-nav
+  [[:contracts routes/contracts "Contracts"]
+   [:clauses routes/clauses "Clause Listing"]
+   [:authorizations routes/authorizations "Signature Authorizations"]])
+
+(defn workspace-header
+  "The shared product header for signed-in operational pages. `active` is
+  one of :contracts, :clauses, or :authorizations; keeping the navigation
+  here rather than repeating it in each handler is what makes those three
+  views feel like one application rather than unrelated demo pages."
+  [active]
+  [:header {:class ["border-b border-slate-200 bg-white"]}
+   [:div {:class ["mx-auto flex max-w-6xl flex-col gap-4 px-6 py-5 sm:flex-row sm:items-end sm:justify-between"]}
+    [:div
+     [:a {:href (routes/contracts) :class ["text-2xl font-semibold tracking-tight text-slate-950"]}
+      "Trustblocks"]
+     [:p {:class ["mt-0.5 text-sm font-medium uppercase tracking-widest text-blue-700"]}
+      "Municipal Contracts"]]
+    [:div {:class ["flex flex-wrap items-center gap-2"]}
+     [:nav {:aria-label "Primary" :class ["flex flex-wrap gap-2"]}
+      (for [[key route label] workspace-nav]
+        [:a {:href (route)
+             :class (if (= key active)
+                      ["rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white"]
+                      ["rounded-md px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-950"])}
+         label])]
+     [:form {:method "post" :action (routes/signout)}
+      [:button {:type "submit"
+                :class ["rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:border-slate-400 hover:text-slate-950"]}
+       "Sign out"]]]]])
 
 (defn static-path
   "Cache-busts a /public asset by appending its last-modified time."

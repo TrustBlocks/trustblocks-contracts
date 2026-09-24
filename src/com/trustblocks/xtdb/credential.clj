@@ -76,24 +76,27 @@
   credential's own valid-from -- not :xt/id, which is a random UUID and
   so is no order at all; sorting by it produced a flaky test before this
   function existed to fix that in one place. Renames the bound
-  xt/valid-from into a plain :valid-from on the way out, converted from
-  XTDB's own #xt/zdt (a ZonedDateTime) to a plain java.time.Instant --
-  the type every valid-from/valid-until this codebase passes around
-  already is, so a caller comparing this against one of those (see
-  com.trustblocks.xtdb.certification/attestations-for-contract) isn't
-  caught out by a ClassCastException between two clock types that both
-  print as an ISO-8601 instant."
+  xt/valid-from/xt/valid-to into plain :valid-from/:valid-until on the way
+  out, converted from XTDB's own #xt/zdt (a ZonedDateTime) to plain
+  java.time.Instant -- the type every valid-from/valid-until this codebase
+  passes around already is, so a caller comparing this against one of those
+  (see com.trustblocks.xtdb.certification/attestations-for-contract) isn't
+  caught out by a ClassCastException between two clock types that both print
+  as an ISO-8601 instant."
   [node literal-binding]
   (->> (xt/q node (list 'from credential-table
                         {:for-valid-time :all-time
-                         :bind           [literal-binding (symbol "*") 'xt/valid-from]}))
+                         :bind           [literal-binding (symbol "*")
+                                          'xt/valid-from 'xt/valid-to]}))
        (sort-by :xt/valid-from)
-       (mapv #(-> % (assoc :valid-from (.toInstant ^java.time.ZonedDateTime (:xt/valid-from %)))
-                  (dissoc :xt/valid-from)))))
+       (mapv #(-> %
+                  (assoc :valid-from (.toInstant ^java.time.ZonedDateTime (:xt/valid-from %))
+                         :valid-until (some-> ^java.time.ZonedDateTime (:xt/valid-to %) .toInstant))
+                  (dissoc :xt/valid-from :xt/valid-to)))))
 
 (defn for-subject
   "Every credential ever issued to `subject`, as stored -- {:issuer
-  :subject :concerto/class :jwt :valid-from}, oldest first. Includes
+  :subject :concerto/class :jwt :valid-from :valid-until}, oldest first. Includes
   credentials outside their own valid-time window (expired, or not yet
   in force); see current-for-subject and as-of-for-subject for the
   questions that answer 'is this one usable right now'."
