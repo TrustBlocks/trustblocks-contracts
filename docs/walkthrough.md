@@ -575,7 +575,7 @@ a closed-world schema.
 LD-Proof path pulls in bitcoinj, web3j, a native libsodium binding and a third
 Maven repository — a full blockchain stack for a project with no blockchain
 requirement. VC-JWT is a spec-recognized alternative built on
-`nimbus-jose-jwt` alone. [`did/vc.clj`](../src/com/trustblocks/did/vc.clj)'s
+`nimbus-jose-jwt` plus Google Tink, which Nimbus's Ed25519 signer requires. [`did/vc.clj`](../src/com/trustblocks/did/vc.clj)'s
 docstring has the full trace.
 
 Verifying needs the *issuer's* key, resolved independently. Never trust a
@@ -803,10 +803,23 @@ the seed has provisioned anyone.
   and, for a signed-in officeholder, a form that posts to
   `POST /contracts/:id/certify`.
 
-Signed in as the Clerk, with the same cookie jar as Part 4:
+Part 4's cookie jar belongs to `you@example.com`, who holds no office, so a
+certification posted with it is refused. Sign in again as the Clerk, the same
+three requests with her address and the new code from the console:
 
 ```sh
-curl -b cookies.txt -H 'Origin: http://localhost:8080' \
+curl -sc clerk.txt -o /dev/null http://localhost:8080/signin
+curl -sb clerk.txt -c clerk.txt -H 'Origin: http://localhost:8080' \
+     -d 'email=pmills@chinagrovenc.gov' http://localhost:8080/_biff/auth/send-code
+curl -sb clerk.txt -c clerk.txt -H 'Origin: http://localhost:8080' \
+     -d 'email=pmills@chinagrovenc.gov' -d 'code=123456' \
+     http://localhost:8080/_biff/auth/verify-code
+```
+
+Then certify:
+
+```sh
+curl -b clerk.txt -H 'Origin: http://localhost:8080' \
      --data-urlencode 'statement=The council adopted the FY2027 budget ordinance' \
      -d 'documentHash=sha256:china-grove-budget-2026-06-02' \
      -d 'validFrom=2026-06-02T19:00:00Z' \
