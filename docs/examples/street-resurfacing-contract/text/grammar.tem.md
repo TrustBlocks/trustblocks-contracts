@@ -69,21 +69,21 @@ B. The Contractor shall provide a completed IRS Form W-9 to the Town prior to ex
 
 **Sec. 9. Performance of Work by Contractor.**
 
-\(a\) The Contractor warrants that all work performed under this Contract conforms to the Contract requirements and is free of any defect in equipment, material, or design furnished, or workmanship performed, by the Contractor or any subcontractor or supplier at any tier. This warranty shall continue for a period of one (1) year from the date of issuance by the Town of written final acceptance of the work.
+(a) The Contractor warrants that all work performed under this Contract conforms to the Contract requirements and is free of any defect in equipment, material, or design furnished, or workmanship performed, by the Contractor or any subcontractor or supplier at any tier. This warranty shall continue for a period of one (1) year from the date of issuance by the Town of written final acceptance of the work.
 
-\(b\) The Contractor shall remedy at its own expense any failure to conform or any defect. In addition, the Contractor shall remedy at its own expense any damage to Town-owned or Town-controlled real or personal property when that damage results from (1) the Contractor's failure to conform to contract requirements, or (2) any defect of equipment, material, workmanship, or design furnished.
+(b) The Contractor shall remedy at its own expense any failure to conform or any defect. In addition, the Contractor shall remedy at its own expense any damage to Town-owned or Town-controlled real or personal property when that damage results from (1) the Contractor's failure to conform to contract requirements, or (2) any defect of equipment, material, workmanship, or design furnished.
 
-\(c\) The Contractor shall restore any work damaged in fulfilling the terms and conditions of this clause. The Contractor's warranty with respect to work repaired or replaced shall run for one (1) year from the date of repair or replacement.
+(c) The Contractor shall restore any work damaged in fulfilling the terms and conditions of this clause. The Contractor's warranty with respect to work repaired or replaced shall run for one (1) year from the date of repair or replacement.
 
-\(d\) The Town shall notify the Contractor in writing within a reasonable time, not to exceed thirty (30) days, after discovery of any failure, defect, or damage.
+(d) The Town shall notify the Contractor in writing within a reasonable time, not to exceed thirty (30) days, after discovery of any failure, defect, or damage.
 
-\(e\) If the Contractor fails to remedy any failure, defect, or damage within a reasonable time, not to exceed thirty (30) days unless otherwise agreed in writing and signed by the Town Manager or designee, after receipt of notice, the Town shall have the right to replace, repair, or otherwise remedy the failure, defect, or damage at the Contractor's expense.
+(e) If the Contractor fails to remedy any failure, defect, or damage within a reasonable time, not to exceed thirty (30) days unless otherwise agreed in writing and signed by the Town Manager or designee, after receipt of notice, the Town shall have the right to replace, repair, or otherwise remedy the failure, defect, or damage at the Contractor's expense.
 
-\(f\) With respect to all warranties, express or implied, from subcontractors, manufacturers, or suppliers for work performed and materials furnished under this Contract, the Contractor shall (1) obtain all warranties that would be given in normal commercial practice; (2) require all warranties to be executed in writing for the benefit of the Town, if directed by the Town; and (3) enforce all warranties for the benefit of the Town, if directed by the Town.
+(f) With respect to all warranties, express or implied, from subcontractors, manufacturers, or suppliers for work performed and materials furnished under this Contract, the Contractor shall (1) obtain all warranties that would be given in normal commercial practice; (2) require all warranties to be executed in writing for the benefit of the Town, if directed by the Town; and (3) enforce all warranties for the benefit of the Town, if directed by the Town.
 
-\(g\) In the event the Contractor's warranty has expired, the Town may bring suit at its own expense to enforce a subcontractor's, manufacturer's, or supplier's warranty.
+(g) In the event the Contractor's warranty has expired, the Town may bring suit at its own expense to enforce a subcontractor's, manufacturer's, or supplier's warranty.
 
-\(h\) Unless a defect is caused by the negligence of the Contractor or a subcontractor or supplier at any tier, the Contractor shall not be liable for the repair of any defect of material or design furnished by the Town, nor for the repair of any damage resulting from any defect in Town-furnished material or design.
+(h) Unless a defect is caused by the negligence of the Contractor or a subcontractor or supplier at any tier, the Contractor shall not be liable for the repair of any defect of material or design furnished by the Town, nor for the repair of any damage resulting from any defect in Town-furnished material or design.
 
 **Sec. 10. Performance of Work by Town.**
 
@@ -93,33 +93,33 @@ If the Contractor fails to perform the work in accordance with the schedule refe
 
 The following attachments are made a part of this Contract and incorporated herein by reference:
 
-> \(a\) Exhibit “A” — Scope of Services / Fee for Scope of Services.
->
-> \(b\) Exhibit “B” — E-Verify Affidavit and Certifications (E-Verify, Iran Divestment Act, Israel Boycott, Gift Ban / Conflict of Interest).
->
-> \(c\) Exhibit “C” — Tax Forms.
->
-> \(d\) Exhibit “D” — Certificate of Insurance.
->
-> \(e\) Exhibit “E” — Finance Forms.
->
-> \(f\) Exhibit “F” — Bond Forms (Bid Bond, Performance Bond, Payment Bond).
->
-> \(g\) Exhibit “G” — General Conditions, Bid Form, and Debarred Firms Certification Form.
->
-> \(h\) Exhibit “H” — Special Provisions and Conditions.
->
-> \(j\) Exhibit “I” — Notice of Award.
->
-> \(k\) Exhibit “J” — Notice to Proceed.
->
-> \(l\) Attachment 1 — Street Schedule.
+(a) Exhibit “A” — Scope of Services / Fee for Scope of Services.
+
+(b) Exhibit “B” — E-Verify Affidavit and Certifications (E-Verify, Iran Divestment Act, Israel Boycott, Gift Ban / Conflict of Interest).
+
+(c) Exhibit “C” — Tax Forms.
+
+(d) Exhibit “D” — Certificate of Insurance.
+
+(e) Exhibit “E” — Finance Forms.
+
+(f) Exhibit “F” — Bond Forms (Bid Bond, Performance Bond, Payment Bond).
+
+(g) Exhibit “G” — General Conditions, Bid Form, and Debarred Firms Certification Form.
+
+(h) Exhibit “H” — Special Provisions and Conditions.
+
+(j) Exhibit “I” — Notice of Award.
+
+(k) Exhibit “J” — Notice to Proceed.
+
+(l) Attachment 1 — Street Schedule.
 
 In case of conflict between an attachment and the text of this contract excluding the attachment, the text of this contract shall control. Any attachment that materially alters the standard terms contained herein must be reviewed by the Town Attorney and approved by the Town in writing.
 
 **Sec. 12. Notice.**
 
-\(a\) All notices and other communications required or permitted by this Contract shall be in writing and shall be given by personal delivery, by electronic mail with confirmed receipt, or by certified United States mail, return receipt requested, addressed as follows:
+(a) All notices and other communications required or permitted by this Contract shall be in writing and shall be given by personal delivery, by electronic mail with confirmed receipt, or by certified United States mail, return receipt requested, addressed as follows:
 
 **To the Town:** {{managerName}}, Town Manager, Town of China Grove, 333 North Main Street, China Grove, NC 28023, (704) 857-2466
 
@@ -127,7 +127,7 @@ In case of conflict between an attachment and the text of this contract excludin
 
 **To the Contractor:** {{#optional contractorNoticeAddress}}{{this}}{{else}}\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_ \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_ \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_{{/optional}}
 
-\(b\) Change of Address; Date Notice Deemed Given. A change of address, electronic mail address, or person to receive notice may be made by either party by notice given to the other party. Any notice under this Contract shall be deemed given at the time of actual delivery if personally delivered or sent by electronic mail with confirmed receipt. If sent by U.S. Mail, it shall be deemed given upon the third calendar day following the day on which it is deposited with the U.S. Postal Service, or upon actual delivery, whichever first occurs.
+(b) Change of Address; Date Notice Deemed Given. A change of address, electronic mail address, or person to receive notice may be made by either party by notice given to the other party. Any notice under this Contract shall be deemed given at the time of actual delivery if personally delivered or sent by electronic mail with confirmed receipt. If sent by U.S. Mail, it shall be deemed given upon the third calendar day following the day on which it is deposited with the U.S. Postal Service, or upon actual delivery, whichever first occurs.
 
 **Sec. 13. Indemnification.**
 
@@ -141,45 +141,45 @@ If the Contractor is dissolved or suspended and the Contractor does not notify t
 
 **Sec. 15. Miscellaneous.**
 
-\(a\) Choice of Law and Forum. This Contract shall be deemed made in Rowan County, North Carolina, and shall be governed by and construed in accordance with the laws of North Carolina. The exclusive forum and venue for all actions arising out of this Contract shall be the appropriate division of the North Carolina General Court of Justice sitting in Rowan County. Such actions shall neither be commenced in nor removed to federal court. This Section shall not apply to subsequent actions to enforce a judgment entered in actions heard pursuant to this Section.
+(a) Choice of Law and Forum. This Contract shall be deemed made in Rowan County, North Carolina, and shall be governed by and construed in accordance with the laws of North Carolina. The exclusive forum and venue for all actions arising out of this Contract shall be the appropriate division of the North Carolina General Court of Justice sitting in Rowan County. Such actions shall neither be commenced in nor removed to federal court. This Section shall not apply to subsequent actions to enforce a judgment entered in actions heard pursuant to this Section.
 
-\(b\) Waiver. No action or failure to act by the Town shall constitute a waiver of any of its rights or remedies that arise out of this Contract, nor shall such action or failure to act constitute approval of or acquiescence in a breach hereunder, except as may be specifically agreed in writing.
+(b) Waiver. No action or failure to act by the Town shall constitute a waiver of any of its rights or remedies that arise out of this Contract, nor shall such action or failure to act constitute approval of or acquiescence in a breach hereunder, except as may be specifically agreed in writing.
 
-\(c\) Performance of Government Functions. Nothing contained in this Contract shall be deemed or construed so as to in any way estop, limit, or impair the Town from exercising or performing any regulatory, policing, legislative, governmental, or other power or function.
+(c) Performance of Government Functions. Nothing contained in this Contract shall be deemed or construed so as to in any way estop, limit, or impair the Town from exercising or performing any regulatory, policing, legislative, governmental, or other power or function.
 
-\(d\) Severability. If any provision of this Contract shall be unenforceable, the remainder of this Contract shall be enforceable to the extent permitted by law.
+(d) Severability. If any provision of this Contract shall be unenforceable, the remainder of this Contract shall be enforceable to the extent permitted by law.
 
-\(e\) Assignment, Successors and Assigns. Without the Town's written consent, the Contractor shall not assign (which includes delegate) any of its rights (including the right to payment) or duties that arise out of this Contract. Unless the Town otherwise agrees in writing, the Contractor and all assigns shall be subject to all of the Town's defenses and shall be liable for all of the Contractor's duties that arise out of this Contract and all of the Town's claims that arise out of this Contract. Without granting the Contractor the right to assign, it is agreed that the duties of the Contractor that arise out of this Contract shall be binding upon it and its heirs, personal representatives, successors, and assigns.
+(e) Assignment, Successors and Assigns. Without the Town's written consent, the Contractor shall not assign (which includes delegate) any of its rights (including the right to payment) or duties that arise out of this Contract. Unless the Town otherwise agrees in writing, the Contractor and all assigns shall be subject to all of the Town's defenses and shall be liable for all of the Contractor's duties that arise out of this Contract and all of the Town's claims that arise out of this Contract. Without granting the Contractor the right to assign, it is agreed that the duties of the Contractor that arise out of this Contract shall be binding upon it and its heirs, personal representatives, successors, and assigns.
 
-\(f\) Compliance with Law. In performing all of the work, the Contractor shall comply with all applicable law. Without limitation:
+(f) Compliance with Law. In performing all of the work, the Contractor shall comply with all applicable law. Without limitation:
 
-> \(1\) E-Verify. The Contractor shall comply with Article 2 of Chapter 64 of the North Carolina General Statutes (Verification of Work Authorization) and with N.C. Gen. Stat. § 143-133.3. If the Contractor utilizes a subcontractor, the Contractor shall require the subcontractor to comply with Article 2 of Chapter 64.
->
-> \(2\) Iran Divestment Act. Pursuant to the Iran Divestment Act, N.C. Gen. Stat. § 147-86.55 et seq., the Contractor certifies that, as of the effective date of this Agreement, the Contractor is not listed on the Final Divestment List created by the State Treasurer pursuant to N.C. Gen. Stat. § 147-86.58. The Contractor further agrees that it will not utilize on this Contract any subcontractor that is identified on that list.
->
-> \(3\) Companies Boycotting Israel. Pursuant to N.C. Gen. Stat. § 147-86.81, the Contractor certifies that it is not identified on the list of restricted companies determined by the State Treasurer to be engaged in a boycott of Israel, and that it will not utilize on this Contract any subcontractor that is so identified.
->
-> \(4\) Gifts and Favors; Conflicts of Interest. The Contractor certifies that it has not offered, given, or agreed to give any Town official or employee any gift or favor in violation of N.C. Gen. Stat. § 133-32, and that no Town official or employee has a prohibited interest in this Contract under N.C. Gen. Stat. § 14-234.
->
-> \(5\) Debarment. The Contractor certifies that neither it nor any of its subcontractors has been suspended or debarred under N.C. Gen. Stat. § 133-27.
+(1) E-Verify. The Contractor shall comply with Article 2 of Chapter 64 of the North Carolina General Statutes (Verification of Work Authorization) and with N.C. Gen. Stat. § 143-133.3. If the Contractor utilizes a subcontractor, the Contractor shall require the subcontractor to comply with Article 2 of Chapter 64.
 
-\(g\) Town Policy. The Town opposes discrimination on the basis of race and sex and urges all of its contractors to provide a fair opportunity for minorities and women to participate in their work force and as subcontractors and vendors under Town contracts.
+(2) Iran Divestment Act. Pursuant to the Iran Divestment Act, N.C. Gen. Stat. § 147-86.55 et seq., the Contractor certifies that, as of the effective date of this Agreement, the Contractor is not listed on the Final Divestment List created by the State Treasurer pursuant to N.C. Gen. Stat. § 147-86.58. The Contractor further agrees that it will not utilize on this Contract any subcontractor that is identified on that list.
 
-\(h\) EEO Provisions. During the performance of this Contract, the Contractor agrees as follows: (1) The Contractor shall not discriminate against any employee or applicant for employment because of race, color, religion, sex, national origin, political affiliation or belief, age, or disability. The Contractor shall take affirmative action to ensure that applicants are employed and that employees are treated equally during employment, without regard to those characteristics. The Contractor shall post in conspicuous places available to employees and applicants for employment notices setting forth these EEO provisions. (2) In all solicitations or advertisements for employees placed by or on behalf of the Contractor, the Contractor shall state that all qualified applicants will receive consideration for employment without regard to those characteristics.
+(3) Companies Boycotting Israel. Pursuant to N.C. Gen. Stat. § 147-86.81, the Contractor certifies that it is not identified on the list of restricted companies determined by the State Treasurer to be engaged in a boycott of Israel, and that it will not utilize on this Contract any subcontractor that is so identified.
 
-\(i\) No Third-Party Right Created. This Contract is intended for the benefit of the Town and the Contractor and not any other person.
+(4) Gifts and Favors; Conflicts of Interest. The Contractor certifies that it has not offered, given, or agreed to give any Town official or employee any gift or favor in violation of N.C. Gen. Stat. § 133-32, and that no Town official or employee has a prohibited interest in this Contract under N.C. Gen. Stat. § 14-234.
 
-\(j\) Principles of Interpretation. In this Contract, unless the context requires otherwise, the singular includes the plural and the plural the singular. Reference to statutes or regulations includes all statutory or regulatory provisions consolidating, amending, or replacing the statute or regulation. References to contracts and agreements shall be deemed to include all amendments to them. The word “person” includes natural persons, firms, companies, associations, partnerships, trusts, corporations, governmental agencies and units, and any other legal entities.
+(5) Debarment. The Contractor certifies that neither it nor any of its subcontractors has been suspended or debarred under N.C. Gen. Stat. § 133-27.
 
-\(k\) Modifications; Entire Agreement. A modification of this Contract is not valid unless signed by both parties and otherwise in accordance with requirements of law. Further, a modification is not enforceable against the Town unless the Town Manager or other duly authorized official signs it for the Town and, where required, it is pre-audited by the Town Finance Officer under N.C. Gen. Stat. § 159-28. This Contract contains the entire agreement between the parties pertaining to its subject matter.
+(g) Town Policy. The Town opposes discrimination on the basis of race and sex and urges all of its contractors to provide a fair opportunity for minorities and women to participate in their work force and as subcontractors and vendors under Town contracts.
 
-\(l\) Corporate Seal. If a corporate seal is included by any party to this Contract, it is only for authentication purposes. This Contract is not signed under seal.
+(h) EEO Provisions. During the performance of this Contract, the Contractor agrees as follows: (1) The Contractor shall not discriminate against any employee or applicant for employment because of race, color, religion, sex, national origin, political affiliation or belief, age, or disability. The Contractor shall take affirmative action to ensure that applicants are employed and that employees are treated equally during employment, without regard to those characteristics. The Contractor shall post in conspicuous places available to employees and applicants for employment notices setting forth these EEO provisions. (2) In all solicitations or advertisements for employees placed by or on behalf of the Contractor, the Contractor shall state that all qualified applicants will receive consideration for employment without regard to those characteristics.
 
-\(m\) No Employment Relationship. For all matters relating to this Agreement, the Contractor shall be deemed an independent contractor. Nothing in this Agreement shall be construed to create an employee-employer relationship between the Town and the Contractor.
+(i) No Third-Party Right Created. This Contract is intended for the benefit of the Town and the Contractor and not any other person.
 
-\(n\) Public Records. The Contractor acknowledges that the Town is subject to Chapter 132 of the North Carolina General Statutes. Bids become public record following the opening of bids. Any material the Contractor contends is a trade secret must be marked as such at the time of submission in accordance with N.C. Gen. Stat. § 132-1.2. Blanket designations of an entire bid as confidential will not be honored.
+(j) Principles of Interpretation. In this Contract, unless the context requires otherwise, the singular includes the plural and the plural the singular. Reference to statutes or regulations includes all statutory or regulatory provisions consolidating, amending, or replacing the statute or regulation. References to contracts and agreements shall be deemed to include all amendments to them. The word “person” includes natural persons, firms, companies, associations, partnerships, trusts, corporations, governmental agencies and units, and any other legal entities.
 
-\(o\) Appropriation. All obligations of the Town under this Contract are subject to the appropriation of funds by the Town Council. No obligation of the Town extends beyond the fiscal year in which funds have been appropriated and pre-audited pursuant to N.C. Gen. Stat. § 159-28.
+(k) Modifications; Entire Agreement. A modification of this Contract is not valid unless signed by both parties and otherwise in accordance with requirements of law. Further, a modification is not enforceable against the Town unless the Town Manager or other duly authorized official signs it for the Town and, where required, it is pre-audited by the Town Finance Officer under N.C. Gen. Stat. § 159-28. This Contract contains the entire agreement between the parties pertaining to its subject matter.
+
+(l) Corporate Seal. If a corporate seal is included by any party to this Contract, it is only for authentication purposes. This Contract is not signed under seal.
+
+(m) No Employment Relationship. For all matters relating to this Agreement, the Contractor shall be deemed an independent contractor. Nothing in this Agreement shall be construed to create an employee-employer relationship between the Town and the Contractor.
+
+(n) Public Records. The Contractor acknowledges that the Town is subject to Chapter 132 of the North Carolina General Statutes. Bids become public record following the opening of bids. Any material the Contractor contends is a trade secret must be marked as such at the time of submission in accordance with N.C. Gen. Stat. § 132-1.2. Blanket designations of an entire bid as confidential will not be honored.
+
+(o) Appropriation. All obligations of the Town under this Contract are subject to the appropriation of funds by the Town Council. No obligation of the Town extends beyond the fiscal year in which funds have been appropriated and pre-audited pursuant to N.C. Gen. Stat. § 159-28.
 
 **Sec. 16. Bonding.**
 
@@ -273,11 +273,11 @@ Title: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
 This instrument has been pre-audited in the manner required by the Local Government Budget and Fiscal Control Act.
 
-> \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
->
-> Finance Officer, Town of China Grove
->
-> Date: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+Finance Officer, Town of China Grove
+
+Date: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
 **EXHIBIT “A”**
 
@@ -315,39 +315,39 @@ The Town of China Grove is soliciting formal bids under N.C. Gen. Stat. § 143-1
 
 **1) Definitions**
 
-> **Bidder —** An individual, partnership, firm, corporation, limited liability company, or joint venture formally submitting a bid for the work contemplated.
->
-> **Town —** The Town of China Grove, North Carolina.
->
-> **Council —** The Town Council of the Town of China Grove.
->
-> **Contract —** The executed agreement between the Town of China Grove and the successful Bidder, covering the performance of the work and the compensation therefor. The term is all-inclusive with reference to all written agreements affecting a contractual relationship and all documents referred to therein, and specifically includes the Bid Form, the printed Contract form and all attachments, the contract bonds, insurance forms, the Standard Specifications and all supplemental specifications, the General Conditions, and all executed supplemental agreements, all of which constitute one instrument.
->
-> **Contractor —** The Contractor named in the contract documents.
->
-> **Designated Representative (or Designee) —** An individual or individuals appointed and authorized to represent the Director.
->
-> **Director —** The Town of China Grove Director of Public Works or the Director's designated representative.
->
-> **Manager —** The Town Manager of the Town of China Grove.
->
-> **MUTCD —** Manual on Uniform Traffic Control Devices, latest edition, together with all addenda, including the North Carolina Supplement to the MUTCD.
->
-> **OSHA —** Occupational Safety and Health Administration.
->
-> **NCDOT —** North Carolina Department of Transportation.
->
-> **Proposal Requirements —** The legal and procedural documents, any General and Special Conditions, together with modifications thereof, and Standard Specifications requirements, with all addenda thereto.
->
-> **Standard Drawings —** NCDOT “Roadway Standard Drawings,” latest edition, with all addenda thereto.
->
-> **Standard Specifications —** NCDOT “Standard Specifications for Roads and Structures,” latest edition, with all addenda thereto.
->
-> **Subcontractor —** Any person, firm, partnership, corporation, or limited liability company with a direct contract with the Contractor that acts for or on behalf of the Contractor in executing any part of the contract, but does not include one who merely furnishes materials.
->
-> **Public Works Department —** The Town of China Grove Public Works Department.
->
-> **Work —** The entire completed service or the various separately identifiable parts, labor, material, or requirements thereof needed to perform under the contract documents to the satisfaction of the Town.
+**Bidder —** An individual, partnership, firm, corporation, limited liability company, or joint venture formally submitting a bid for the work contemplated.
+
+**Town —** The Town of China Grove, North Carolina.
+
+**Council —** The Town Council of the Town of China Grove.
+
+**Contract —** The executed agreement between the Town of China Grove and the successful Bidder, covering the performance of the work and the compensation therefor. The term is all-inclusive with reference to all written agreements affecting a contractual relationship and all documents referred to therein, and specifically includes the Bid Form, the printed Contract form and all attachments, the contract bonds, insurance forms, the Standard Specifications and all supplemental specifications, the General Conditions, and all executed supplemental agreements, all of which constitute one instrument.
+
+**Contractor —** The Contractor named in the contract documents.
+
+**Designated Representative (or Designee) —** An individual or individuals appointed and authorized to represent the Director.
+
+**Director —** The Town of China Grove Director of Public Works or the Director's designated representative.
+
+**Manager —** The Town Manager of the Town of China Grove.
+
+**MUTCD —** Manual on Uniform Traffic Control Devices, latest edition, together with all addenda, including the North Carolina Supplement to the MUTCD.
+
+**OSHA —** Occupational Safety and Health Administration.
+
+**NCDOT —** North Carolina Department of Transportation.
+
+**Proposal Requirements —** The legal and procedural documents, any General and Special Conditions, together with modifications thereof, and Standard Specifications requirements, with all addenda thereto.
+
+**Standard Drawings —** NCDOT “Roadway Standard Drawings,” latest edition, with all addenda thereto.
+
+**Standard Specifications —** NCDOT “Standard Specifications for Roads and Structures,” latest edition, with all addenda thereto.
+
+**Subcontractor —** Any person, firm, partnership, corporation, or limited liability company with a direct contract with the Contractor that acts for or on behalf of the Contractor in executing any part of the contract, but does not include one who merely furnishes materials.
+
+**Public Works Department —** The Town of China Grove Public Works Department.
+
+**Work —** The entire completed service or the various separately identifiable parts, labor, material, or requirements thereof needed to perform under the contract documents to the satisfaction of the Town.
 
 **2) Project Information**
 
@@ -473,13 +473,10 @@ Unit prices shall remain as submitted by the Contractor for a period of three hu
 
 Asphalt Binder Price Adjustment. Price adjustments for asphalt binder for plant mix will be made in accordance with Section 620 of the NCDOT Standard Specifications. The base price index for asphalt binder is {{#optional asphaltBinderBaseIndexPerTon}}${{this as "0,0.00"}}{{else}}\$\_\_\_\_\_\_\_\_\_\_{{/optional}} per ton, representing the average of F.O.B. selling prices of asphalt binder at suppliers' terminals on {{#optional asphaltBinderBaseIndexDate}}{{this as "MMMM D, YYYY"}}{{else}}\[BASE INDEX DATE\], 2026{{/optional}}.
 
-> • Price adjustments shall apply for both upward and downward movement of prices.
->
-> • The price adjustment clause is inserted to provide either additional compensation to the Contractor or a credit to the Town, depending upon an increase or decrease in the average price of asphalt binder for plant mix.
->
-> • Price adjustment computations may be performed on a month-to-month basis.
->
-> • Due to budgetary constraints, any increase to the contract cost resulting from a rising index cost of asphalt binder may affect the scope of the contract and the total quantity of asphalt that can be installed in order to remain within the appropriated budget.
+- Price adjustments shall apply for both upward and downward movement of prices.
+- The price adjustment clause is inserted to provide either additional compensation to the Contractor or a credit to the Town, depending upon an increase or decrease in the average price of asphalt binder for plant mix.
+- Price adjustment computations may be performed on a month-to-month basis.
+- Due to budgetary constraints, any increase to the contract cost resulting from a rising index cost of asphalt binder may affect the scope of the contract and the total quantity of asphalt that can be installed in order to remain within the appropriated budget.
 
 **18) Inspection and Acceptance of Work**
 
@@ -515,7 +512,7 @@ The Town shall have the right to deduct liquidated damages from any money in its
 
 **BID FORM**
 
-**Bids are to be submitted to the following address by 2:00 p.m., local time, {{#optional bidOpeningDate}}{{this as "dddd, MMMM D, YYYY"}}{{else}}\[DAY\], \[BID OPENING DATE\], 2026{{/optional}}.**
+**Bids are to be submitted to the following address by 2:00 p.m., local time, {{#optional bidOpeningDate}}{{this as "MMMM D, YYYY"}}{{else}}\[DAY\], \[BID OPENING DATE\], 2026{{/optional}}.**
 
 **{{managerName}}{{#optional managerCredentials}}, {{this}}{{else}}{{/optional}}, Town Manager**
 
@@ -537,25 +534,25 @@ Town Council Chambers, China Grove Town Hall
 
 3\. In submitting this bid, the Bidder represents that:
 
-> a\. Bidder has examined copies of all the bidding documents and of the following Addenda (receipt of all of which is hereby acknowledged):
+a\. Bidder has examined copies of all the bidding documents and of the following Addenda (receipt of all of which is hereby acknowledged):
 
 {{#ulist addenda}}
 Addendum No. {{addendumNumber}}, dated {{dated as "MMMM D, YYYY"}}
 {{/ulist}}
 
-> b\. Bidder has visited the site and become familiar with and is satisfied as to the general, local, and site conditions that may affect cost, progress, performance, and furnishing of the work.
->
-> c\. Bidder is familiar with and has satisfied itself as to all federal, State, and local laws and regulations that may affect cost, progress, performance, and furnishing of the work.
->
-> d\. Bidder is aware of the general nature of work to be performed by the Town and others at the site that relates to the work for which this bid is submitted, as indicated in the contract documents.
->
-> e\. Bidder has correlated the information known to Bidder, information and observations obtained from visits to the site, reports and drawings identified in the contract documents, and any additional examinations, investigations, explorations, tests, studies, utility locations, and data with the contract documents.
->
-> f\. Bidder has given the Director written notice of all conflicts, errors, ambiguities, or discrepancies that Bidder has discovered in the contract documents; the written resolution thereof by the Director is acceptable to Bidder; and the contract documents are generally sufficient to indicate and convey understanding of all terms and conditions for performing and furnishing the work.
->
-> g\. This bid is genuine and not made in the interest of or on behalf of any undisclosed person, firm, or corporation, and is not submitted in conformity with any agreement or rules of any group, association, organization, or corporation; Bidder has not directly or indirectly induced or solicited any other Bidder to submit a false or sham bid; Bidder has not solicited or induced any person, firm, or corporation to refrain from bidding; and Bidder has not sought by collusion to obtain for itself any advantage over any other Bidder or over the Town of China Grove.
->
-> h\. Bidder holds a current North Carolina general contractor license in the classification and limitation appropriate to this work, and certifies that it is not listed on the Final Divestment List (N.C.G.S. § 147-86.58) or the restricted companies list for boycotts of Israel (N.C.G.S. § 147-86.81), and has not been debarred under N.C.G.S. § 133-27.
+b\. Bidder has visited the site and become familiar with and is satisfied as to the general, local, and site conditions that may affect cost, progress, performance, and furnishing of the work.
+
+c\. Bidder is familiar with and has satisfied itself as to all federal, State, and local laws and regulations that may affect cost, progress, performance, and furnishing of the work.
+
+d\. Bidder is aware of the general nature of work to be performed by the Town and others at the site that relates to the work for which this bid is submitted, as indicated in the contract documents.
+
+e\. Bidder has correlated the information known to Bidder, information and observations obtained from visits to the site, reports and drawings identified in the contract documents, and any additional examinations, investigations, explorations, tests, studies, utility locations, and data with the contract documents.
+
+f\. Bidder has given the Director written notice of all conflicts, errors, ambiguities, or discrepancies that Bidder has discovered in the contract documents; the written resolution thereof by the Director is acceptable to Bidder; and the contract documents are generally sufficient to indicate and convey understanding of all terms and conditions for performing and furnishing the work.
+
+g\. This bid is genuine and not made in the interest of or on behalf of any undisclosed person, firm, or corporation, and is not submitted in conformity with any agreement or rules of any group, association, organization, or corporation; Bidder has not directly or indirectly induced or solicited any other Bidder to submit a false or sham bid; Bidder has not solicited or induced any person, firm, or corporation to refrain from bidding; and Bidder has not sought by collusion to obtain for itself any advantage over any other Bidder or over the Town of China Grove.
+
+h\. Bidder holds a current North Carolina general contractor license in the classification and limitation appropriate to this work, and certifies that it is not listed on the Final Divestment List (N.C.G.S. § 147-86.58) or the restricted companies list for boycotts of Israel (N.C.G.S. § 147-86.81), and has not been debarred under N.C.G.S. § 133-27.
 
 4\. Bidder will complete the work for the following unit prices. Quantities indicated are estimated and not guaranteed; they are solely for comparing bids and establishing the initial contract amount. Final payment will be based on actual quantities.
 
@@ -798,27 +795,21 @@ The successful Bidder will be required to furnish a one hundred percent (100%) P
 
 **Milling:**
 
-> • Milling shall be performed in such a manner as to control the dust generated and mitigate mill dust from the Contractor's operations.
->
-> • The Contractor is to provide areas outside the right-of-way to dispose of milled material, which becomes the property of the Contractor. Any cost associated with this is incidental to the pay items associated with this part of the work.
->
-> • All milled roads must have binder placed no later than three (3) calendar days after completion of milling.
->
-> • Milled surfaces left open to traffic shall be signed in accordance with the MUTCD, and any milled edge exceeding two inches adjacent to a travel lane shall be protected or wedged.
+- Milling shall be performed in such a manner as to control the dust generated and mitigate mill dust from the Contractor's operations.
+- The Contractor is to provide areas outside the right-of-way to dispose of milled material, which becomes the property of the Contractor. Any cost associated with this is incidental to the pay items associated with this part of the work.
+- All milled roads must have binder placed no later than three (3) calendar days after completion of milling.
+- Milled surfaces left open to traffic shall be signed in accordance with the MUTCD, and any milled edge exceeding two inches adjacent to a travel lane shall be protected or wedged.
 
 **Asphalt Repaving:**
 
-> • Pave each section of roadway begun in a continuous operation. Do not begin work on another section of roadway unless satisfactory progress is being made toward completion of intersections and all other required incidental work, except for milling and patching operations.
->
-> • Place asphalt concrete in trench sections with asphalt pavement spreaders made for the purpose, or with other equipment approved by the Director.
->
-> • The actual asphalt binder content will be established during construction by the Director within the limits established in the Standard Specifications. Certain listed streets could be rehabilitated and resurfaced using a mix type different from that specified in the contract pay items at the direction of the Director. In the event a different mix is specified by the Director or proposed in writing by the Contractor, and if the Contractor and the Director mutually agree to a contract unit price for the new mix type pay item, payment will be made in accordance with the appropriate method of measurement and basis of payment given in the General Conditions and by written change order.
+- Pave each section of roadway begun in a continuous operation. Do not begin work on another section of roadway unless satisfactory progress is being made toward completion of intersections and all other required incidental work, except for milling and patching operations.
+- Place asphalt concrete in trench sections with asphalt pavement spreaders made for the purpose, or with other equipment approved by the Director.
+- The actual asphalt binder content will be established during construction by the Director within the limits established in the Standard Specifications. Certain listed streets could be rehabilitated and resurfaced using a mix type different from that specified in the contract pay items at the direction of the Director. In the event a different mix is specified by the Director or proposed in writing by the Contractor, and if the Contractor and the Director mutually agree to a contract unit price for the new mix type pay item, payment will be made in accordance with the appropriate method of measurement and basis of payment given in the General Conditions and by written change order.
 
 **SC-11. Damages and Repairs**
 
-> • The Town of China Grove will not be responsible for any claim or damages brought by property owners arising out of the Contractor's operations. Should the Contractor fail to make necessary damage repairs within a reasonable period of time as determined by the Director to any public or private infrastructure damaged by the Contractor or a subcontractor within the course of the work, the Town will make repairs and shall be reimbursed by the Contractor for all labor, tools, and materials necessary to correct the failure. Such reimbursements shall be deducted from money due the Contractor or shall be billed to the Contractor.
->
-> • The Contractor will be responsible for protection, prevention of vandalism, and maintenance of asphalt work, permanent thermoplastic pavement lines and markings, and newly installed fresh-poured concrete such as curb and gutter, wheelchair ramps, and sidewalk sections, prior to acceptance by the Town.
+- The Town of China Grove will not be responsible for any claim or damages brought by property owners arising out of the Contractor's operations. Should the Contractor fail to make necessary damage repairs within a reasonable period of time as determined by the Director to any public or private infrastructure damaged by the Contractor or a subcontractor within the course of the work, the Town will make repairs and shall be reimbursed by the Contractor for all labor, tools, and materials necessary to correct the failure. Such reimbursements shall be deducted from money due the Contractor or shall be billed to the Contractor.
+- The Contractor will be responsible for protection, prevention of vandalism, and maintenance of asphalt work, permanent thermoplastic pavement lines and markings, and newly installed fresh-poured concrete such as curb and gutter, wheelchair ramps, and sidewalk sections, prior to acceptance by the Town.
 
 **SC-12. Inspection and Final Acceptance of the Work**
 

@@ -127,3 +127,31 @@ for each optional.
 Accord renders `DateTime` as `07/01/2025`. We render the wire form,
 `2025-07-01T00:00:00.000Z`, per `render-value`'s rule that a DateTime stays a
 string until something has a reason to parse it. Not yet reconciled.
+
+## TemplateMark is CommonMark, not GitHub markdown
+
+[TemplateMark](https://docs.accordproject.org/docs/markup-templatemark/)
+extends CommonMark, and Accord's markup documents exactly one extension:
+pipe tables (which may not contain lists, headings, blockquotes or nested
+tables). Everything else GitHub adds — strikethrough, task lists, footnotes,
+raw HTML — is outside it.
+
+That matters most when a template starts life as a Word document. Converting
+the Street Resurfacing bid package with pandoc left three things that
+CommonMark would read with the wrong meaning:
+
+- **Indentation became blockquotes.** Word's indented paragraphs (the
+  Sec. 11 exhibit list, the Sec. 15(f) certifications, the General Conditions
+  definitions) came out as `>` lines, which CommonMark reads as quotations.
+  They are plain paragraphs; the text carries its own `(a)`/`(1)` numbering.
+- **Word bullets became literal `•` characters** instead of list items.
+  They are `- ` bullet lists now.
+- **`<u>` underline tags** — raw HTML, and underline has no CommonMark form.
+
+Format strings are limited to the documented tokens too. `dddd` (weekday)
+happens to render through Accord's engine, but it is not a TemplateMark
+DateTime token, so the bid opening date uses `"MMMM D, YYYY"`.
+
+`test/com/trustblocks/template/street_resurfacing_test.clj` checks every
+template's grammar for these, so the next conversion fails a test rather
+than a reader.

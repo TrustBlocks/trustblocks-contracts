@@ -77,3 +77,26 @@
                     (filter #(.exists ^java.io.File %)))]
     (is (<= 2 (count copies)))
     (is (apply = (map slurp copies)))))
+
+(def ^:private documented-format
+  "The `as \"...\"` formats TemplateMark documents: DateTime tokens (YYYY M MM
+  MMM MMMM D DD H HH h hh a A mm ss SSS Z, with punctuation and spaces) and
+  amount patterns (0,0 / 0 0 with optional decimals, CCC or K). See
+  docs/templatemark-conformance.md."
+  #"(?:(?:YYYY|MMMM|MMM|MM|M|DD|D|HH|H|hh|h|mm|ss|SSS|Z|a|A)|[ ,./:-])+|K?0[ ,]0(?:[.,]0+)?(?: ?CCC)?")
+
+(deftest every-grammar-is-commonmark-templatemark
+  ;; TemplateMark is CommonMark plus pipe tables -- not GitHub markdown. A
+  ;; grammar converted from Word tends to carry indentation as blockquotes,
+  ;; bullets as literal characters, and underline as HTML; none of those mean
+  ;; in CommonMark what they meant in Word.
+  (doseq [^java.io.File d (.listFiles (io/file "docs/examples"))
+          :let [g (io/file d "text" "grammar.tem.md")]
+          :when (.exists g)
+          :let [text (slurp g)]]
+    (testing (.getName d)
+      (is (not (re-find #"(?m)^>" text)) "blockquote used for indentation")
+      (is (not (re-find #"\u2022" text)) "literal bullet character")
+      (is (not (re-find #"<[a-zA-Z/][^>]*>" text)) "raw HTML")
+      (doseq [[_ fmt] (re-seq #"as \"([^\"]*)\"" text)]
+        (is (re-matches documented-format fmt) (str "undocumented format " (pr-str fmt)))))))
