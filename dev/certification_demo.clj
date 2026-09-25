@@ -54,7 +54,7 @@
     :authority ["SIGN_CONTRACTS" "ATTEST_ORDINANCES"]}])
 
 ;; The vote's own date is the real councilActionDate from
-;; docs/examples/manager-employment-contract/sample.json. The sample has
+;; the manager-employment-contract template's sample.json. The sample has
 ;; no second meeting date on file, so next-meeting is this demo's own
 ;; addition, not something the source contract records. The office
 ;; grant's window is the manager's own contract term (termStartDate/
@@ -101,7 +101,6 @@
   (when-not (ex/current-state node me/contract-id)
     (me/approve! node))
   (store/put-model! node "model/identity.cto")
-  (store/put-model! node "model/attestation.cto")
   (let [town (ensure-town! node)]
     (doseq [officeholder officeholders]
       (ensure-officeholder! node town officeholder))

@@ -91,8 +91,10 @@ production browser integration.
 node_modules/.bin/concerto --version     # 4.2.0; depends on concerto-core 5
 npm ls @accordproject/concerto-core @accordproject/concerto-cto
 bin/clj -M:run test
-bin/template-conformance
 ```
+
+Template conformance (`bb conformance`) now runs in the
+TrustBlocks/trustblocks-templates repository, with the templates.
 
 `bin/clj` automatically sets `CONCERTO_CLI` to
 `node_modules/.bin/concerto`, avoiding accidental use of an older globally

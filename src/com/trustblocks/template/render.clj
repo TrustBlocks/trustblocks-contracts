@@ -7,7 +7,8 @@
   This is not Accord's TemplateMark engine -- that's a JavaScript toolchain
   (see docs/walkthrough.md) with loops, sub-clauses, formulas, and its own
   formatting directives. What's implemented here is only what the one real
-  template this app has (docs/examples/manager-employment-contract) actually
+  template this app had (manager-employment-contract, now in
+  trustblocks-templates) actually
   uses: {{var}} substitution, {{#optional x}}...{{else}}...{{/optional}} and
   {{#if x}}...{{else}}...{{/if}} blocks, paragraph/heading/horizontal-rule
   block structure, and **bold** inline markup. A grammar leaning on anything
@@ -18,8 +19,8 @@
   Where it does implement something, it follows TemplateMark's semantics
   rather than mustache's -- notably scope rebinding inside blocks, which is
   the difference that makes a grammar either draft or fail through Accord's
-  own engine. See resolve-conditionals, and docs/templatemark-conformance.md
-  for how those semantics were established."
+  own engine. See resolve-conditionals, and trustblocks-templates'
+  docs/templatemark-conformance.md for how those semantics were established."
   (:require [clojure.string :as str]))
 
 ;; ---------------------------------------------------------------- tokenize

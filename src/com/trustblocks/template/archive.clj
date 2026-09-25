@@ -24,9 +24,22 @@
   TypeScript execution backend exists. See com.trustblocks.xtdb.execute's
   runtimes: a contract ingested this way can be stored and queried today,
   and executed once :typescript is a real backend rather than only a
-  refusal."
+  refusal.
+
+  A template whose logic is Clojure -- ours, from trustblocks-templates --
+  says so in a package.json section of its own, since Accord's tools accept
+  only es6/typescript as accordproject.runtime and would refuse the archive
+  otherwise:
+
+    \"trustblocks\": {\"runtime\": \"clojure\", \"logic\": \"logic/clause.clj\"}
+
+  Ingesting such a template installs that file as the clause for the
+  template's root type (the one concept carrying @template) through
+  execute/put-clause!, which compiles it in the sandbox before storing it --
+  so a template's logic lands exactly as a hand-installed clause would."
   (:require [cheshire.core :as json]
             [clojure.java.io :as io]
+            [com.trustblocks.xtdb.execute :as execute]
             [com.trustblocks.xtdb.store :as store]
             [xtdb.api :as xt])
   (:import [java.io File]
@@ -80,12 +93,48 @@
   (let [f (io/file dir "text" "grammar.tem.md")]
     (when (.exists f) (slurp f))))
 
+(defn- template-root
+  "The fully-qualified name of the one declaration carrying @template among
+  `namespaces` -- the template's root type, which its clause runs for.
+  Asked of the registry rather than read from package.json, so there is
+  one statement of it: the model's."
+  [node namespaces]
+  (let [reg   (store/registry-from-xtdb node)
+        ns?   (set namespaces)
+        roots (for [[fqn {:keys [namespace declaration]}] reg
+                    :when (and (ns? namespace)
+                               (some #(= "template" (:name %)) (:decorators declaration)))]
+                fqn)]
+    (when (not= 1 (count roots))
+      (throw (ex-info "A template must have exactly one @template declaration"
+                      {:namespaces namespaces :found (vec roots)})))
+    (first roots)))
+
+(defn- install-clause!
+  "Installs a Clojure-logic template's clause -- see the ns docstring.
+  Returns the root type it was installed for, or nil when the template
+  declares no Trustblocks runtime."
+  [node dir namespaces {:keys [trustblocks]}]
+  (when trustblocks
+    (let [{:keys [runtime logic]} trustblocks
+          f (when logic (io/file dir logic))]
+      (when-not (= "clojure" runtime)
+        (throw (ex-info "Unsupported trustblocks.runtime" {:dir (str dir) :runtime runtime})))
+      (when-not (and f (.exists f))
+        (throw (ex-info "trustblocks.logic names no file in the template"
+                        {:dir (str dir) :logic logic})))
+      (let [root (template-root node namespaces)]
+        (execute/put-clause! node root (slurp f) :runtime :clojure)
+        root))))
+
 (defn ingest-dir!
   "Loads every model/*.cto in `dir` into XTDB and records the template's
   package.json metadata plus its logic source (unexecuted -- see ns
-  docstring) under archive-table, keyed by the package name.
+  docstring) under archive-table, keyed by the package name. A template
+  with Clojure logic also has its clause installed.
 
-  Returns {:name :namespaces :logic-files}."
+  Returns {:name :namespaces :logic-files :clause}, :clause being the root
+  type a clause was installed for, or nil."
   [node dir]
   (let [dir       (io/file dir)
         model-dir (io/file dir "model")
@@ -115,7 +164,8 @@
       (xt/execute-tx node [[:put-docs archive-table record]])
       {:name        id
        :namespaces  (:archive/namespaces record)
-       :logic-files (mapv :file (:archive/logic record []))})))
+       :logic-files (mapv :file (:archive/logic record []))
+       :clause      (install-clause! node dir (:archive/namespaces record) pkg)})))
 
 (defn by-namespace
   "The archive record whose :archive/namespaces includes `ns`, or nil.
