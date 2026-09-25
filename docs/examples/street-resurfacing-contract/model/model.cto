@@ -1,0 +1,153 @@
+namespace com.trustblocks.municipal.construction@1.0.0
+
+import com.trustblocks.municipal.agreement@1.0.0.MunicipalAgreement
+
+/**
+ * A unit-price public works construction contract.
+ *
+ * Derived from the Town of China Grove's formally bid Street Resurfacing
+ * package, Contract No. STR-27 (N.C. Gen. Stat. § 143-129), in
+ * docs/examples/China_Grove_Street_Resurfacing_Bid_Package.docx. The
+ * template's text is the contract as executed: the Standard Form
+ * Construction Contract (Sec. 1-18, signatures, pre-audit certificate),
+ * Exhibit "A" (Scope / Fee), Exhibit "G" (General Conditions and the Bid
+ * Form's unit-price schedule), Exhibit "H" (Special Provisions), and
+ * Attachment 1 (Street Schedule). The Invitation to Bid and the fill-in
+ * forms (Exhibits "B"-"F", "I", "J", the bidder signature and debarment
+ * certification sheets) are incorporated by reference in Sec. 11 but are
+ * not reproduced -- they are forms completed around the contract, not
+ * terms of it.
+ *
+ * Every blank in the package is an optional property whose absence
+ * renders the original blank, so sample.json is the package exactly as
+ * issued -- no contractor, no prices, no streets -- and drafting it
+ * reproduces the source. An awarded contract is the same instance with
+ * those properties filled in.
+ *
+ * What is data and what is text: properties are what changes from one
+ * contract let under this form to the next -- the contract number,
+ * contractor, dates, completion time, liquidated damages rate, the Town's
+ * officeholders, and the bid schedule. Statutory terms (retainage under
+ * § 143-134.1, the § 143-128(f1) mediation threshold) and the Town's
+ * standard insurance limits stay in the text. So does the Town's name:
+ * this is China Grove's own form, and the jurisdiction inherited from
+ * MunicipalAgreement is recorded as data for querying across contracts,
+ * not substituted into prose that another municipality would redraft
+ * anyway.
+ *
+ * Numbers that payment logic will compute with -- completion days, the
+ * daily liquidated damages rate, each pay item's quantity and unit price
+ * -- are numeric, formatted in the text with TemplateMark's `as`. Where
+ * the prose also spells a number out ("two hundred seventy (270)"), the
+ * words are a paired ...Written property, as in the manager employment
+ * template, rather than derived.
+ *
+ * Extended amounts and section totals on the Bid Form are left as the
+ * blanks they are in the source: they are arithmetic over quantity and
+ * unit price, and the Bid Form itself says the unit price governs where
+ * the two disagree.
+ */
+@template
+asset StreetResurfacingContract extends MunicipalAgreement {
+  // Jurisdiction (stateCode, stateName, countyName, municipalityName,
+  // municipalityType, governingBodyName) is inherited from
+  // com.trustblocks.municipal.agreement.MunicipalAgreement.
+
+  // ---- Contract identity ----------------------------------------------------
+  @description("The Town's contract number, e.g. STR-27")
+  o String contractNumber
+  @description("The fiscal year whose budget ordinance funds the work, e.g. FY 2026-2027")
+  o String budgetOrdinanceFiscalYear
+
+  // ---- Contractor (blank until award) ----------------------------------------
+  o String contractorName optional
+  @description("As the form's checkboxes read, e.g. \"a limited liability company\"")
+  o String contractorEntityType optional
+  @description("State under whose laws the Contractor is organized")
+  o String contractorStateOfOrganization optional
+  @description("Address for notices under Sec. 12, as one line")
+  o String contractorNoticeAddress optional
+
+  // ---- Town officeholders -----------------------------------------------------
+  o String managerName
+  @description("Post-nominal credentials, e.g. AICP, ICMA-CM")
+  o String managerCredentials optional
+  @description("The Director of Public Works -- the Director throughout the General Conditions")
+  o String publicWorksDirectorName
+  o String clerkName
+
+  // ---- Time -------------------------------------------------------------------
+  @description("Calendar days from the Notice to Proceed Date to the Completion Date")
+  o Integer completionDays
+  o String completionDaysWritten
+  @description("The Notice to Proceed Date -- the Commence Date, and the date the Contract is made")
+  o DateTime noticeToProceedDate optional
+  @description("When sealed bids are opened")
+  o DateTime bidOpeningDate optional
+
+  // ---- Money --------------------------------------------------------------------
+  @description("Liquidated damages per calendar day of delay (General Conditions 22)")
+  o Double liquidatedDamagesPerDay
+  o String liquidatedDamagesPerDayWritten
+  @description("Asphalt binder base price index, dollars per ton (General Conditions 17)")
+  o Double asphaltBinderBaseIndexPerTon optional
+  o DateTime asphaltBinderBaseIndexDate optional
+
+  // ---- Bid Form ---------------------------------------------------------------------
+  o Addendum[] addenda
+  o BidItem[] crackAndJointSealingItems
+  o BidItem[] patchingLevelingSealCoatItems
+  o BidItem[] millingItems
+  o BidItem[] reclamationItems
+  o BidItem[] resurfacingItems
+  o BidItem[] concreteItems
+  o BidItem[] pavementMarkingItems
+
+  // ---- Attachment 1 -------------------------------------------------------------------
+  o StreetSegment[] streets
+}
+
+/**
+ * One pay item on the Bid Form. The Town sets the item, its description
+ * and unit; the estimated quantity is filled in before advertisement and
+ * the unit price by the bidder. Payment is on actual quantities installed
+ * and accepted (General Conditions 16-17), so estimatedQuantity is only
+ * the basis for comparing bids and the initial contract amount.
+ *
+ * Each Bid Form section is its own array on the contract, rather than one
+ * array tagged by section, because each section's specification text sits
+ * between its items in the document and TemplateMark cannot filter a list.
+ */
+concept BidItem {
+  @description("e.g. 5.1")
+  o String payItem
+  o String description
+  @description("As printed on the Bid Form: lbs., Tons, Sq. Yd., Lin. Ft., Each ...")
+  o String unit
+  o Double estimatedQuantity optional
+  o Double unitPrice optional
+}
+
+/**
+ * One street section on Attachment 1, the Street Schedule.
+ */
+concept StreetSegment {
+  o String streetName
+  o String fromLocation
+  o String toLocation
+  o Boolean fullMill
+  o Boolean edgeMill
+  o Double surfaceThicknessInches
+  o Double intermediateThicknessInches optional
+  o Double lengthFeet
+  o Double widthFeet
+  o String notes optional
+}
+
+/**
+ * An addendum whose receipt the bidder acknowledges on the Bid Form.
+ */
+concept Addendum {
+  o String addendumNumber
+  o DateTime dated
+}

@@ -103,6 +103,10 @@ docs/
   examples/
     snow-removal.cto           synthetic, walkthrough-only contract — deliberately zero imports
     manager-employment-contract/  the REAL China Grove contract: model/ (6 namespaces), sample.json, text/grammar.tem.md
+    street-resurfacing-contract/  China Grove's formally bid unit-price construction contract (STR-27): model/, a
+                               37-item bid schedule, sample.json = the package exactly as issued (every blank is an
+                               optional field whose absence renders the original blank). Not yet seeded into the app.
+    China_Grove_Street_Resurfacing_Bid_Package.docx  its source document
     late-delivery.cta          Accord's own reference template — used only as a cross-check oracle
 
 dev/                       runnable scripts; on the classpath for both direct execution and test fixtures
@@ -426,7 +430,7 @@ identity for this email".
 ```sh
 bin/clj -M:run test
 ```
-Currently 53 tests / 182 assertions, 0 failures. Focus a namespace or var
+Currently 56 tests / 197 assertions, 0 failures. Focus a namespace or var
 with `--focus <fully.qualified.name>`.
 
 **Lint + format + test together** (what to run before considering any change
@@ -475,11 +479,17 @@ bin/template-conformance
    director, progress payments, retainage). Align with Accord's proposed
    `runtime@1.0.0.AgreementState` and `obligation@1.0.0.ObligationTransition`
    (accordproject/models PR #200, open) rather than inventing new shapes.
-4. **If a second contract template is ever added, use it to pressure-test
-   `MunicipalAgreement` reuse and the attestation-clause pattern** — both
-   are currently proven against exactly one real contract type each. A
-   second real template is the cheapest way to find out whether either
-   generalizes as intended.
+4. **Take the Street Resurfacing template (`docs/examples/street-resurfacing-contract`)
+   the rest of the way.** Its model and grammar are done and conformant, and it
+   already confirmed `MunicipalAgreement` reuse (a vendored copy, kept identical
+   by test). Still to do: (a) `template/render.clj` does not yet understand
+   `{{#ulist}}`/`{{#olist}}` or `{{x as "..."}}`, both of which this grammar uses,
+   so it is not seeded into the app yet — Contract View would print those
+   directives literally; (b) an execution model — pay requests certified by the
+   Director of Public Works and approved by the Town Manager, statutory
+   retainage, liquidated damages — which is where the attestation-clause
+   pattern gets its second real test, and where the state design in item 3
+   lands.
 5. Only after the above: revisit the explicitly-parked items (`:typescript`
    clause runtime, model-publishing repo, bearer-token auth, mail provider,
    key encryption at rest) — none of them block anything else on this list,

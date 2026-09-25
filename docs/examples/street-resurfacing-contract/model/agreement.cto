@@ -1,0 +1,38 @@
+namespace com.trustblocks.municipal.agreement@1.0.0
+
+import org.accordproject.contract@0.2.0.Contract from https://models.accordproject.org/accordproject/contract@0.2.0.cto
+import org.accordproject.usa.state@0.3.0.USState from https://models.accordproject.org/usa/state@0.3.0.cto
+
+/**
+ * What every TrustBlocks municipal agreement has: the jurisdiction it is made
+ * in, and the body that acts for it. Shared here rather than restated per
+ * template -- these same fields appear in the manager employment contract and
+ * in both street-closing documents, declared separately each time.
+ *
+ * Shared by *inheritance*, not composition, and that is deliberate. A nested
+ * `o Jurisdiction jurisdiction` would be the ordinary modelling instinct, but
+ * TemplateMark can only reach a nested concept through {{#with}}, which is
+ * block-level and injects paragraph breaks even mid-sentence -- so
+ * {{municipalityType}} could never appear inside a sentence again, and this
+ * contract uses it inside sentences roughly twenty times. Concerto flattens a
+ * subclass into one tagged object, so inherited properties stay addressable
+ * exactly as if they were declared locally. Accord's own registry is built
+ * the same way: Contract, Clause, SignatureClause extends Clause.
+ * See docs/templatemark-conformance.md.
+ *
+ * No state is baked into the namespace. stateCode carries it as data, so the
+ * same models serve any state; only the values change.
+ */
+
+abstract asset MunicipalAgreement extends Contract {
+
+  @description("ISO/USPS state code; stateName is the prose form used in the text")
+  o USState stateCode
+  o String stateName
+  o String countyName
+  o String municipalityName
+  @description("Town, City, or Village")
+  o String municipalityType
+  @description("Town Council, Board of Aldermen, Board of Commissioners")
+  o String governingBodyName
+}

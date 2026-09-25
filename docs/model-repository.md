@@ -12,6 +12,7 @@ Reverse domain, from `trustblocks.com`:
 | `com.trustblocks.municipal.agreement@1.0.0` | `MunicipalAgreement`, the abstract base every agreement extends |
 | `com.trustblocks.municipal.employment@1.0.0` | `ManagerEmployment`, the manager employment contract's root model |
 | `com.trustblocks.municipal.employment.execution@1.0.0` | its board-approval state machine |
+| `com.trustblocks.municipal.construction@1.0.0` | `StreetResurfacingContract`, a unit-price public works construction contract, with `BidItem`, `StreetSegment` and `Addendum` |
 
 **No jurisdiction in the namespace.** The manager employment model was
 inherited as `us.nc.municipal.manageremployment@0.1.0`, which bakes North
@@ -51,9 +52,13 @@ vendored alongside as `@models.accordproject.org.*.cto` -- the same layout
 Accord's own `.cta` archives use, which keeps an archive self-contained and
 loadable with no network.
 
-When a second template needs `MunicipalAgreement`, it moves to a shared
-directory here and is vendored into each template, exactly as the Accord
-models are. Nothing is published over HTTP yet, so our own models import each
+The second template to need `MunicipalAgreement` -- the Street Resurfacing
+contract -- carries its own verbatim copy of `agreement.cto`, exactly as both
+carry Accord's models. There is no separate canonical file: each copy is
+what that template's archive loads, and
+`test/com/trustblocks/template/street_resurfacing_test.clj` fails if the
+copies ever differ, since the registry is global and a drifted copy would
+silently shadow the other. Nothing is published over HTTP yet, so our own models import each
 other by namespace with no `from` URL; that works because cicero-core loads
 every `model/*.cto` in the archive. Publishing becomes worthwhile when someone
 outside this repo needs to import them.

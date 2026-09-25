@@ -1,0 +1,10 @@
+{
+    "name": "street-resurfacing-contract",
+    "version": "0.1.0",
+    "description": "Municipal unit-price street resurfacing construction contract. Derived from the Town of China Grove's formally bid package, Contract No. STR-27 (N.C. Gen. Stat. 143-129): Standard Form Construction Contract, General Conditions and unit-price Bid Form, Special Provisions, and Street Schedule, with statutory retainage, liquidated damages, and non-binding mediation.",
+    "accordproject": {
+        "runtime": "typescript",
+        "template": "contract",
+        "cicero": "^2.0.0"
+    }
+}

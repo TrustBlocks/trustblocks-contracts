@@ -122,10 +122,11 @@
 
   There's no explicit link recorded from a contract instance back to the
   archive it was minted from -- only every namespace an archive's ingest
-  touched. A namespace belongs to at most one archive in practice (each
-  model/*.cto is ingested from exactly one template directory), so this
-  scan is how a $class's own template -- and its grammar, for Contract
-  View -- gets found. Loads every archive into memory to do it; fine at
+  touched. Shared namespaces (Accord's own, MunicipalAgreement) appear in
+  every template that vendors them, so ask with the namespace of a
+  contract's own $class: that one belongs to exactly one template, and
+  this scan is how that template -- and its grammar, for Contract View --
+  gets found. Loads every archive into memory to do it; fine at
   the handful of templates this app knows about today, worth indexing if
   that stops being true."
   [node ns]

@@ -1,0 +1,258 @@
+{
+  "$class": "com.trustblocks.municipal.construction@1.0.0.StreetResurfacingContract",
+  "contractId": "china-grove-str-27",
+  "stateCode": "NC",
+  "stateName": "North Carolina",
+  "countyName": "Rowan",
+  "municipalityName": "China Grove",
+  "municipalityType": "Town",
+  "governingBodyName": "Town Council",
+  "contractNumber": "STR-27",
+  "budgetOrdinanceFiscalYear": "FY 2026-2027",
+  "managerName": "Franklin D. Gover III",
+  "managerCredentials": "AICP, ICMA-CM",
+  "publicWorksDirectorName": "David Ketner",
+  "clerkName": "Pamela Mills",
+  "completionDays": 270,
+  "completionDaysWritten": "two hundred seventy",
+  "liquidatedDamagesPerDay": 500.0,
+  "liquidatedDamagesPerDayWritten": "five hundred dollars",
+  "addenda": [],
+  "crackAndJointSealingItems": [
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "1.1",
+      "description": "Seal existing pavement cracks and joints",
+      "unit": "lbs."
+    }
+  ],
+  "patchingLevelingSealCoatItems": [
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "2.1",
+      "description": "Asphalt Full Depth Finished Patching — place and compact Intermediate Course 3″ I19.0B with 2″ Surface Course S9.5B cap (areas to be determined)",
+      "unit": "Tons"
+    },
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "2.2",
+      "description": "Asphalt Full Depth Patching — place and compact Intermediate Course I19.0B (no surface course cap)",
+      "unit": "Tons"
+    },
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "2.3",
+      "description": "Asphalt Leveling — place and compact Intermediate Course I19.0B",
+      "unit": "Tons"
+    },
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "2.4",
+      "description": "Asphalt Leveling — place and compact Asphalt Open Graded Leveling Course (P78 or mix as approved by the Director)",
+      "unit": "Tons"
+    },
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "2.5",
+      "description": "Place and compact suitable sub-base material (locations to be determined)",
+      "unit": "Cu. Yd."
+    },
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "2.6",
+      "description": "Asphalt Seal Coat — straight seal, No. 78M aggregate",
+      "unit": "Sq. Yd."
+    }
+  ],
+  "millingItems": [
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "3.1",
+      "description": "Full mill the bituminous pavement — depth 0″ to 4″",
+      "unit": "Sq. Yd."
+    },
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "3.2",
+      "description": "Edge mill the bituminous pavement — depth 0″ to 4″",
+      "unit": "Sq. Yd."
+    },
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "3.3",
+      "description": "Incidental milling 0″ to 6″",
+      "unit": "Sq. Yd."
+    }
+  ],
+  "reclamationItems": [
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "4.1",
+      "description": "Reclamation of existing roadway with cement stabilization",
+      "unit": "Sq. Yd."
+    },
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "4.2",
+      "description": "Undercut and replace with approved suitable material for subgrade repairs",
+      "unit": "Tons"
+    }
+  ],
+  "resurfacingItems": [
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "5.1",
+      "description": "Asphalt Resurfacing — place and compact 1.25″ of Surface Course S9.5B",
+      "unit": "Tons"
+    },
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "5.2",
+      "description": "Asphalt Resurfacing — place and compact 1.5–2″ of Surface Course S9.5B",
+      "unit": "Tons"
+    }
+  ],
+  "concreteItems": [
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "6.1",
+      "description": "Standard valley type concrete curb and gutter (incidental and as directed)",
+      "unit": "Lin. Ft."
+    },
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "6.2",
+      "description": "Standard 2′-6″ concrete curb and gutter (incidental and as directed)",
+      "unit": "Lin. Ft."
+    },
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "6.3",
+      "description": "Wheelchair ramps, ADA/PROWAG compliant (incidental and as directed)",
+      "unit": "Ea."
+    },
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "6.4",
+      "description": "4″ thick concrete sidewalk",
+      "unit": "Sq. Yd."
+    }
+  ],
+  "pavementMarkingItems": [
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "7.1",
+      "description": "Thermoplastic pavement marking lines — 4″ double yellow solid",
+      "unit": "Lin. Ft."
+    },
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "7.2",
+      "description": "Thermoplastic pavement marking lines — 4″ yellow solid, skip, and mini-skip",
+      "unit": "Lin. Ft."
+    },
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "7.3",
+      "description": "Thermoplastic pavement marking lines — 8″ yellow gore line",
+      "unit": "Lin. Ft."
+    },
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "7.4",
+      "description": "Thermoplastic pavement marking lines — 4″ white solid, skip, mini-skip, and parking stall line",
+      "unit": "Lin. Ft."
+    },
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "7.5",
+      "description": "Thermoplastic pavement marking lines — 24″ stop bar",
+      "unit": "Lin. Ft."
+    },
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "7.6",
+      "description": "Temporary painted pavement marking, white and yellow",
+      "unit": "Lin. Ft."
+    },
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "7.7",
+      "description": "Thermoplastic crosswalk, high visibility — 24″ white bars, NCDOT standard",
+      "unit": "Lin. Ft."
+    },
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "7.8",
+      "description": "Thermoplastic pavement marking symbol — yield line",
+      "unit": "Lin. Ft."
+    },
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "7.9",
+      "description": "Thermoplastic pavement marking symbol — thru, right-turn, or left-turn arrow",
+      "unit": "Each"
+    },
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "7.10",
+      "description": "Thermoplastic pavement marking symbol — combination arrow",
+      "unit": "Each"
+    },
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "7.11",
+      "description": "Thermoplastic pavement marking symbol — characters 8′-4″, NCDOT standard",
+      "unit": "Each"
+    },
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "7.12",
+      "description": "Thermoplastic pavement marking symbol — SCHOOL 10′ with 24″ band, NCDOT standard",
+      "unit": "Each"
+    },
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "7.13",
+      "description": "Thermoplastic pavement marking symbol — railroad RXR, NCDOT standard",
+      "unit": "Each"
+    },
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "7.14",
+      "description": "Thermoplastic pavement marking symbol — bicycle shared lane, NCDOT standard",
+      "unit": "Each"
+    },
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "7.15",
+      "description": "Thermoplastic pavement marking symbol — accessible parking symbol, NCDOT standard",
+      "unit": "Each"
+    },
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "7.16",
+      "description": "Permanent raised pavement marker — yellow / yellow",
+      "unit": "Each"
+    },
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "7.17",
+      "description": "Permanent raised pavement marker — crystal / red",
+      "unit": "Each"
+    },
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "7.18",
+      "description": "Permanent raised pavement marker — blue / blue at fire hydrant locations",
+      "unit": "Each"
+    },
+    {
+      "$class": "com.trustblocks.municipal.construction@1.0.0.BidItem",
+      "payItem": "7.19",
+      "description": "“Fire Lane” red box with white lettering (match existing)",
+      "unit": "Each"
+    }
+  ],
+  "streets": []
+}
