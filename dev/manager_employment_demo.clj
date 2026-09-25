@@ -14,7 +14,8 @@
   retroactiveSalary is explicitly true -- but it means \"when this became
   effective\" and \"when it was approved\" are two different facts, and this
   demo only tracks the second one as the state's valid time. Modeling the
-  first properly is future work; see the template's model/execution.cto.
+  first properly is future work; see the template's ManagerEmploymentState
+  in model/model.cto.
 
     bin/clj -M:xtdb-jvm-opts -i dev/manager_employment_demo.clj"
   (:require [cheshire.core :as json]
@@ -24,7 +25,6 @@
             [com.trustblocks.xtdb.store :as store]
             [xtdb.node :as xt.node]))
 
-(def contract-fqn "com.trustblocks.municipal.employment@1.0.0.ManagerEmployment")
 (def contract-id  "china-grove-gover-2025")
 ;; The real councilActionDate from sample.json -- the Board's own meeting
 ;; date, and so also this trigger's own valid time (see approve!'s
@@ -65,7 +65,7 @@
   each repeating the same literal date."
   [node]
   (ex/trigger! node contract-id
-               {"$class" "com.trustblocks.municipal.employment.execution@1.0.0.BoardApprovalRequest"
+               {"$class" "com.trustblocks.municipal.employment@1.0.0.BoardApprovalRequest"
                 "requestedAt" board-meeting-date}
                board-meeting-date))
 
@@ -90,7 +90,7 @@
       (println "\nTriggering a second Board approval on the same contract...")
       (try
         (ex/trigger! node contract-id
-                     {"$class"      "com.trustblocks.municipal.employment.execution@1.0.0.BoardApprovalRequest"
+                     {"$class"      "com.trustblocks.municipal.employment@1.0.0.BoardApprovalRequest"
                       "requestedAt" "2026-01-05T00:00:00.000Z"}
                      "2026-01-05T00:00:00.000Z")
         (println "BUG: a second approval should have been refused")
