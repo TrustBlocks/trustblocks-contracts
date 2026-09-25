@@ -2,7 +2,7 @@
 
 **Street Resurfacing — Contract No. {{contractNumber}}**
 
-This contract (together with all exhibits and valid amendments, the “Agreement” or the “Contract”) is made and entered into as of the Notice to Proceed Date specified on EXHIBIT “K,” by the TOWN OF CHINA GROVE, a North Carolina municipal corporation (“Town”), and {{#optional contractorName}}{{this}}{{else}}\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_{{/optional}} (“Contractor”), {{#optional contractorEntityType}}{{this}}{{else}}( ) a corporation, ( ) a professional corporation, ( ) a professional association, ( ) a limited liability company, ( ) a limited partnership, ( ) a sole proprietorship, or ( ) a general partnership{{/optional}}; organized and existing under the laws of the State of {{#optional contractorStateOfOrganization}}{{this}}{{else}}\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_{{/optional}} and authorized to transact business in the State of North Carolina.
+This contract (together with all exhibits and valid amendments, the “Agreement” or the “Contract”) is made and entered into as of the Notice to Proceed Date{{#optional noticeToProceedDate}}, {{this as "MMMM D, YYYY"}},{{/optional}} specified on EXHIBIT “K,” by the TOWN OF CHINA GROVE, a North Carolina municipal corporation (“Town”), and {{#optional contractorName}}{{this}}{{else}}\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_{{/optional}} (“Contractor”), {{#optional contractorEntityType}}{{this}}{{else}}( ) a corporation, ( ) a professional corporation, ( ) a professional association, ( ) a limited liability company, ( ) a limited partnership, ( ) a sole proprietorship, or ( ) a general partnership{{/optional}}; organized and existing under the laws of the State of {{#optional contractorStateOfOrganization}}{{this}}{{else}}\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_{{/optional}} and authorized to transact business in the State of North Carolina.
 
 **Sec. 1. Background and Purpose.**
 
@@ -36,7 +36,7 @@ Retainage shall be governed by N.C. Gen. Stat. § 143-134.1. The Town shall with
 
 **Sec. 5. Term.**
 
-The Contractor shall commence work on the Notice to Proceed Date specified on EXHIBIT “K” (the “Commence Date”) and shall complete the work within {{completionDaysWritten}} ({{completionDays}}) calendar days from the Commence Date (the “Completion Date”). All work set forth in the Scope of Services at Exhibit “A” shall be completed between the Commence Date and the Completion Date. Any portion of the work that the Town specifies and directs to be completed on a date before the Completion Date shall be set out in writing between the Town and the Contractor. Time is of the essence.
+The Contractor shall commence work on the Notice to Proceed Date{{#optional noticeToProceedDate}}, {{this as "MMMM D, YYYY"}},{{/optional}} specified on EXHIBIT “K” (the “Commence Date”) and shall complete the work within {{completionDaysWritten}} ({{completionDays}}) calendar days from the Commence Date (the “Completion Date”). All work set forth in the Scope of Services at Exhibit “A” shall be completed between the Commence Date and the Completion Date. Any portion of the work that the Town specifies and directs to be completed on a date before the Completion Date shall be set out in writing between the Town and the Contractor. Time is of the essence.
 
 If the Contractor's obligations are not completed by the Completion Date or other specified date, the Town reserves the right to terminate this Agreement, order the Contractor to cease all work and vacate the premises, and procure equivalent services. The Contractor shall be accountable for all damages incurred by the Town as a consequence of the missed Completion Date. The exercise of any of these rights shall not prejudice any other right the Town may have at law or in equity.
 
@@ -283,7 +283,7 @@ This instrument has been pre-audited in the manner required by the Local Governm
 
 **SCOPE OF SERVICES / FEE FOR SCOPE OF SERVICES**
 
-This document is an Exhibit to the Agreement for Street Resurfacing, Contract No. {{contractNumber}}, between the TOWN OF CHINA GROVE and {{#optional contractorName}}{{this}}{{else}}\[CONTRACTOR\]{{/optional}}, dated as of the Notice to Proceed Date specified on EXHIBIT “K.”
+This document is an Exhibit to the Agreement for Street Resurfacing, Contract No. {{contractNumber}}, between the TOWN OF CHINA GROVE and {{#optional contractorName}}{{this}}{{else}}\[CONTRACTOR\]{{/optional}}, dated as of the Notice to Proceed Date{{#optional noticeToProceedDate}}, {{this as "MMMM D, YYYY"}},{{/optional}} specified on EXHIBIT “K.”
 
 **Scope of Services**
 
@@ -363,7 +363,7 @@ The Director, acting directly or through duly authorized representatives, will d
 
 **4) Contract Time, Notice to Proceed, and Town's Right to Terminate**
 
-The commencement date of this contract is the date indicated on the Notice to Proceed, Exhibit “K,” and the contract shall end {{completionDaysWritten}} ({{completionDays}}) calendar days after that date (the “Completion Date”). The Contractor shall start work as directed as soon as possible after issuance of a Notice to Proceed and Town purchase order number, but in no event later than two (2) weeks after delivery of the Notice to Proceed and purchase order number. Any request for delay in starting work shall be made in writing by the Contractor with detailed justification. The Town shall have the right to suspend work or to terminate the contract after giving at least ten (10) days' written notice of suspension or termination to the Contractor.
+The commencement date of this contract is the date{{#optional noticeToProceedDate}}, {{this as "MMMM D, YYYY"}},{{/optional}} indicated on the Notice to Proceed, Exhibit “K,” and the contract shall end {{completionDaysWritten}} ({{completionDays}}) calendar days after that date (the “Completion Date”). The Contractor shall start work as directed as soon as possible after issuance of a Notice to Proceed and Town purchase order number, but in no event later than two (2) weeks after delivery of the Notice to Proceed and purchase order number. Any request for delay in starting work shall be made in writing by the Contractor with detailed justification. The Town shall have the right to suspend work or to terminate the contract after giving at least ten (10) days' written notice of suspension or termination to the Contractor.
 
 Renewal of this contract for one (1) additional term is permitted only by written amendment executed before the Completion Date, as provided in Sec. 5 of the Standard Form Construction Contract, and is contingent upon appropriation of funds under N.C. Gen. Stat. § 159-28. This contract does not renew automatically.
 
@@ -736,9 +736,9 @@ Total Bid written in words: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
 *Note: The Total Bid is the sum of the section totals. No contingency line is included; project contingency, if any, is held by the Town in the project budget and is not bid or priced by the Bidder. In the event of a discrepancy between a unit price and an extended amount, the unit price shall govern; in the event of a discrepancy between the sum of the section totals and the Total Bid, the sum of the section totals shall govern.*
 
-This bid shall not include any unauthorized additions, deletions, or conditions. The Bidder agrees that any and all excavations are unclassified. This bid will remain subject to acceptance for sixty (60) days after the date of submittal, and once accepted and the contract executed between the Town and the Contractor, the unit prices shall remain as submitted herewith until {{completionDays}} days from the date noted on the Notice to Proceed, Exhibit “K.”
+This bid shall not include any unauthorized additions, deletions, or conditions. The Bidder agrees that any and all excavations are unclassified. This bid will remain subject to acceptance for sixty (60) days after the date of submittal, and once accepted and the contract executed between the Town and the Contractor, the unit prices shall remain as submitted herewith until {{completionDays}} days from the date{{#optional noticeToProceedDate}}, {{this as "MMMM D, YYYY"}},{{/optional}} noted on the Notice to Proceed, Exhibit “K.”
 
-The Bidder agrees that the work will be completed and ready for final payment on or before {{completionDays}} days from the date noted on the Notice to Proceed, Exhibit “K.”
+The Bidder agrees that the work will be completed and ready for final payment on or before {{completionDays}} days from the date{{#optional noticeToProceedDate}}, {{this as "MMMM D, YYYY"}},{{/optional}} noted on the Notice to Proceed, Exhibit “K.”
 
 ***Do Not Separate the Bid Form and Signature of Bidder sheets from the Contract document book.***
 

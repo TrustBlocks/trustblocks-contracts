@@ -80,7 +80,7 @@ asset StreetResurfacingContract extends MunicipalAgreement {
   @description("Calendar days from the Notice to Proceed Date to the Completion Date")
   o Integer completionDays
   o String completionDaysWritten
-  @description("The Notice to Proceed Date -- the Commence Date, and the date the Contract is made")
+  @description("The Notice to Proceed Date -- the Commence Date, and the date the Contract is made. Rendered beside each place the text names it, so an award's Completion Date can be read from the contract itself")
   o DateTime noticeToProceedDate optional
   @description("When sealed bids are opened")
   o DateTime bidOpeningDate optional
