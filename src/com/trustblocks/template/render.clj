@@ -83,39 +83,63 @@
 
 ;; ------------------------------------------------------------------ parse
 
+(defn- literal
+  "A directive token restored to its source text, for rendering literally."
+  [[kind k]]
+  [:text (case kind :else "{{else}}" :close (str "{{/" (name k) "}}"))])
+
 (defn- parse-nodes
-  "tokens -> [nodes remaining-tokens], stopping at :else or :close (left for
-  the caller) or end of input. A block becomes [:block kind name body
-  else-body]."
-  [tokens]
-  (loop [tokens tokens, nodes (transient [])]
-    (if (empty? tokens)
-      [(persistent! nodes) tokens]
-      (let [[kind :as tok] (first tokens), more (rest tokens)]
-        (case kind
-          (:text :var) (recur more (conj! nodes tok))
-          :open (let [[_ block-kind nm]  tok
-                      [body rest1]       (parse-nodes more)
-                      at-else?           (= :else (ffirst rest1))
-                      [else-body rest2]  (if at-else? (parse-nodes (rest rest1)) [[] rest1])]
-                  (recur (rest rest2) ; drop the :close
-                         (conj! nodes [:block block-kind nm body else-body])))
-          (:else :close) [(persistent! nodes) tokens])))))
+  "tokens -> [nodes remaining-tokens]. `open` is the kind of block being
+  parsed (nil at the top level): parsing stops at that block's own
+  {{/kind}}, or at {{else}} inside #if/#optional, leaving it for the
+  caller. A block becomes [:block kind name body else-body].
+
+  Any other {{else}} or {{/kind}} -- stray at the top level, or closing a
+  block other than the open one -- is rendered as literal text rather than
+  silently ending the document there."
+  ([tokens] (parse-nodes tokens nil))
+  ([tokens open]
+   (loop [tokens tokens, nodes (transient [])]
+     (if (empty? tokens)
+       [(persistent! nodes) tokens]
+       (let [[kind k :as tok] (first tokens), more (rest tokens)]
+         (case kind
+           (:text :var) (recur more (conj! nodes tok))
+           :open (let [[_ block-kind nm]  tok
+                       [body rest1]       (parse-nodes more block-kind)
+                       at-else?           (= :else (ffirst rest1))
+                       [else-body rest2]  (if at-else? (parse-nodes (rest rest1) block-kind) [[] rest1])]
+                   (recur (rest rest2) ; drop the :close
+                          (conj! nodes [:block block-kind nm body else-body])))
+           :else (if (#{:if :optional} open)
+                   [(persistent! nodes) tokens]
+                   (recur more (conj! nodes (literal tok))))
+           :close (if (= k open)
+                    [(persistent! nodes) tokens]
+                    (recur more (conj! nodes (literal tok))))))))))
 
 ;; ----------------------------------------------------------------- format
+
+(def ^:private currency-symbols
+  {"USD" "$" "GBP" "£" "EUR" "€" "JPY" "¥" "CAD" "$" "AUD" "$"})
 
 (defn- amount
   "`n` formatted by a TemplateMark amount pattern -- 0,0 or 0 0 for the
   thousands separator, then optionally a decimal separator and the number
-  of places, e.g. 0,0.00 -> 12,000.00. nil if `fmt` is not one."
-  [n fmt]
-  (when-let [[_ group _ dec places] (re-matches #"K?0([ ,])0(([.,])(0+))?(?: ?CCC)?" fmt)]
+  of places, e.g. 0,0.00 -> 12,000.00 -- with `currency` (an ISO code, or
+  nil) placed where the pattern asks: K before the number as a symbol, CCC
+  after it as the code. nil if `fmt` is not an amount pattern."
+  [n fmt currency]
+  (when-let [[_ k group _ dec places ccc] (re-matches #"(K)?0([ ,])0(([.,])(0+))?( ?CCC)?" fmt)]
     (let [scale (count (or places ""))
           bd    (.setScale (bigdec n) scale RoundingMode/HALF_UP)
           [i f] (str/split (.toPlainString (.abs bd)) #"\." 2)
           int*  (->> (reverse i) (partition-all 3) (map (comp str/join reverse)) reverse
                      (str/join group))]
-      (str (when (neg? (.signum bd)) "-") int* (when f (str dec f))))))
+      (str (when (neg? (.signum bd)) "-")
+           (when (and k currency) (get currency-symbols currency currency))
+           int* (when f (str dec f))
+           (when (and ccc currency) (str (when (str/starts-with? ccc " ") " ") currency))))))
 
 (def ^:private date-token
   #"YYYY|MMMM|MMM|MM|M|DD|D|HH|H|hh|h|mm|ss|SSS|Z|a|A|[^A-Za-z]+|[A-Za-z]")
@@ -137,14 +161,16 @@
 
 (defn- date
   "`s`, a Concerto DateTime string, formatted at its own UTC offset -- the
-  offset the value was written with, as Accord's engine does. nil if `s` is
-  not a date-time or `fmt` is not a TemplateMark date format."
+  offset the value was written with, as Accord's engine does -- or at UTC
+  when it has none. nil if `s` is not a date-time or `fmt` is not a
+  TemplateMark date format."
   [s fmt]
   (when-let [pattern (java-date-pattern fmt)]
-    (try
-      (.format (OffsetDateTime/parse s)
-               (DateTimeFormatter/ofPattern pattern Locale/US))
-      (catch Exception _ nil))))
+    (when-let [dt (or (try (OffsetDateTime/parse s) (catch Exception _ nil))
+                      ;; No offset: UTC, the same reading
+                      ;; com.trustblocks.xtdb.execute/->instant gives it.
+                      (try (OffsetDateTime/parse (str s "Z")) (catch Exception _ nil)))]
+      (.format dt (DateTimeFormatter/ofPattern pattern Locale/US)))))
 
 (defn- format-value
   "A value as the text shows it. Without a format a value renders as its
@@ -154,13 +180,17 @@
   [v fmt]
   (or (when fmt
         (cond
-          (number? v) (amount v fmt)
+          (number? v) (amount v fmt nil)
+          ;; org.accordproject.money MonetaryAmount
+          (and (map? v) (number? (get v "doubleValue")))
+          (amount (get v "doubleValue") fmt (get v "currencyCode"))
+
           (string? v) (date v fmt)))
       (str v)))
 
 ;; ---------------------------------------------------------------- resolve
 
-(defn- placeholder [i] (str "" i ""))
+(defn- placeholder [i] (str "\uE000" i "\uE001"))
 
 (defn- resolve-nodes
   "Parsed nodes against `scope` -> markdown text, accumulating each resolved
@@ -213,7 +243,9 @@
 
 (def ^:private html-renderer
   ;; escapeHtml: raw HTML in a grammar is shown as text, never rendered.
-  (-> (HtmlRenderer/builder) (.extensions extensions) (.escapeHtml true) (.build)))
+  ;; sanitizeUrls: only http(s), mailto and data:image links survive, so no
+  ;; javascript: link can reach the page.
+  (-> (HtmlRenderer/builder) (.extensions extensions) (.escapeHtml true) (.sanitizeUrls true) (.build)))
 
 (defn- escape-html [s]
   (-> (str s)
@@ -234,8 +266,17 @@
   (let [values (volatile! [])
         md     (-> (tokenize grammar) parse-nodes first (resolve-nodes data values))
         html   (.render html-renderer (.parse parser md))]
-    (str/replace html #"(\d+)"
-                 (fn [[_ i]] (value-span (nth @values (parse-long i)))))))
+    (-> html
+        ;; Inside a tag -- a link's href, an image's alt -- a value can only
+        ;; be escaped text: a span there would end the attribute.
+        (str/replace #"<[^>]*>"
+                     (fn [tag]
+                       (str/replace tag #"\uE000(\d+)\uE001"
+                                    (fn [[_ i]] (let [[kind v] (nth @values (parse-long i))]
+                                                  (escape-html (if (= kind :value) v (str "{{" v "}}"))))))))
+        ;; Everywhere else, the highlighted span.
+        (str/replace #"\uE000(\d+)\uE001"
+                     (fn [[_ i]] (value-span (nth @values (parse-long i))))))))
 
 (defn render
   "render-html as hiccup children, for a page to place inside its own

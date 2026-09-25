@@ -61,6 +61,27 @@
   (testing "raw HTML in a grammar is escaped, not rendered"
     (is (not (re-find #"<script>" (html "<script>alert(1)</script>" {}))))))
 
+(deftest review-findings-on-the-renderer
+  ;; Each found by code review of the PR that introduced this renderer.
+  (testing "a value inside a link or image stays inside its attribute"
+    (let [out (html "[site]({{u}}) ![{{alt}}](https://x.test/i.png)"
+                    {"u" "https://example.gov/a?b=1&c=2" "alt" "Town \"seal\""})]
+      (is (re-find #"href=\"https://example.gov/a\?b=1&amp;c=2\"" out))
+      (is (re-find #"alt=\"Town &quot;seal&quot;\"" out))
+      (is (not (re-find #"=\"<span" out)))))
+  (testing "javascript: links do not survive"
+    (is (not (re-find #"javascript:" (html "[bad](javascript:alert(1))" {})))))
+  (testing "a stray or mismatched closer is literal text, not the end of the document"
+    (is (re-find #"A \{\{/if\}\} B .*Ada" (html "A {{/if}} B {{x}}" {"x" "Ada"})))
+    (is (re-find #"\{\{else\}\}" (html "top {{else}} level" {})))
+    (is (re-find #"(?s)\{\{/optional\}\}.*<p>after</p>" (html "{{#ulist xs}}\n{{this}} {{/optional}}\n{{/ulist}}\n\nafter" {"xs" ["a"]}))))
+  (testing "a DateTime with no offset is read as UTC and still formatted"
+    (is (re-find #"July 14, 2026" (html "{{d as \"MMMM D, YYYY\"}}" {"d" "2026-07-14T10:00:00"}))))
+  (testing "a MonetaryAmount formats with its currency where the pattern asks"
+    (let [m {"$class" "org.accordproject.money@0.3.0.MonetaryAmount" "doubleValue" 2000500.0 "currencyCode" "USD"}]
+      (is (re-find #">2,000,500.00 USD<" (html "{{m as \"0,0.00 CCC\"}}" {"m" m})))
+      (is (re-find #">\$2,000,500.00<" (html "{{m as \"K0,0.00\"}}" {"m" m}))))))
+
 (deftest our-templates-render-completely
   ;; Every variable in both real templates resolves against its own sample:
   ;; no dimmed {{token}} anywhere.
