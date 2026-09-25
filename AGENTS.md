@@ -34,6 +34,8 @@ code around it.
 deps.edn                  Clojure CLI deps + aliases (see §7)
 bb.edn                    babashka deps for the no-database half of docs/walkthrough.md
 bin/clj                   ALWAYS use this, never bare `clj` — pins JAVA_HOME to JDK 21 (XTDB needs 21-24)
+bin/playground            runs Accord's WebMCP Template Playground (webmcp-poc, pinned) locally on :5173 -- parked,
+                          see docs/template-playground-webmcp.md; .mcp.json declares its agent relay
 repl.clj                  REPL scratch: (get-node), (refresh)
 resources/config.edn      Biff config (port, cookie secret, css paths, main-ns, nrepl-port)
 tests.edn                 kaocha config

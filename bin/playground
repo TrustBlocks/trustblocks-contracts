@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# Run Accord Project's WebMCP Template Playground locally, as Trustblocks'
+# own playground. See docs/template-playground-webmcp.md.
+#
+# A local service rather than a hosted one on purpose: the branch's agent
+# relay (which lets Claude Code drive the page's WebMCP tools) exists only in
+# its Vite development build, and a production build exposes WebMCP only to
+# Chrome with an experimental flag. Pushing a template into the page through
+# those tools is also how a full-length contract gets in at all -- the share
+# link carries the whole template in the URL, ~72,000 characters for STR-27.
+#
+# Keeps a sibling checkout (never inside this repo, so its node_modules and
+# build output stay out of git) at a pinned commit of the webmcp-poc branch,
+# installs its dependencies when they are missing or stale, and serves it on
+# http://localhost:5173. Point Trustblocks at it with
+#   TRUSTBLOCKS_TEMPLATE_PLAYGROUND_ORIGIN=http://localhost:5173
+#
+# Usage:  bin/playground
+#   TRUSTBLOCKS_PLAYGROUND_DIR  checkout location (default ~/Code/template-playground)
+#   TRUSTBLOCKS_PLAYGROUND_REF  commit to run (default: the one last verified)
+set -euo pipefail
+
+repo=https://github.com/accordproject/template-playground.git
+dir="${TRUSTBLOCKS_PLAYGROUND_DIR:-$HOME/Code/template-playground}"
+# webmcp-poc as verified in docs/template-playground-webmcp.md. Moving it is a
+# deliberate act: the branch is an experimental proof of concept.
+ref="${TRUSTBLOCKS_PLAYGROUND_REF:-8206dc182337ee402dd3a7c52d40a02c0c234f0d}"
+port=5173
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "error: node is not on PATH (the playground is a Node/Vite app)" >&2
+  exit 1
+fi
+
+if [[ ! -d "$dir/.git" ]]; then
+  echo "Cloning $repo into $dir ..."
+  git clone --quiet --branch webmcp-poc "$repo" "$dir"
+fi
+
+cd "$dir"
+
+if [[ "$(git rev-parse HEAD)" != "$ref" ]]; then
+  if [[ -n "$(git status --porcelain)" ]]; then
+    echo "error: $dir has local changes and is not at $ref; refusing to switch" >&2
+    exit 1
+  fi
+  git cat-file -e "$ref^{commit}" 2>/dev/null || git fetch --quiet origin webmcp-poc
+  git checkout --quiet --detach "$ref"
+fi
+
+# npm records the lockfile it last installed from; reinstall when it is
+# missing or older than the checkout's own lockfile.
+if [[ ! -f node_modules/.package-lock.json || package-lock.json -nt node_modules/.package-lock.json ]]; then
+  echo "Installing playground dependencies (npm ci) ..."
+  npm ci --no-audit --no-fund
+fi
+
+if lsof -nP -iTCP:"$port" -sTCP:LISTEN -t >/dev/null 2>&1; then
+  echo "error: port $port is already in use -- is the playground already running?" >&2
+  exit 1
+fi
+
+echo "Template Playground (webmcp-poc @ ${ref:0:7}) on http://localhost:$port"
+exec npm run dev -- --port "$port" --strictPort
