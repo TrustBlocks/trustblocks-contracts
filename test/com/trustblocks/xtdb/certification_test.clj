@@ -41,8 +41,7 @@
   ;; happened' can't be certified about a contract that doesn't exist.
   (me/load! node)
   (me/approve! node)
-  (store/put-model! node "model/identity.cto")
-  (store/put-model! node "model/attestation.cto"))
+  (store/put-model! node "model/identity.cto"))
 
 (defn- provision! [node]
   (let [town (identity/provision-town! node {:slug "china-grove" :name "China Grove"})

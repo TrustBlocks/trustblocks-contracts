@@ -24,7 +24,8 @@
   contract's own state' gets decided -- 'this contract was approved by
   Board action on ...' is only sayable once the Board really has
   approved it, and the clause is what knows that, not this namespace.
-  See model/attestation.cto's own docstring for the standard
+  See attestation.cto (shared by the templates in trustblocks-templates,
+  and carried by each template that supports attestation) for the standard
   AttestationRequest/Response pair every contract wanting attestation
   support adds one branch of its own clause for.
 
@@ -97,7 +98,7 @@
   certifies something about `contract-id` -- refusing unless their
   OfficeGrant, as of `valid-from` (the event's own time, not now), names
   `required-authority`, AND unless `contract-id`'s own stored clause
-  agrees this is true right now (see model/attestation.cto).
+  agrees this is true right now (see the templates' attestation.cto).
 
   `valid-from` is deliberately when the authority check is made
   against, not wall-clock time: it answers 'was this person authorized

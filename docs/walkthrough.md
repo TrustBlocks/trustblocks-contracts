@@ -456,7 +456,8 @@ Parts 1–4 answer *what did we agree and what has happened under it*. Municipal
 work also needs *who says so, with what authority*: the Town Clerk certifying
 that the council voted, then that the minutes recording the vote were
 approved. Part 5 builds that on the real China Grove town-manager contract,
-[`docs/examples/manager-employment-contract`](examples/manager-employment-contract/).
+the [`manager-employment-contract`](https://github.com/TrustBlocks/trustblocks-templates/blob/main/templates/manager-employment-contract/)
+template from TrustBlocks/trustblocks-templates.
 
 Three layers, each only knowing about the one below it:
 
@@ -486,9 +487,8 @@ bin/clj -M:xtdb-jvm-opts
 (import '[java.time Instant])
 
 (def node (xt.node/start-node))
-(me/load! node)                                 ; the contract, its model and its clause
+(me/load! node)                                 ; the template: model (incl. AttestationRequest/Response), clause
 (store/put-model! node "model/identity.cto")    ; OfficeGrant, Attestation
-(store/put-model! node "model/attestation.cto") ; AttestationRequest/Response
 ```
 
 The contract is loaded but **not yet approved by the Board**. That matters
@@ -614,7 +614,7 @@ happen, in this order:
    to have held the office then; whether she holds it today is a different
    question.
 3. **Ask the contract.** Run `ex/trigger!` with a standard
-   `AttestationRequest` ([`model/attestation.cto`](../model/attestation.cto)),
+   `AttestationRequest` ([`attestation.cto`](https://github.com/TrustBlocks/trustblocks-templates/blob/main/shared/model/attestation.cto)),
    so the contract's own sandboxed clause decides whether the statement can be
    true yet.
 4. **Sign** the clause's *response*, not the caller's input, as an
@@ -644,8 +644,8 @@ Try it before the Board has approved anything:
 
 The Clerk's authority checked out; the *contract* refused. Its clause has one
 branch for `AttestationRequest`, and it will not attest to an approval that
-has not happened (see `clojure-clause` in
-[`dev/manager_employment_demo.clj`](../dev/manager_employment_demo.clj)).
+has not happened (see the template's
+[`logic/clause.clj`](https://github.com/TrustBlocks/trustblocks-templates/blob/main/templates/manager-employment-contract/logic/clause.clj)).
 Adding attestation support to any contract means adding that one branch.
 
 Approve it, then certify:

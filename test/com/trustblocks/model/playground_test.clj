@@ -14,6 +14,7 @@
             [clojure.test :refer [deftest is testing]]
             [com.trustblocks.model.playground :as pg]
             [com.trustblocks.template.archive :as archive]
+            [com.trustblocks.template.library :as library]
             [com.trustblocks.xtdb.store :as store]
             [xtdb.node :as xt.node])
   (:import [blazing.chain LZSEncoding]
@@ -140,10 +141,10 @@ concept Greeting {
   ;; the real template stops needing more than one namespace -- exactly
   ;; when the explanation would go stale.
   (with-open [node (xt.node/start-node)]
-    (archive/ingest-dir! node "docs/examples/manager-employment-contract")
+    (archive/ingest-dir! node (library/dir "manager-employment-contract"))
     (let [reg      (store/registry-from-xtdb node)
           instance (json/parse-string
-                    (slurp "docs/examples/manager-employment-contract/sample.json"))
+                    (library/sample "manager-employment-contract"))
           {:keys [url unavailable]} (pg/template-status node reg instance)]
       (is (nil? url))
       (is (re-find #"needs \d+ namespaces beyond what Template Playground bundles" unavailable)))))

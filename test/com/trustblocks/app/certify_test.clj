@@ -46,7 +46,6 @@
     (me/load! node)
     (me/approve! node)
     (store/put-model! node "model/identity.cto")
-    (store/put-model! node "model/attestation.cto")
     (provision-clerk! node)
 
     (testing "a missing field redirects with a certify-error, not a 500"

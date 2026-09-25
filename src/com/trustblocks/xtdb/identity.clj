@@ -33,7 +33,7 @@
   "A new Town identity: a fresh Ed25519 keypair and a path-based did:web
   under our own domain -- did:web:trustblocks.com:towns:<slug> -- since
   no real municipal domain is ours to serve /.well-known from yet (see
-  docs/model-repository.md's own note on this project's domains). A
+  trustblocks-templates' docs/model-conventions.md on this project's domains). A
   did:web identity is just files at a URL, so this can move to a town's
   own domain later without anyone's DID changing meaning, only where it
   resolves."

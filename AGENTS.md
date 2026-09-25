@@ -34,7 +34,6 @@ code around it.
 deps.edn                  Clojure CLI deps + aliases (see §7)
 bb.edn                    babashka deps for the no-database half of docs/walkthrough.md
 bin/clj                   ALWAYS use this, never bare `clj` — pins JAVA_HOME to JDK 21 (XTDB needs 21-24)
-bin/template-conformance  Node/Accord JS toolchain check that templates load+draft correctly (dev-only)
 repl.clj                  REPL scratch: (get-node), (refresh)
 resources/config.edn      Biff config (port, cookie secret, css paths, main-ns, nrepl-port)
 tests.edn                 kaocha config
@@ -83,37 +82,34 @@ src/com/trustblocks/
                                  attestations-for-contract — the newest and most involved file, read it fully
 
   template/
-    archive.clj                ingest a .cta archive (or unpacked dir) into XTDB
+    library.clj                where our templates come from: the trustblocks-templates git dep, on the classpath
+    archive.clj                ingest a .cta archive (or unpacked dir) into XTDB; installs a Clojure-logic
+                               template's clause (package.json "trustblocks" section) via execute/put-clause!
     audit.clj                  staged, human-readable validation of a template's ingestibility
     render.clj                 narrow TemplateMark-subset renderer for Contract View (NOT Accord's full grammar)
 
-model/                     repo-root — cross-cutting Concerto models not owned by one template
+model/                     repo-root — the app's own Concerto models, not any template's
   identity.cto               Authority enum, OfficeGrant/Attestation concepts (VC credentialSubject shapes)
-  attestation.cto            AttestationRequest/AttestationResponse — the standard pair a contract's own clause
-                             adopts for attestation support (see certification.clj)
 
 docs/
   walkthrough.md             narrative tour, Parts 1-5 (Concerto as data -> storing -> executing -> HTTP trigger
                              -> identity, DID/VC and attestation); every form is meant to be pasted and run
   operator-runbook.md         local operations: seed/signin, demo identities, REPL provisioning/revocation
-  model-repository.md        municipal model namespace conventions, reuse-by-inheritance rule, parked publishing plan
   concerto-xtdb-mapping.md   original research notes on the Concerto<->XTDB mapping problem xtdb/keys.clj solves
-  templatemark-conformance.md  the case for round-tripping templates through Accord's own JS toolchain
   template-playground-webmcp.md  local exploration of Accord's experimental webmcp-poc branch
   examples/
     snow-removal.cto           synthetic, walkthrough-only contract — deliberately zero imports
-    manager-employment-contract/  the REAL China Grove contract: model/ (6 namespaces), sample.json, text/grammar.tem.md
     late-delivery.cta          Accord's own reference template — used only as a cross-check oracle
 
 dev/                       runnable scripts; on the classpath for both direct execution and test fixtures
   seed.clj                   boots the real app + seeds both contracts + the Clerk + both certifications —
                              THE way to get a working local instance, see §7
-  manager_employment_demo.clj  loads the real employment contract + its clause; exposes approve!
+  manager_employment_demo.clj  loads the real employment contract template (clause included) from the library;
+                             exposes approve!
   snow_removal_demo.clj        the synthetic snow-plowing contract + three visit triggers
   certification_demo.clj       provisions Town+Clerk+OfficeGrant, certifies vote then minutes;
                              depends on manager_employment_demo.clj (needs a real, approved contract to attest to)
   late_delivery_demo.clj       cross-checks the Clojure clause runtime against Accord's own known-good answer
-  conformance.cljs             what bin/template-conformance runs
   trigger_demo.clj, ingest_demo.clj, contract_queries.clj, audit_library.clj,
   accord_probe.clj, demo.clj   smaller/older exploratory scripts
 
@@ -188,7 +184,7 @@ are probably in the wrong repo.
   (`identity/by-email`) — there is no separate officeholder login/password.
   The signed-in session IS the officeholder, for authorization purposes.
 - **Jurisdiction fields are shared by inheritance, not composition**
-  (`MunicipalAgreement`, see `docs/model-repository.md`). A nested
+  (`MunicipalAgreement`, see trustblocks-templates' `docs/model-conventions.md`). A nested
   `Jurisdiction` concept was rejected: TemplateMark can only reach a nested
   concept via `{{#with}}`, which is block-level and injects paragraph breaks
   mid-sentence, and the real contract uses e.g. `{{municipalityType}}` inside
@@ -207,13 +203,22 @@ are probably in the wrong repo.
 - **The model registry (`registry-from-xtdb`) is global and flat** — every
   `.cto` ever `put-model!`'d into a node is visible to every query,
   regardless of which contract or feature it was loaded for. This is why
-  `model/identity.cto` and `model/attestation.cto` live at the repo root
-  rather than inside any one template's directory, and why test fixtures
-  must load every model a clause's Request/Response types reference.
-- **A model-publishing repo (`models.trustblocks.com`) is a deliberately
-  parked, separate decision** — not a folder in this repo, so it can
-  contribute back to Accord's own model library independently later. Not
-  started. Don't build it without asking; see `docs/model-repository.md`.
+  `model/identity.cto` lives at the repo root rather than inside any one
+  template, why each template that supports attestation carries its own
+  verified copy of the shared `attestation.cto`, and why test fixtures must
+  load every model a clause's Request/Response types reference.
+- **Our municipal templates live in their own public repository,
+  [TrustBlocks/trustblocks-templates](https://github.com/TrustBlocks/trustblocks-templates)**
+  — models, TemplateMark text, and Clojure clause logic (`logic/clause.clj`),
+  built to standard `.cta` archives. This app consumes it as a git dependency
+  (pinned sha in `deps.edn`; `-M:templates-local` for a sibling checkout) and
+  runs it; it no longer carries template copies. Accord's tools accept only
+  `es6`/`typescript` as `accordproject.runtime`, so our templates keep
+  `typescript` there and name their Clojure logic in a separate
+  `"trustblocks"` section of `package.json`. New templates go there, not in
+  `docs/examples/`. Its `bb check` / `bb conformance` are the template-side
+  checks; the app's `template/library_test.clj` checks they survive our own
+  pipeline and arrive with their clause installed.
 
 ## 4. Conventions to follow
 
@@ -339,8 +344,8 @@ not a starting point to improve on.**
   sibling research repo's `PROCEEDING-MODEL.md` — deliberately scoped down
   to just the two-step vote-then-minutes case for now; nothing in this repo
   implements the general form.
-- A model-publishing repo/site (`models.trustblocks.com`) — parked by
-  decision, see `docs/model-repository.md`.
+- Serving the templates repository at `models.trustblocks.com` /
+  `templates.trustblocks.com` — see its `docs/model-conventions.md`.
 
 ## 6. Open threads & known issues
 
@@ -399,8 +404,8 @@ new machine):
   `TRUSTBLOCKS_JAVA_HOME`). **Always invoke `bin/clj`, never bare `clj`** —
   a bare `clj` uses the system JDK and XTDB will fail to start.
 - Node.js on `PATH`, with `npm install` run at least once (`node_modules/`
-  gitignored). This is a **real runtime dependency**, not just for
-  `bin/template-conformance`: `com.trustblocks.concerto.cto/parse` (in the
+  gitignored). This is a **real runtime dependency**:
+  `com.trustblocks.concerto.cto/parse` (in the
   external `concerto-clj` dependency) shells out to Accord's own JS tooling
   to parse `.cto` files, and that runs every time `put-model!`/`load-registry`
   is called — including inside most of the test suite. `bin/clj` automatically
@@ -426,7 +431,7 @@ identity for this email".
 ```sh
 bin/clj -M:run test
 ```
-Currently 53 tests / 182 assertions, 0 failures. Focus a namespace or var
+Currently 57 tests / 192 assertions, 0 failures. Focus a namespace or var
 with `--focus <fully.qualified.name>`.
 
 **Lint + format + test together** (what to run before considering any change
@@ -451,12 +456,10 @@ curl ...   # sign in (POST /_biff/auth/send-code, read the code from the log,
            # POST /_biff/auth/verify-code), then exercise the actual route
 ```
 
-**Template conformance** (only needed after touching a `.cto`/`.cta` under
-`docs/examples/`):
-```sh
-npm install   # once
-bin/template-conformance
-```
+**Template conformance** now lives with the templates, in
+`~/Code/trustblocks-templates`: `bb check`, then `npm install` once and
+`bb conformance`. To try a template change in this app before committing it
+there, run with `-M:templates-local` (e.g. `bin/clj -M:templates-local:run test`).
 
 ## 8. Recommended next steps
 
