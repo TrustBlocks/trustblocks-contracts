@@ -33,3 +33,8 @@ node_modules/
 
 # macOS
 .DS_Store
+
+# Editor / assistant tooling state -- per-developer, never committed
+.calva/
+.eca/
+.zed/
