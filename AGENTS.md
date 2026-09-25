@@ -86,7 +86,9 @@ src/com/trustblocks/
     archive.clj                ingest a .cta archive (or unpacked dir) into XTDB; installs a Clojure-logic
                                template's clause (package.json "trustblocks" section) via execute/put-clause!
     audit.clj                  staged, human-readable validation of a template's ingestibility
-    render.clj                 narrow TemplateMark-subset renderer for Contract View (NOT Accord's full grammar)
+    render.clj                 Contract View renderer: TemplateMark's template layer (vars, `as` formats, #if/#optional,
+                               #ulist/#olist, Accord's scoping) + commonmark-java (CommonMark + tables) for the markdown;
+                               values are placeholders swapped in after rendering, so they can never become markup
 
 model/                     repo-root — the app's own Concerto models, not any template's
   identity.cto               Authority enum, OfficeGrant/Attestation concepts (VC credentialSubject shapes)
@@ -102,11 +104,13 @@ docs/
     late-delivery.cta          Accord's own reference template — used only as a cross-check oracle
 
 dev/                       runnable scripts; on the classpath for both direct execution and test fixtures
-  seed.clj                   boots the real app + seeds both contracts + the Clerk + both certifications —
+  seed.clj                   boots the real app + seeds all three contracts (snow removal, manager employment,
+                             STR-27 as issued) + the Clerk + both certifications —
                              THE way to get a working local instance, see §7
   manager_employment_demo.clj  loads the real employment contract template (clause included) from the library;
                              exposes approve!
   snow_removal_demo.clj        the synthetic snow-plowing contract + three visit triggers
+  street_resurfacing_demo.clj  loads STR-27 (street-resurfacing-contract template) as its bid package as issued
   certification_demo.clj       provisions Town+Clerk+OfficeGrant, certifies vote then minutes;
                              depends on manager_employment_demo.clj (needs a real, approved contract to attest to)
   late_delivery_demo.clj       cross-checks the Clojure clause runtime against Accord's own known-good answer
@@ -270,7 +274,9 @@ not a starting point to improve on.**
 - **Coverage is uneven, intentionally not backfilled wholesale**: DID/
   identity/credential/certification/certify (the newest code) have real unit
   tests. `app/trigger.clj` has a handler test for its 409 refusals only.
-  `template/render.clj`, `model/graph.clj` and `app/contracts.clj` have
+  `template/render.clj` has its own tests (formats, scoping, lists, tables,
+  escaping, and both real templates rendering with no unresolved token).
+  `model/graph.clj` and `app/contracts.clj` have
   none — they're exercised by the `dev/*_demo.clj` scripts and manual curl
   instead. Don't assume test presence maps to code
   age or importance.
@@ -431,7 +437,7 @@ identity for this email".
 ```sh
 bin/clj -M:run test
 ```
-Currently 57 tests / 192 assertions, 0 failures. Focus a namespace or var
+Currently 63 tests / 219 assertions, 0 failures. Focus a namespace or var
 with `--focus <fully.qualified.name>`.
 
 **Lint + format + test together** (what to run before considering any change
