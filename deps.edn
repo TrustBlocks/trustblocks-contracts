@@ -59,6 +59,11 @@
         io.github.TrustBlocks/trustblocks-templates {:git/sha "c437ba4c407875c1166a46f78746ffce5923fafb"}
 
         dev.onionpancakes/chassis     {:mvn/version "1.0.365"}
+        ;; CommonMark + pipe tables -- exactly the markdown TemplateMark is
+        ;; defined over -- for rendering a contract's text on Contract View.
+        ;; See com.trustblocks.template.render.
+        org.commonmark/commonmark                {:mvn/version "0.24.0"}
+        org.commonmark/commonmark-ext-gfm-tables {:mvn/version "0.24.0"}
         metosin/malli                 {:mvn/version "0.20.1"}
         cheshire/cheshire             {:mvn/version "6.2.0"}
         camel-snake-kebab/camel-snake-kebab {:mvn/version "0.4.3"}

@@ -1,8 +1,9 @@
 (ns seed
   "Starts the app for real (config -> xtdb -> ring -> datastar -> graph, same
   modules bin/clj -M:run dev boots, just not through the dev task's file
-  watcher) and loads our two real contracts -- the snow-removal plowing
-  contract and the China Grove manager employment contract -- into its
+  watcher) and loads our contracts -- the snow-removal plowing contract,
+  the China Grove manager employment contract, and the China Grove Street
+  Resurfacing contract (STR-27, its bid package as issued) -- into its
   actual XTDB storage, so /contracts has real data to show instead of an
   empty list.
 
@@ -30,7 +31,7 @@
   cross-checks our Clojure clause runtime against a known-good APAP answer),
   not one of our contracts.
 
-  Requiring the two demo namespaces below also reruns their own standalone
+  Requiring the demo namespaces below also reruns their own standalone
   verification, each against its own fresh throwaway in-memory node -- a
   free regression check, not noise -- before this seeds the real app's node
   with the same data.
@@ -47,7 +48,8 @@
             [com.trustblocks.xtdb.certification :as cert]
             [com.trustblocks.xtdb.execute :as ex]
             [manager-employment-demo :as me]
-            [snow-removal-demo :as snow]))
+            [snow-removal-demo :as snow]
+            [street-resurfacing-demo :as street]))
 
 (println "\nBuilding CSS...")
 (tasks/css)
@@ -67,6 +69,9 @@
 (if (ex/current-state node me/contract-id)
   (println "  already approved, skipping trigger")
   (me/approve! node))
+
+(println "Seeding the Street Resurfacing contract (STR-27) into the running app...")
+(street/load! node)
 
 (println "Seeding the China Grove Clerk and the vote-then-minutes certifications...")
 (cert-demo/load! node)

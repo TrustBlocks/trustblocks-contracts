@@ -1,2 +1,21 @@
 @import "tailwindcss";
 @source "../src/**/*.clj";
+
+/* Contract View prose -- com.trustblocks.template.render emits plain
+   CommonMark HTML (paragraphs, headings, lists, tables), styled here rather
+   than per element. */
+@layer components {
+  .contract-prose { @apply text-slate-800; }
+  .contract-prose p { @apply mb-4 leading-relaxed; }
+  .contract-prose h1, .contract-prose h2, .contract-prose h3, .contract-prose h4 { @apply mt-6 mb-2 font-semibold text-slate-950; }
+  .contract-prose h1 { @apply text-2xl; }
+  .contract-prose h2 { @apply text-xl; }
+  .contract-prose hr { @apply my-4 border-slate-300; }
+  .contract-prose strong { @apply font-semibold; }
+  .contract-prose em { @apply italic; }
+  .contract-prose ul { @apply mb-4 list-disc space-y-1 pl-6; }
+  .contract-prose ol { @apply mb-4 list-decimal space-y-1 pl-6; }
+  .contract-prose table { @apply mb-4 w-full border-collapse text-sm; }
+  .contract-prose th, .contract-prose td { @apply border border-slate-300 px-3 py-2 text-left align-top; }
+  .contract-prose th { @apply bg-slate-50 font-semibold; }
+}
