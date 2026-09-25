@@ -50,7 +50,7 @@
 
         ;; Concerto models as EDN and Malli schemas compiled from them at
         ;; runtime. Not on Clojars yet -- see github.com/TrustBlocks/concerto-clj.
-        io.github.TrustBlocks/concerto-clj {:git/sha "d80655fb6b737765e60e66e0a8277e8b12daa4db"}
+        io.github.TrustBlocks/concerto-clj {:git/sha "3fd274ed1954c342ffa6d173fa5ca6d5b279da3c"}
 
         ;; The municipal contract templates this app runs -- models, text,
         ;; and Clojure clause logic -- each on the classpath under its own

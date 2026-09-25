@@ -411,27 +411,22 @@ new machine):
   via `JAVA_HOME` (default `/opt/homebrew/opt/openjdk@21/...`, override with
   `TRUSTBLOCKS_JAVA_HOME`). **Always invoke `bin/clj`, never bare `clj`** —
   a bare `clj` uses the system JDK and XTDB will fail to start.
-- Node.js on `PATH`, with `npm install` run at least once (`node_modules/`
-  gitignored). This is a **real runtime dependency**:
-  `com.trustblocks.concerto.cto/parse` (in the
-  external `concerto-clj` dependency) shells out to Accord's own JS tooling
-  to parse `.cto` files, and that runs every time `put-model!`/`load-registry`
-  is called — including inside most of the test suite. `bin/clj` automatically
-  prefers the lockfile-pinned `node_modules/.bin/concerto` (CLI 4.2 backed by
-  Concerto Core/CTO 5) over an older global installation. If tests fail with
-  something about spawning a process or finding a CLI, check Node/npm first.
-
-  **That dependency is optional upstream, not yet here.** `concerto-clj` main
-  has an instaparse port of the CTO grammar (`(cto/parse f :parser :clojure)`,
-  no Node on the JVM), differential-tested against the CLI across all 237
-  models in Accord's template library. This app pins `concerto-clj` at
-  `d80655f`, which predates it, and calls the CLI default. Bumping the pin and
-  choosing `:clojure` would drop Node from model loading — though the planned
-  TypeScript clause runtime needs Node regardless. Accord's
-  `accordproject/concerto-rust` (0.1.0: model validation, no CTO parser yet)
-  is the one to watch: with a parser, run as WASM in the JVM, it would be a
-  grammar Accord maintains rather than a port we track. Malli stays our
-  instance validation either way.
+- **Node is not needed to load models.** `store/put-model!` and
+  `load-registry` parse `.cto` with `concerto-clj`'s instaparse port of Accord's
+  grammar (`store/default-parser` → `:clojure`), in-process, roughly 100×
+  faster than spawning the CLI per file (12 models: ~50 ms vs ~5 s). It is held
+  to the CLI, not trusted alone: `test/com/trustblocks/xtdb/parser_test.clj`
+  parses every model this app loads both ways and requires them identical.
+  `TRUSTBLOCKS_CTO_PARSER=cli` switches back to Accord's CLI.
+- Node.js on `PATH`, with `npm install` run once (`node_modules/` gitignored),
+  is still needed for: that differential test (it fails, not skips, without the
+  CLI); the babashka half of `docs/walkthrough.md` (instaparse cannot run under
+  babashka); and the planned TypeScript clause runtime. `bin/clj` points
+  `CONCERTO_CLI` at the lockfile-pinned `node_modules/.bin/concerto` (CLI 4.2,
+  Concerto Core/CTO 5). Accord's `accordproject/concerto-rust` (0.1.0: model
+  validation, no CTO parser yet) is the one to watch: with a parser, run as
+  WASM in the JVM, it would be a grammar Accord maintains rather than a port we
+  track. Malli stays our instance validation either way.
 
 **Run the app locally:**
 ```sh
