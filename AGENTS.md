@@ -421,6 +421,18 @@ new machine):
   Concerto Core/CTO 5) over an older global installation. If tests fail with
   something about spawning a process or finding a CLI, check Node/npm first.
 
+  **That dependency is optional upstream, not yet here.** `concerto-clj` main
+  has an instaparse port of the CTO grammar (`(cto/parse f :parser :clojure)`,
+  no Node on the JVM), differential-tested against the CLI across all 237
+  models in Accord's template library. This app pins `concerto-clj` at
+  `d80655f`, which predates it, and calls the CLI default. Bumping the pin and
+  choosing `:clojure` would drop Node from model loading — though the planned
+  TypeScript clause runtime needs Node regardless. Accord's
+  `accordproject/concerto-rust` (0.1.0: model validation, no CTO parser yet)
+  is the one to watch: with a parser, run as WASM in the JVM, it would be a
+  grammar Accord maintains rather than a port we track. Malli stays our
+  instance validation either way.
+
 **Run the app locally:**
 ```sh
 rm -rf storage log   # clean XTDB state
