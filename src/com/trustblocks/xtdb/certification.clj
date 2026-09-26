@@ -47,11 +47,13 @@
             [com.trustblocks.did.vc :as vc]
             [com.trustblocks.xtdb.credential :as credential]
             [com.trustblocks.xtdb.execute :as execute]
-            [com.trustblocks.xtdb.identity :as identity]))
+            [com.trustblocks.xtdb.identity :as identity]
+            [com.trustblocks.xtdb.matter :as matter]))
 
 (def office-grant-class "com.trustblocks.identity@1.0.0.OfficeGrant")
 (def attestation-class "com.trustblocks.identity@1.0.0.Attestation")
 (def attestation-request-class "com.trustblocks.attestation@1.0.0.AttestationRequest")
+(def designation-class "com.trustblocks.identity@1.0.0.Designation")
 
 (defn grant-office!
   "The Town grants `officeholder-did` an office and a set of authorities,
@@ -70,19 +72,95 @@
                            "authority" authority}
       :valid-from valid-from :valid-until valid-until})))
 
+(defn- verified-credentials
+  "Every credential of class `cls` held by `subject-did` that was genuinely
+  in force at `at` -- checked against XTDB's own valid-time *and* the
+  issuer's signature -- as {:subject <decoded credentialSubject> :jwt
+  :issuer}."
+  [node subject-did cls at]
+  (keep (fn [record]
+          (when (= cls (:concerto/class record))
+            (when-let [issuer (identity/by-did node (:issuer record))]
+              (let [subject (vc/verify (:identity/public-key issuer) (:jwt record)
+                                       (:issuer record) subject-did at)]
+                (when-not (:error subject)
+                  {:subject subject :jwt (:jwt record) :issuer (:issuer record)})))))
+        (credential/as-of-for-subject node subject-did at)))
+
 (defn- verified-office-grant
   "An OfficeGrant credential of `officeholder-did`'s that was genuinely
   in force at `at` -- checked against XTDB's own valid-time *and* the
   signature, since this is the one place authority to act is decided
   rather than merely displayed. nil if none."
   [node officeholder-did at]
-  (some (fn [record]
-          (when (= office-grant-class (:concerto/class record))
-            (when-let [issuer (identity/by-did node (:issuer record))]
-              (let [subject (vc/verify (:identity/public-key issuer) (:jwt record)
-                                       (:issuer record) officeholder-did at)]
-                (when-not (:error subject) subject)))))
-        (credential/as-of-for-subject node officeholder-did at)))
+  (:subject (first (verified-credentials node officeholder-did office-grant-class at))))
+
+(defn- grant-with
+  "The verified OfficeGrant of `did`'s in force at `at` that names
+  `authority`, as verified-credentials returns it, or nil."
+  [node did authority at]
+  (some #(when (some #{authority} (get-in % [:subject "authority"])) %)
+        (verified-credentials node did office-grant-class at)))
+
+(defn authority-for
+  "How `did` holds `authority` at `at`, or nil: {:via :office-grant :jwt}
+  from their own OfficeGrant, or {:via :designation :jwt :designator} from
+  a Designation for `matter` -- the credential that authorized the act, for
+  the signed record of it to name as evidence.
+
+  A designation counts only while its designator still holds the
+  authority, through their own OfficeGrant: authority delegated is
+  authority the principal still has. It is checked at `at`, the act's own
+  time, so a designee's acts before the designator left office stand and
+  those after do not. A designee cannot pass the authority on."
+  [node did authority at & {:keys [matter]}]
+  (or (when-let [{:keys [jwt]} (grant-with node did authority at)]
+        {:via :office-grant :jwt jwt})
+      (when matter
+        (some (fn [{:keys [subject jwt issuer]}]
+                (when (and (= matter (get subject "matterId"))
+                           (some #{authority} (get subject "authority"))
+                           (grant-with node issuer authority at))
+                  {:via :designation :jwt jwt :designator issuer}))
+              (verified-credentials node did designation-class at)))))
+
+(defn designate!
+  "The officeholder signed in as `designator-email` designates
+  `designee-did` to act for them on `matter` -- with `authority`, a subset
+  of their own, in `capacity` -- from `valid-from` until `valid-until`.
+  Returns the signed Designation VC, whose evidence is the designator's own
+  OfficeGrant.
+
+  Refused unless the matter is open (:no-such-matter), the designee has an
+  identity, and the designator holds every authority delegated, at
+  `valid-from`, through their own OfficeGrant (:missing-authority)."
+  [node {:keys [designator-email designee-did name capacity matter authority
+                valid-from valid-until]}]
+  (let [designator (or (identity/by-email node designator-email)
+                       (throw (ex-info "No officeholder identity for this email"
+                                       {:trustblocks/error :no-such-officeholder
+                                        :email designator-email})))
+        did    (:xt/id designator)
+        grants (map #(grant-with node did % valid-from) authority)]
+    (when-not (matter/get-matter node matter)
+      (throw (ex-info "No such matter" {:trustblocks/error :no-such-matter :matter matter})))
+    (when-not (identity/by-did node designee-did)
+      (throw (ex-info "No identity for the designee"
+                      {:trustblocks/error :no-such-officeholder :did designee-did})))
+    (when (or (empty? authority) (some nil? grants))
+      (throw (ex-info "A designator can delegate only authority they hold"
+                      {:trustblocks/error :missing-authority :did did :delegating authority})))
+    (credential/issue!
+     node (identity/keypair designator)
+     {:issuer did :subject designee-did
+      :credential-subject {"$class"    designation-class
+                           "id"        designee-did
+                           "name"      name
+                           "capacity"  capacity
+                           "matterId"  matter
+                           "authority" (vec authority)}
+      :valid-from valid-from :valid-until valid-until
+      :evidence (:jwt (first grants))})))
 
 (defn- attestation-request-id
   "A deterministic id for this exact attestation attempt, so a retried
