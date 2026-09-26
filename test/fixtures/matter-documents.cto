@@ -1,0 +1,13 @@
+namespace test.matter@1.0.0
+
+/**
+ * A document type for com.trustblocks.xtdb.matter-test: a work order that a
+ * matter's terms (the snow-removal contract) is advanced by. Stored as an
+ * instance, so it can be a document of a matter.
+ */
+asset WorkOrder identified by workOrderId {
+  o String workOrderId
+  o String route
+  o DateTime visitedAt
+  o Double inchesFallen
+}

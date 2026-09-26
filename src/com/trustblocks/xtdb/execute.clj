@@ -310,7 +310,7 @@
   "One attempt at trigger!'s clause run and write. Returns trigger!'s result,
   or ::stale if another execution wrote this contract's state in between --
   see assert-state-unchanged."
-  [node reg ctx contract-id contract src runtime request now at request-id by]
+  [node reg ctx contract-id contract src runtime request now at request-id by document]
   ;; Asked again on every attempt, ahead of the order check: after a retry, a
   ;; concurrent copy of this same request may be the write that moved the
   ;; state, and its caller should hear "already executed", not "out of order".
@@ -361,7 +361,8 @@
                                :response  (k/->xtdb response)
                                :clause    src}
                         request-id (assoc :request-id request-id)
-                        by         (assoc :by by))])
+                        by         (assoc :by by)
+                        document   (assoc :document document))])
 
          ;; The new state is valid from the moment the request took effect,
          ;; not from when the database learned of it. That separation is the
@@ -416,14 +417,17 @@
   writes this contract's state while the clause runs, the clause is run again
   against the new state -- see assert-state-unchanged.
 
-  `:by` records who submitted it. Everything else here answers what happened
+  `:by` records who submitted it. `:document` records which document of a
+  matter the request came from (see com.trustblocks.xtdb.matter), so the
+  audit trail says which pay application moved the state, not only that
+  something did. Everything else here answers what happened
   and when; for a record that may be read in a dispute, who is the third
   question, and the one nothing else in the row answers.
 
   Errors carry a :trustblocks/error tag in their ex-data so a caller can tell
   a bad request from a refusal from a broken clause without reading messages.
   See com.trustblocks.app.trigger, which turns those tags into status codes."
-  [node contract-id request now & {:keys [reg ctx request-id by]}]
+  [node contract-id request now & {:keys [reg ctx request-id by document]}]
   (let [;; A clause receives DateTimes as wire strings, never a platform date
         ;; (see com.trustblocks.clause), so an Instant or Date from a REPL is
         ;; normalised here. A string passes through untouched, keeping the
@@ -460,7 +464,7 @@
     (let [at (->instant now)]
       (loop [attempt 1]
         (let [outcome (run-and-record! node reg ctx contract-id contract src runtime
-                                       request now at request-id by)]
+                                       request now at request-id by document)]
           (cond
             (not= ::stale outcome) outcome
 
