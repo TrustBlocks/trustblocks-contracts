@@ -366,16 +366,23 @@
                                         :certification certification
                                         :entered-at (when status (state-entered-at node contract-id at))
                                         :at at))
-        result  (if src
-                  (run-clause runtime ctx src {:data contract :request request
-                                               :state state :now now})
-                  (let [state-fqn (lifecycle/state-type lc fqn)]
-                    {:response (lifecycle/response status t now)
-                     :state    (lifecycle/state lc fqn contract-id
-                                                (mm/identity-field reg state-fqn) t)}))
+        result  (let [clause-result (when src
+                                      (run-clause runtime ctx src {:data contract :request request
+                                                                   :state state :now now}))]
+                  (if-not lc
+                    clause-result
+                    ;; With a lifecycle, the lifecycle owns the status and the
+                    ;; clause what follows from the event: its state is merged
+                    ;; over the state it was given, under the new status, and
+                    ;; it may leave the answer to the transition.
+                    (let [state-fqn (lifecycle/state-type lc fqn)
+                          moved     (lifecycle/state lc fqn contract-id
+                                                     (mm/identity-field reg state-fqn) t)]
+                      {:response (or (:response clause-result) (lifecycle/response status t now))
+                       :state    (merge state moved (:state clause-result))})))
         response (:response result)]
 
-    (when (and t src (not= (get t "to") (get (:state result) "status")))
+    (when (and t (not= (get t "to") (get (:state result) "status")))
       (throw (ex-info (str "The clause did not leave the document in "
                            (get t "to") ", where its lifecycle says "
                            (get t "event") " leads")

@@ -50,6 +50,13 @@
   [node id & {:keys [at]}]
   (row node matter-table id at))
 
+(defn all
+  "Every matter open now, by id."
+  [node]
+  (->> (xt/q node (list 'from matter-table [(symbol "*")]))
+       (sort-by :xt/id)
+       vec))
+
 (defn open!
   "Open matter `id`, anchored to the stored instance `terms` (see the ns
   docstring), valid from `opened-at`. Returns the matter record.

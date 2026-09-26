@@ -10,6 +10,7 @@
             [com.trustblocks.app.clauses :as app.clauses]
             [com.trustblocks.app.contracts :as app.contracts]
             [com.trustblocks.app.landing :as app.landing]
+            [com.trustblocks.app.matters :as app.matters]
             [com.trustblocks.app.trigger :as app.trigger]
             [com.trustblocks.lib.ui :as ui]
             [com.trustblocks.model.contract :as model.contract]))
@@ -25,6 +26,7 @@
    app.auth/module
    app.landing/module
    app.contracts/module
+   app.matters/module
    app.clauses/module
    app.authorizations/module
    app.trigger/module

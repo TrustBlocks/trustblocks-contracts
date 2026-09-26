@@ -313,6 +313,35 @@
                        (mapv #(office-grant-authorization node did now %)))}))
      (identity/officeholders node))))
 
+(defn matter-record
+  "Every credential naming `matter-id` -- designations, receipts,
+  attestations -- verified and decoded for display, oldest first by the time
+  of the act: the credentialSubject plus \"$class\", \"issuer\",
+  \"subject\", \"valid-from\", \"valid-until\" and \"evidence\" (the
+  authorizing credential's own subject and issuer, decoded, when there is
+  one). A record that fails to verify is left out, as
+  attestations-for-contract leaves it."
+  [node matter-id]
+  (let [decode (fn [jwt]
+                 (try (let [{:keys [vc iss]} (interop/jws-claims jwt)]
+                        {"issuer" iss "credentialSubject" (into {} (get vc "credentialSubject"))
+                         "type" (last (get vc "type"))})
+                      (catch Exception _ nil)))]
+    (keep (fn [{:keys [issuer subject jwt valid-from valid-until] cls :concerto/class}]
+            (when-let [signer (identity/by-did node issuer)]
+              ;; At its own signed validFrom, for the reason
+              ;; office-grant-authorization gives.
+              (let [signed (try (java.time.Instant/parse
+                                 (get (:vc (interop/jws-claims jwt)) "validFrom"))
+                                (catch Exception _ valid-from))
+                    claims (vc/verify (:identity/public-key signer) jwt issuer subject signed)]
+                (when-not (:error claims)
+                  (assoc claims
+                         "$class" cls "issuer" issuer "subject" subject
+                         "valid-from" valid-from "valid-until" valid-until
+                         "evidence" (some-> (get claims "evidence") decode))))))
+          (credential/for-matter node matter-id))))
+
 (defn attestations-for-contract
   "Every Attestation ever certified about `contract-id`, oldest first,
   each verified and decoded rather than handed back as a raw stored row

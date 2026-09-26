@@ -3,7 +3,9 @@
   modules bin/clj -M:run dev boots, just not through the dev task's file
   watcher) and loads our contracts -- the snow-removal plowing contract,
   the China Grove manager employment contract, and the China Grove Street
-  Resurfacing contract (STR-27, its bid package as issued) -- into its
+  Resurfacing contract (STR-27, its bid package as issued), and the STR-27
+  matter (an illustrative award, three pay requests and their signed
+  record; stored files under storage/documents) -- into its
   actual XTDB storage, so /contracts has real data to show instead of an
   empty list.
 
@@ -49,7 +51,9 @@
             [com.trustblocks.xtdb.execute :as ex]
             [manager-employment-demo :as me]
             [snow-removal-demo :as snow]
-            [street-resurfacing-demo :as street]))
+            [street-resurfacing-demo :as street]
+            [street-resurfacing-matter-demo :as str-27]
+            [com.trustblocks.xtdb.document :as document]))
 
 (println "\nBuilding CSS...")
 (tasks/css)
@@ -73,6 +77,9 @@
 (println "Seeding the Street Resurfacing contract (STR-27) into the running app...")
 (street/load! node)
 
+(println "Seeding the STR-27 matter: an illustrative award and three pay requests...")
+(str-27/load! node document/default-root)
+
 (println "Seeding the China Grove Clerk and the vote-then-minutes certifications...")
 (cert-demo/load! node)
 (if (seq (cert/attestations-for-contract node cert-demo/contract-id))
@@ -82,3 +89,4 @@
 (println "\nSeeded. Sign in at http://localhost:8080/signin with any email;")
 (println "the six-digit code prints here, since no mail provider is configured.")
 (println (str "To certify something as the Town Clerk, sign in as " cert-demo/clerk-email " instead."))
+(println "The STR-27 matter, its pay requests and their signed record: http://localhost:8080/matters/str-27")

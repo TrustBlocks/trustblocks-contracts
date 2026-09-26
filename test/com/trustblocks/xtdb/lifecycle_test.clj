@@ -9,6 +9,7 @@
             [com.trustblocks.template.library :as library]
             [com.trustblocks.xtdb.execute :as execute]
             [com.trustblocks.xtdb.store :as store]
+            [xtdb.api :as xt]
             [xtdb.node :as xt.node]))
 
 (def ^:private pay "com.trustblocks.municipal.construction.payapplication@1.0.0.")
@@ -23,8 +24,13 @@
 (defn- refusal [f]
   (try (f) nil (catch clojure.lang.ExceptionInfo e (:trustblocks/error (ex-data e)))))
 
-(defn- setup! [node]
+(defn- setup!
+  "The pay application template, and a blank pay request -- with the
+  template's clause removed, so these tests hold the lifecycle alone to
+  what it declares; advance-test runs the clause."
+  [node]
   (let [ingested (archive/ingest-dir! node (library/dir "street-resurfacing/pay-application"))]
+    (xt/execute-tx node [[:delete-docs execute/clause-table root]])
     (store/put-instance! node nil (assoc (json/parse-string (library/sample "street-resurfacing/pay-application"))
                                          "payRequestId" id))
     ingested))
@@ -39,7 +45,7 @@
   (with-open [node (xt.node/start-node)]
     (let [{:keys [lifecycle clause]} (setup! node)]
       (is (= root lifecycle))
-      (is (nil? clause))
+      (is (= root clause))
       (is (= "ContractorPayRequestState" (get (execute/get-lifecycle node root) "stateType"))))))
 
 (deftest a-pay-request-moves-only-as-its-lifecycle-allows
@@ -61,7 +67,7 @@
       (is (= :no-transition (refusal #(trigger! node (event "PaymentApproved") "2026-03-26T14:00:00Z"
                                                 (by "Attestation" "APPROVE_PAYMENTS"))))))
     (testing "either certification the template accepts will do"
-      (trigger! node (event "InspectionCertified") "2026-04-01T14:00:00Z"
+      (trigger! node (event "InspectionCertified" "approvedPayItems" []) "2026-04-01T14:00:00Z"
                 (by "Receipt" "RECEIVE_INSPECTION_REPORTS"))
       (is (= "INSPECTED" (status node))))
     (trigger! node (event "PayRequestCertified") "2026-04-02T14:00:00Z" (by "Attestation" "CERTIFY_PAY_APPLICATIONS"))
@@ -93,7 +99,7 @@
     (trigger! node (event "PayRequestReturned" "reason" "Quantities exceed the engineer's certificate")
               "2026-03-28T14:00:00Z" (by "Attestation" "CERTIFY_PAY_APPLICATIONS"))
     (is (= "RETURNED" (status node)))
-    (is (= :no-transition (refusal #(trigger! node (event "InspectionCertified") "2026-03-29T14:00:00Z"
+    (is (= :no-transition (refusal #(trigger! node (event "InspectionCertified" "approvedPayItems" []) "2026-03-29T14:00:00Z"
                                               (by "Attestation" "CERTIFY_INSPECTIONS")))))))
 
 (deftest a-clause-is-held-to-the-lifecycle
