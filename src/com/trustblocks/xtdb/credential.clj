@@ -54,6 +54,7 @@
       (throw (ex-info "credentialSubject failed validation" {:$class fqn :errors errs})))
     (let [type        (:name (:declaration (get reg fqn)))
           contract-id (get credential-subject "contractId")
+          matter-id   (get credential-subject "matterId")
           jwt         (vc/issue issuer-keypair
                                 {:issuer issuer :subject subject
                                  :credential-subject (dissoc credential-subject "$class")
@@ -67,7 +68,8 @@
                   :subject        subject
                   :concerto/class fqn
                   :jwt            jwt}
-           contract-id (assoc :contract-id contract-id))]])
+           contract-id (assoc :contract-id contract-id)
+           matter-id   (assoc :matter-id matter-id))]])
       jwt)))
 
 (defn- all-time
@@ -112,6 +114,13 @@
   never will."
   [node contract-id]
   (all-time node {:contract-id contract-id}))
+
+(defn for-matter
+  "Every credential ever issued that names `matter-id` in its
+  credentialSubject (a Designation, a Receipt), oldest first -- the same
+  shape as for-subject, bound by :matter-id."
+  [node matter-id]
+  (all-time node {:matter-id matter-id}))
 
 (defn as-of-for-subject
   "Every credential of `subject`'s that was in force at `instant`."

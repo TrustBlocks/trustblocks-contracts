@@ -29,6 +29,14 @@ enum Authority {
   o ATTEST_ORDINANCES
   o SIGN_CONTRACTS
   o ATTEST_FINANCIALS
+  // A construction contract's pay applications -- see
+  // docs/design/matters.md's first slice.
+  o RECEIVE_PAY_APPLICATIONS
+  o RECEIVE_INSPECTION_REPORTS
+  o CERTIFY_INSPECTIONS
+  o CERTIFY_PAY_APPLICATIONS
+  o APPROVE_PAYMENTS
+  o CERTIFY_PAYMENTS
 }
 
 /**
@@ -62,5 +70,44 @@ concept Attestation {
   @description("Which contract this concerns, when it concerns one. A council vote and the minutes approving it are not themselves contract executions -- a proceeding like that has no parties and no mutual assent, so it is not a Contract -- but it usually happens about one.")
   o String contractId optional
   @description("When the officeholder actually performed this act -- wall-clock time. Distinct from validFrom on the outer VC envelope, which is the event's own time (the meeting the statement is about), not when it was typed in. The two coincide for a same-day certification and diverge for a Clerk certifying a months-old vote, which is the case this project was built around.")
+  o DateTime certifiedAt
+}
+
+/**
+ * An officeholder appointed, in writing, to act for another on one
+ * matter -- the "Director's designated representative" of a construction
+ * contract's General Conditions. Issued by the designator to the designee
+ * (`id`); the VC's own validFrom/validUntil bound the appointment.
+ *
+ * Only authority the designator holds can be delegated, and a designee's
+ * authority lasts only while the designator still holds it: com.trustblocks.
+ * xtdb.certification checks both when the designee acts. A designation is
+ * not itself delegable.
+ */
+concept Designation {
+  o String id
+  o String name
+  @description("The capacity the designee acts in, as the contract names it, e.g. \"Designated Representative of the Director of Public Works\"")
+  o String capacity
+  @description("The one matter the designation covers")
+  o String matterId
+  o Authority[] authority
+}
+
+/**
+ * An officeholder's certification that a document was received -- the way
+ * a party with no identity of its own (a contractor, a consulting engineer,
+ * a surety) enters the record: the Town's officeholder vouches for receipt,
+ * under her own authority. `documentHash` names the stored file exactly
+ * (com.trustblocks.xtdb.document). When it was received is the VC's
+ * validFrom; certifiedAt is when she certified it.
+ */
+concept Receipt {
+  o String id
+  o String documentHash
+  o String matterId
+  @description("Who the document was received from, as named on it, e.g. \"Example Paving, LLC\"")
+  o String receivedFrom
+  o String description optional
   o DateTime certifiedAt
 }
