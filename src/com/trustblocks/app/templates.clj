@@ -24,6 +24,7 @@
   (:require [cheshire.core :as json]
             [clojure.string :as str]
             [com.trustblocks.concerto.metamodel :as mm]
+            [com.trustblocks.lib.code :as code]
             [com.trustblocks.lib.middleware :as mid]
             [com.trustblocks.lib.ui :as ui]
             [com.trustblocks.routes :as routes]
@@ -165,7 +166,9 @@
                     [:h2 {:class ["font-mono text-sm font-semibold text-slate-950"]} ns]
                     [:span {:class ["text-xs text-slate-500"]}
                      (if (= ns own) "the template's own namespace" "imported")]]
-                   [:pre {:class code-block} (or (store/model-source node ns) "(source not available)")]])])))))
+                   (if-let [source (store/model-source node ns)]
+                     (code/cto-listing source)
+                     [:p {:class ["text-sm text-slate-500"]} "(source not available)"])])])))))
 
 (def ^:private request-type "org.accordproject.runtime@0.2.0.Request")
 (def ^:private attestation-request "com.trustblocks.attestation@1.0.0.AttestationRequest")

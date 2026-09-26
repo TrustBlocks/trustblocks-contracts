@@ -15,6 +15,7 @@
             [com.trustblocks.app.auth :as auth]
             [com.trustblocks.app.certify :as certify]
             [com.trustblocks.concerto.metamodel :as mm]
+            [com.trustblocks.lib.code :as code]
             [com.trustblocks.lib.middleware :as mid]
             [com.trustblocks.lib.ui :as ui]
             [com.trustblocks.model.graph :as model.graph]
@@ -378,8 +379,9 @@
 (defn- concerto-source-block [node ns]
   [:div {:class ["mb-6"]}
    [:p {:class ["text-xs text-gray-500 font-mono mb-1"]} ns]
-   [:pre {:class ["text-sm bg-gray-50 border rounded p-4 overflow-x-auto"]}
-    (or (store/model-source node ns) "(source not available)")]])
+   (if-let [source (store/model-source node ns)]
+     (code/cto-listing source)
+     [:p {:class ["text-sm text-slate-500"]} "(source not available)"])])
 
 (defn model-concerto-page
   "The $class's own supertype chain, in native Concerto (.cto) syntax --
