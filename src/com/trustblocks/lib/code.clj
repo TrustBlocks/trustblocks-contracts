@@ -59,6 +59,17 @@
           (recur rest-of true out)
           (recur (subs rest-of (count tok)) false (conj out [(classify tok) tok])))))))
 
+(defn- indentation
+  "A line's leading spaces, drawn so a reader sees them: each two-space
+  level twice as wide, with a faint guide at its left edge, as editors
+  draw indentation. The spaces themselves are kept, so copied text is the
+  source exactly."
+  [spaces]
+  (let [levels (quot (count spaces) 2)
+        extra  (subs spaces (* 2 levels))]
+    (concat (repeat levels [:span {:class ["inline-block w-[4ch] border-l border-slate-700"]} "  "])
+            (when (seq extra) [[:span extra]]))))
+
 (defn- line-row [n content]
   [:div {:id (str "L" n) :class ["flex"]}
    [:span {:class ["w-12 shrink-0 select-none pr-4 text-right text-slate-500"]} n]
@@ -71,12 +82,14 @@
   [:div {:class ["overflow-auto rounded-lg bg-slate-950 py-4 font-mono text-xs leading-6"]}
    (second
     (reduce (fn [[in-block? rows] [i line]]
-              (let [[toks in-block?'] (tokens line in-block?)]
+              (let [lead (re-find #"^ *" line)
+                    [toks in-block?'] (tokens (subs line (count lead)) in-block?)]
                 [in-block?'
                  (conj rows (line-row (inc i)
-                                      (if (empty? toks)
+                                      (if (and (empty? toks) (empty? lead))
                                         " "
-                                        (for [[kind text] toks]
-                                          [:span {:class (token-classes kind)} text]))))]))
+                                        (concat (indentation lead)
+                                                (for [[kind text] toks]
+                                                  [:span {:class (token-classes kind)} text])))))]))
             [false []]
             (map-indexed vector (str/split-lines (or source "")))))])

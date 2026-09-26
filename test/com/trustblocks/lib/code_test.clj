@@ -29,6 +29,8 @@ asset Thing identified by id {
       (is (str/includes? (text-of h) "  o String id"))
       (is (str/includes? (text-of h) "  --&gt; Party owner // who owns it"))
       (is (re-find #"whitespace-pre" h)))
+    (testing "indentation is drawn: a guide per two-space level, the spaces kept"
+      (is (re-find #"<span class=\"inline-block w-\[4ch\] border-l border-slate-700\">  </span><span class=\"text-sky-300 font-semibold\">o<" h)))
     (testing "highlighted by kind"
       (is (re-find #"text-sky-300[^>]*>namespace<" h))
       (is (re-find #"text-sky-300[^>]*>o<" h))
@@ -38,5 +40,5 @@ asset Thing identified by id {
       (is (re-find #"text-violet-300[^>]*>1.5<" h))
       (is (re-find #"text-emerald-300[^>]*>// who owns it<" h)))
     (testing "a /** */ comment is a comment on every line it spans"
-      (is (re-find #"text-emerald-300[^>]*> \* over lines.<" h))
-      (is (re-find #"text-emerald-300[^>]*> \*/<" h)))))
+      (is (re-find #"text-emerald-300[^>]*>\* over lines.<" h))
+      (is (re-find #"text-emerald-300[^>]*>\*/<" h)))))
