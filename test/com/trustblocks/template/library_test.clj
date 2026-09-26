@@ -22,7 +22,7 @@
   "STR-27's bid package as issued, filled in the way an award fills it.
   Illustrative values -- STR-27 has not been awarded."
   []
-  (-> (sample "street-resurfacing-contract")
+  (-> (sample "street-resurfacing/contract")
       (assoc "contractorName" "Example Paving, LLC"
              "contractorEntityType" "a limited liability company"
              "contractorStateOfOrganization" "North Carolina"
@@ -53,16 +53,16 @@
 
 (deftest a-template-without-logic-installs-no-clause
   (with-open [node (xt.node/start-node)]
-    (is (nil? (:clause (archive/ingest-dir! node (library/dir "street-resurfacing-contract")))))))
+    (is (nil? (:clause (archive/ingest-dir! node (library/dir "street-resurfacing/contract")))))))
 
 (deftest the-street-contract-stores-and-reads-back-exactly
   (with-open [node (xt.node/start-node)]
     ;; Both templates in one node on purpose: they share Accord's namespaces
     ;; and MunicipalAgreement, and the registry is global.
     (archive/ingest-dir! node (library/dir "manager-employment-contract"))
-    (archive/ingest-dir! node (library/dir "street-resurfacing-contract"))
+    (archive/ingest-dir! node (library/dir "street-resurfacing/contract"))
     (let [reg (store/registry-from-xtdb node)]
-      (doseq [[what instance] [["the bid package as issued" (sample "street-resurfacing-contract")]
+      (doseq [[what instance] [["the bid package as issued" (sample "street-resurfacing/contract")]
                                ["an award" (awarded)]]]
         (testing what
           (is (nil? (store/validate reg instance)))
@@ -70,9 +70,40 @@
           (is (= instance (store/get-instance node (get instance "contractId") :reg reg)))))
       (testing "a payment term of the wrong type is refused"
         (is (= {:completion-days ["should be an integer"]}
-               (store/validate reg (assoc (sample "street-resurfacing-contract")
+               (store/validate reg (assoc (sample "street-resurfacing/contract")
                                           "completionDays" "270"))))))))
+
+(def ^:private pay-application "com.trustblocks.municipal.construction.payapplication@1.0.0.")
+
+(deftest a-pay-request-stores-and-reads-back-exactly
+  (with-open [node (xt.node/start-node)]
+    (archive/ingest-dir! node (library/dir "street-resurfacing/pay-application"))
+    (let [reg     (store/registry-from-xtdb node)
+          blank   (sample "street-resurfacing/pay-application")
+          request (assoc blank
+                         "payRequestId" "str-27-pay-1"
+                         "applicationNumber" 1
+                         "periodFrom" "2026-09-01T04:00:00.000Z"
+                         "periodTo" "2026-09-30T04:00:00.000Z"
+                         "payItems" [{"$class" (str pay-application "PayItemLine")
+                                      "payItem" "5.1" "description" "Surface course" "unit" "Tons"
+                                      "unitPrice" 98.75 "quantityThisPeriod" 230.0
+                                      "amountThisPeriod" 22712.5
+                                      "completed" true "approvedByEngineer" false}]
+                         "netAmountDue" 21576.87)]
+      (doseq [[what instance] [["the blank form" blank] ["a filled request" request]]]
+        (testing what
+          (is (nil? (store/validate reg instance)))
+          (store/put-instance! node reg instance)
+          (is (= instance (store/get-instance node (get instance "payRequestId") :reg reg)))))
+      (testing "an unchecked box is false, not absent"
+        (is (some? (store/validate reg (update-in request ["payItems" 0] dissoc "approvedByEngineer"))))))))
 
 (deftest a-missing-template-is-named
   (is (thrown-with-msg? clojure.lang.ExceptionInfo #"No template named nope"
                         (library/dir "nope"))))
+
+(deftest a-package-template-is-found-under-its-package
+  (is (= "pay-application" (.getName (library/dir "street-resurfacing/pay-application"))))
+  (is (thrown-with-msg? clojure.lang.ExceptionInfo #"No template named street-resurfacing/nope"
+                        (library/dir "street-resurfacing/nope"))))

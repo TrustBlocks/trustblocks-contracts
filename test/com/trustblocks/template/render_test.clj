@@ -3,6 +3,7 @@
   plus tables for the markdown -- and values that can never become markup."
   (:require [cheshire.core :as json]
             [clojure.java.io :as io]
+            [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
             [com.trustblocks.template.library :as library]
             [com.trustblocks.template.render :as render]))
@@ -83,14 +84,30 @@
       (is (re-find #">\$2,000,500.00<" (html "{{m as \"K0,0.00\"}}" {"m" m}))))))
 
 (deftest our-templates-render-completely
-  ;; Every variable in both real templates resolves against its own sample:
+  ;; Every variable in every real template resolves against its own sample:
   ;; no dimmed {{token}} anywhere.
-  (doseq [t ["manager-employment-contract" "street-resurfacing-contract"]]
+  (doseq [t ["manager-employment-contract" "street-resurfacing/contract"
+             "street-resurfacing/pay-application"]]
     (let [out (html (slurp (io/file (library/dir t) "text" "grammar.tem.md"))
                     (json/parse-string (library/sample t)))]
       (is (not (re-find #"\{\{" out)) t)))
   (testing "STR-27's 37 pay items, four bullet lists, and two tables"
-    (let [out (html (slurp (io/file (library/dir "street-resurfacing-contract") "text" "grammar.tem.md"))
-                    (json/parse-string (library/sample "street-resurfacing-contract")))]
+    (let [out (html (slurp (io/file (library/dir "street-resurfacing/contract") "text" "grammar.tem.md"))
+                    (json/parse-string (library/sample "street-resurfacing/contract")))]
       (is (= 50 (count (re-seq #"<li>" out))))
       (is (= 2 (count (re-seq #"<table>" out)))))))
+
+(deftest a-pay-request-renders-its-checkboxes
+  (let [line (fn [item completed approved]
+               {"$class" "com.trustblocks.municipal.construction.payapplication@1.0.0.PayItemLine"
+                "payItem" item "description" "Surface course" "unit" "Tons"
+                "quantityThisPeriod" 230.0 "completed" completed "approvedByEngineer" approved})
+        out (html (slurp (io/file (library/dir "street-resurfacing/pay-application") "text" "grammar.tem.md"))
+                  (assoc (json/parse-string (library/sample "street-resurfacing/pay-application"))
+                         "payItems" [(line "5.1" true true) (line "5.2" true false)]
+                         "netAmountDue" 21576.87))
+        text (str/replace out #"<(?!/?strong)[^>]+>" "")]
+    (is (not (re-find #"\{\{" out)))
+    (is (re-find #"5\.1</strong> Surface course \(Tons\).*Completed \[X\] Approved by Engineer \[X\]" text))
+    (is (re-find #"5\.2</strong>.*Completed \[X\] Approved by Engineer \[ \]" text))
+    (is (re-find #"NET AMOUNT DUE THIS ESTIMATE: \$21,576.87" text))))

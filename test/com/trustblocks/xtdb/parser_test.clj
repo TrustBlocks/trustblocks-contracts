@@ -17,7 +17,7 @@
 
 (defn- models-the-app-loads []
   (concat (store/model-dir-files (io/file (library/dir "manager-employment-contract") "model"))
-          (store/model-dir-files (io/file (library/dir "street-resurfacing-contract") "model"))
+          (store/model-dir-files (io/file (library/dir "street-resurfacing/contract") "model"))
           (store/model-dir-files (io/file (archive/unzip! "docs/examples/late-delivery.cta") "model"))
           [(io/file "model/identity.cto")
            (io/file "docs/examples/snow-removal.cto")]))

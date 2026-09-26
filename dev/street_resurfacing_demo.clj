@@ -1,10 +1,13 @@
 (ns street-resurfacing-demo
   "Loads the Town of China Grove's Street Resurfacing contract, STR-27 --
-  the street-resurfacing-contract template from TrustBlocks/trustblocks-
-  templates (see com.trustblocks.template.library) -- as the bid package
-  exactly as issued: every blank still blank, no contractor, prices or
-  streets. It has no clause yet; there is nothing to trigger until the pay
-  request logic exists.
+  the street-resurfacing package's contract template from
+  TrustBlocks/trustblocks-templates (see com.trustblocks.template.library)
+  -- as the bid package exactly as issued: every blank still blank, no
+  contractor, prices or streets. It has no clause yet; there is nothing to
+  trigger until the pay request logic exists.
+
+  Also ingests the package's pay application template, for its model: no
+  pay request is stored until one is made under an awarded contract.
 
   A plain upsert of whatever the template holds, safe to call repeatedly
   (see dev/seed.clj).
@@ -16,12 +19,14 @@
             [com.trustblocks.xtdb.store :as store]
             [xtdb.node :as xt.node]))
 
-(def template "street-resurfacing-contract")
+(def template "street-resurfacing/contract")
+(def pay-application "street-resurfacing/pay-application")
 (def contract-id "china-grove-str-27")
 
 (defn load! [node]
-  (println "Ingesting the street-resurfacing-contract template ...")
+  (println "Ingesting the street-resurfacing package's templates ...")
   (println (archive/ingest-dir! node (library/dir template)))
+  (println (archive/ingest-dir! node (library/dir pay-application)))
   (store/put-instance! node nil (json/parse-string (library/sample template))))
 
 (defn run []
