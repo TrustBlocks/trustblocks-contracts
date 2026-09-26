@@ -42,6 +42,28 @@
   (and (= credential (:credential certification))
        (= authority (:authority certification))))
 
+(defn- find-transition [lifecycle status event]
+  (first (filter #(and (= event (get % "event"))
+                       (if status
+                         (some #{status} (get % "from"))
+                         (empty? (get % "from"))))
+                 (get lifecycle "transitions"))))
+
+(defn- no-transition! [event status]
+  (refuse! (str event " cannot happen "
+                (if status (str "in state " status) "before the lifecycle has begun"))
+           {:trustblocks/error :no-transition :event event :status status}))
+
+(defn requirements
+  "The certifications that can certify `request` from `status` -- what a
+  host asks before it knows who will sign: the {\"credential\"
+  \"authority\"} maps the transition accepts, empty for a timed event.
+  Refuses :no-transition as transition does."
+  [lifecycle status request]
+  (let [event (event-name request)]
+    (get (or (find-transition lifecycle status event) (no-transition! event status))
+         "requires")))
+
 (defn transition
   "The transition `request` takes from `status` (nil before the lifecycle
   has begun), given the verified `certification` -- {:credential
@@ -55,15 +77,7 @@
   - :too-early -- a timed event before its days have passed."
   [lifecycle status request & {:keys [certification entered-at at]}]
   (let [event (event-name request)
-        t     (first (filter #(and (= event (get % "event"))
-                                   (if status
-                                     (some #{status} (get % "from"))
-                                     (empty? (get % "from"))))
-                             (get lifecycle "transitions")))]
-    (when-not t
-      (refuse! (str event " cannot happen "
-                    (if status (str "in state " status) "before the lifecycle has begun"))
-               {:trustblocks/error :no-transition :event event :status status}))
+        t     (or (find-transition lifecycle status event) (no-transition! event status))]
     (if-let [days (get t "afterDays")]
       (let [due (.plus ^java.time.Instant entered-at (java.time.Duration/ofDays days))]
         (when (.isBefore ^java.time.Instant at due)

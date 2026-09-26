@@ -23,6 +23,21 @@
 (defpath contract-model-concerto "/contracts/:id/model/concerto")
 (defpath contract-trigger "/contracts/:id/trigger")
 (defpath contract-certify "/contracts/:id/certify")
+(defpath matters "/matters")
+(defpath matter "/matters/:id")
+(defpath stored-document "/documents/:id")
+
+(defn- path-segment
+  "The first path segment after `prefix` -- read from :uri, for the reason
+  contract-id gives."
+  [ctx prefix]
+  (-> (:uri ctx)
+      (str/replace-first prefix "")
+      (str/split #"/")
+      first))
+
+(defn matter-id [ctx] (path-segment ctx #"^/matters/"))
+(defn stored-document-id [ctx] (path-segment ctx #"^/documents/"))
 
 (defn contract-id
   "The :id out of any /contracts/:id/... request -- the inverse of the paths

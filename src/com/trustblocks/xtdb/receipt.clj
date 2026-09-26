@@ -54,18 +54,55 @@
         (filter #(= receipt-class (:concerto/class %))
                 (credential/for-matter node matter-id))))
 
+(defn check-receivable!
+  "Refuses a receipt of `document-hash` on `matter` that could not be
+  signed: :no-such-matter, :no-such-stored-document, :already-received."
+  [node matter document-hash]
+  (when-not (matter/get-matter node matter)
+    (refuse! "No such matter" {:trustblocks/error :no-such-matter :matter matter}))
+  (when-not (document/get-document node document-hash)
+    (refuse! "No such stored document"
+             {:trustblocks/error :no-such-stored-document :document document-hash}))
+  (when-let [earlier (first (filter #(= document-hash (get % "documentHash"))
+                                    (receipts-for-matter node matter)))]
+    (refuse! "This document has already been received on this matter"
+             {:trustblocks/error :already-received :document document-hash
+              :received-at (get earlier "received-at")})))
+
+(defn issue!
+  "Sign and record `officeholder`'s Receipt -- no checks; see receive! and
+  com.trustblocks.xtdb.advance, which make them first. `evidence` is the
+  credential that authorized it."
+  [node officeholder {:keys [matter document-hash received-from description received-at evidence]}]
+  (let [did (:xt/id officeholder)]
+    (credential/issue!
+     node (identity/keypair officeholder)
+     {:issuer did :subject did
+      :credential-subject (cond-> {"$class"       receipt-class
+                                   "id"           did
+                                   "documentHash" document-hash
+                                   "matterId"     matter
+                                   "receivedFrom" received-from
+                                   "certifiedAt"  (str (java.time.Instant/now))}
+                            description (assoc "description" description))
+      :valid-from received-at :valid-until open-ended
+      :evidence evidence})))
+
 (defn receive!
   "The officeholder signed in as `email` certifies that stored document
   `document-hash` was received on matter `matter` from `received-from` at
   `received-at`, under `required-authority` (e.g. RECEIVE_PAY_APPLICATIONS).
   Returns the signed Receipt VC.
 
+  A receipt that also moves a document through its lifecycle -- a pay
+  request received -- goes through com.trustblocks.xtdb.advance instead,
+  which takes the authority from the template's lifecycle.
+
   Refusals, tagged :trustblocks/error: :no-such-officeholder,
   :no-such-matter, :no-such-stored-document, :missing-authority (neither
   their OfficeGrant nor a Designation for this matter covers it at
   `received-at`), :already-received."
-  [node {:keys [email matter document-hash received-from description
-                required-authority received-at]}]
+  [node {:keys [email matter document-hash required-authority received-at] :as receipt}]
   (let [officeholder (or (identity/by-email node email)
                          (refuse! "No officeholder identity for this email"
                                   {:trustblocks/error :no-such-officeholder :email email}))
@@ -80,20 +117,5 @@
                             (refuse! "Not authorized to receive this on this matter at that time"
                                      {:trustblocks/error :missing-authority :did did
                                       :required required-authority :matter matter}))]
-      (when-let [earlier (first (filter #(= document-hash (get % "documentHash"))
-                                        (receipts-for-matter node matter)))]
-        (refuse! "This document has already been received on this matter"
-                 {:trustblocks/error :already-received :document document-hash
-                  :received-at (get earlier "received-at")}))
-      (credential/issue!
-       node (identity/keypair officeholder)
-       {:issuer did :subject did
-        :credential-subject (cond-> {"$class"       receipt-class
-                                     "id"           did
-                                     "documentHash" document-hash
-                                     "matterId"     matter
-                                     "receivedFrom" received-from
-                                     "certifiedAt"  (str (java.time.Instant/now))}
-                              description (assoc "description" description))
-        :valid-from received-at :valid-until open-ended
-        :evidence jwt}))))
+      (check-receivable! node matter document-hash)
+      (issue! node officeholder (assoc receipt :evidence jwt)))))

@@ -112,6 +112,7 @@ dev/                       runnable scripts; on the classpath for both direct ex
   manager_employment_demo.clj  loads the real employment contract template (clause included) from the library;
                              exposes approve!
   snow_removal_demo.clj        the synthetic snow-plowing contract + three visit triggers
+  street_resurfacing_matter_demo.clj  the STR-27 matter: illustrative award, 3 pay requests through their lifecycle, signed record
   street_resurfacing_demo.clj  loads STR-27 (street-resurfacing package: contract, plus the pay-application model) as its bid package as issued
   certification_demo.clj       provisions Town+Clerk+OfficeGrant, certifies vote then minutes;
                              depends on manager_employment_demo.clj (needs a real, approved contract to attest to)
