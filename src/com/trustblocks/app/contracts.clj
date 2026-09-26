@@ -11,7 +11,9 @@
   com.trustblocks.app.certify handles the officeholder form rendered below.
   Ingestion/provisioning remains a dev-script/REPL operation documented in
   docs/operator-runbook.md."
-  (:require [clojure.string :as str]
+  (:require [cheshire.core :as json]
+            [clojure.pprint :as pprint]
+            [clojure.string :as str]
             [com.trustblocks.app.auth :as auth]
             [com.trustblocks.app.certify :as certify]
             [com.trustblocks.concerto.metamodel :as mm]
@@ -19,6 +21,7 @@
             [com.trustblocks.lib.middleware :as mid]
             [com.trustblocks.lib.ui :as ui]
             [com.trustblocks.model.graph :as model.graph]
+            [com.trustblocks.model.malli :as model.malli]
             [com.trustblocks.model.playground :as pg]
             [com.trustblocks.routes :as routes]
             [com.trustblocks.template.archive :as archive]
@@ -26,7 +29,8 @@
             [com.trustblocks.xtdb.certification :as cert]
             [com.trustblocks.xtdb.execute :as execute]
             [com.trustblocks.xtdb.identity :as identity]
-            [com.trustblocks.xtdb.store :as store]))
+            [com.trustblocks.xtdb.store :as store]
+            [dev.onionpancakes.chassis.core :as chassis]))
 
 ;; ---------------------------------------------------------------- rendering
 
@@ -326,7 +330,8 @@
 
 (def ^:private model-tab-routes
   [[:fields   routes/contract-model          "Fields"]
-   [:concerto routes/contract-model-concerto "Concerto"]])
+   [:concerto routes/contract-model-concerto "Concerto"]
+   [:malli    routes/contract-model-malli    "Malli"]])
 
 (defn- model-tabs
   "The Fields/Concerto tab strip shared by both model pages. Plain links to
@@ -399,6 +404,95 @@
          id fqn :concerto
          [:div (map #(concerto-source-block node %) namespaces)])))))
 
+(def ^:private malli-block
+  ["max-h-[32rem] overflow-auto whitespace-pre-wrap rounded-lg bg-slate-950 p-5 font-mono text-xs leading-6 text-slate-100"])
+
+(defn- edn-text [x]
+  (binding [pprint/*print-right-margin* 100]
+    (with-out-str (pprint/pprint x))))
+
+(defn- malli-section [title blurb & body]
+  (into [:section {:class ["space-y-3"]}
+         [:h2 {:class ["text-lg font-semibold text-slate-950"]} title]
+         [:p {:class ["max-w-3xl text-sm leading-6 text-slate-600"]} blurb]]
+        body))
+
+(def ^:private viz-script
+  "Graphviz, compiled to WebAssembly, to draw Malli's DOT in the page."
+  "https://cdn.jsdelivr.net/npm/@viz-js/viz@3/lib/viz-standalone.js")
+
+(def ^:private draw-diagram
+  "Draws #malli-diagram's DOT, or says it could not and points at the source."
+  "Viz.instance().then(function (viz) {
+     var el = document.getElementById('malli-diagram');
+     document.getElementById('malli-diagram-loading').remove();
+     el.appendChild(viz.renderSVGElement(el.dataset.dot));
+   }).catch(function () {
+     document.getElementById('malli-diagram-loading').textContent =
+       'The diagram could not be drawn here; its DOT source is below.';
+   });")
+
+(defn model-malli-page
+  "The contract type's model as Malli -- see com.trustblocks.model.malli:
+  the native schema, this contract validated against it, a sample made up
+  from it (?seed= picks another), its JSON Schema, and its diagram."
+  [{:keys [biff.xtdb/node] :as ctx}]
+  (let [id       (routes/contract-id ctx)
+        reg      (store/registry-from-xtdb node)
+        instance (store/get-instance node id :reg reg)]
+    (if-not instance
+      (ui/on-error {:status 404})
+      (let [fqn    (get instance "$class")
+            schema (model.malli/schema reg fqn)
+            errors (model.malli/explain schema instance)
+            seed   (or (some-> (query-param ctx "seed") parse-long) 1)
+            sample (try {:ok (model.malli/sample schema seed)}
+                        (catch Exception e {:error (ex-message e)}))
+            dot    (model.malli/dot reg fqn)]
+        (model-shell
+         id fqn :malli
+         [:div {:class ["space-y-10"]}
+          (malli-section
+           "1. The schema"
+           "The Concerto model, compiled to a Malli schema by our own Clojure parser and compiler (concerto-clj). It is plain EDN -- data, not code -- so everything below is done with that one value."
+           [:pre {:class malli-block} (edn-text (model.malli/form reg fqn))])
+          (malli-section
+           "2. This contract, validated"
+           "The stored contract checked against the schema -- the same check that guards every write to XTDB. Errors come back as data, humanized by Malli."
+           (if errors
+             [:div {:class ["rounded-lg border border-red-200 bg-red-50 p-4"]}
+              [:p {:class ["mb-2 text-sm font-semibold text-red-800"]} "Does not conform"]
+              [:pre {:class ["whitespace-pre-wrap font-mono text-xs text-red-900"]} (edn-text errors)]]
+             [:p {:class ["rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800"]}
+              (str id " conforms to the schema.")]))
+          (malli-section
+           "3. A contract made up from the schema"
+           "Malli generates a valid instance from the schema alone -- the raw material of property-based testing. Nonsense by design: any string the model allows, any number. Every one validates."
+           (if-let [made (:ok sample)]
+             [:div {:class ["space-y-2"]}
+              [:pre {:class malli-block} (json/generate-string made {:pretty true})]
+              [:p {:class ["text-sm"]}
+               [:span {:class ["mr-3 font-mono text-xs text-slate-500"]} (str "seed " seed)]
+               [:a {:href (str (routes/contract-model-malli id) "?seed=" (inc seed))
+                    :class ["font-medium text-blue-700 hover:underline"]}
+                "Generate another →"]]]
+             [:p {:class ["text-sm text-slate-600"]} (str "Malli could not generate one: " (:error sample))]))
+          (malli-section
+           "4. As JSON Schema"
+           "The same model exported by Malli to JSON Schema, for anything outside Clojure that validates JSON. Concerto has its own exporter; this one is ours, from the schema above."
+           [:pre {:class malli-block} (json/generate-string (model.malli/json-schema schema) {:pretty true})])
+          (malli-section
+           "5. As a diagram"
+           "Malli's own Graphviz export: each type, its properties, and which types refer to which -- drawn in the page by Graphviz compiled to WebAssembly."
+           [:div {:id "malli-diagram" :data-dot dot
+                  :class ["overflow-auto rounded-lg border border-slate-200 bg-white p-4"]}
+            [:p {:id "malli-diagram-loading" :class ["text-sm text-slate-500"]} "Drawing…"]]
+           [:details {:class ["text-sm"]}
+            [:summary {:class ["cursor-pointer text-slate-600"]} "The DOT source"]
+            [:pre {:class (conj malli-block "mt-2")} dot]]
+           [:script {:src viz-script}]
+           [:script (chassis/raw-string draw-diagram)])])))))
+
 (defn document-page
   "The contract as prose: its originating template's grammar.tem.md (see
   com.trustblocks.template.archive/by-namespace), rendered against this
@@ -445,4 +539,5 @@
      [(routes/contract) {:get show-page}]
      [(routes/contract-document) {:get document-page}]
      [(routes/contract-model) {:get model-page}]
-     [(routes/contract-model-concerto) {:get model-concerto-page}]]]})
+     [(routes/contract-model-concerto) {:get model-concerto-page}]
+     [(routes/contract-model-malli) {:get model-malli-page}]]]})
