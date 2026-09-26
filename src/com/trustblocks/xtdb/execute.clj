@@ -21,8 +21,10 @@
   means they get valid time too -- \"what was the logic on June 2?\" is the same
   query as \"what was the state on June 2?\". A compiled TypeScript blob in an
   archive cannot answer that."
-  (:require [clojure.walk :as walk]
+  (:require [cheshire.core :as json]
+            [clojure.walk :as walk]
             [com.trustblocks.clause :as clause]
+            [com.trustblocks.lifecycle :as lifecycle]
             [com.trustblocks.concerto.metamodel :as mm]
             [com.trustblocks.xtdb.keys :as k]
             [com.trustblocks.xtdb.store :as store]
@@ -75,6 +77,7 @@
 (def clause-table    :clause)
 (def state-table     :contract-state)
 (def execution-table :execution)
+(def lifecycle-table :lifecycle)
 
 ;; ---------------------------------------------------------------- clauses
 
@@ -132,6 +135,41 @@
                :runtime (keyword (or (:clause/runtime record) "clojure"))}))
        (sort-by :class)
        vec))
+
+;; ------------------------------------------------------------- lifecycles
+
+(defn put-lifecycle!
+  "Store the lifecycle a template declares for its root type `fqn` -- see
+  com.trustblocks.lifecycle -- after checking it against
+  com.trustblocks.lifecycle@1.0.0.Lifecycle, whose model must be loaded.
+  Kept as its JSON text: it is the template's declaration, read back exactly
+  as written, and XTDB would rewrite its keys."
+  [node fqn lc & {:keys [reg]}]
+  (let [reg (or reg (store/registry-from-xtdb node))]
+    (when-let [errs (store/validate reg lc)]
+      (throw (ex-info "Lifecycle failed validation" {:$class fqn :errors errs})))
+    (xt/execute-tx node [[:put-docs lifecycle-table
+                          {:xt/id fqn :lifecycle/json (json/generate-string lc)}]])
+    {:$class fqn}))
+
+(defn get-lifecycle
+  "The lifecycle declared for contract type `fqn`, as Concerto JSON, or nil."
+  [node fqn]
+  (some-> (first (xt/q node (list 'from lifecycle-table [{:xt/id fqn} (symbol "*")])))
+          :lifecycle/json
+          json/parse-string))
+
+(defn- state-entered-at
+  "When the state in force at `at` was written -- the time the document
+  entered its current status, which a timed event counts from."
+  [node contract-id at]
+  (->> (xt/q node (list 'from state-table
+                        {:for-valid-time :all-time
+                         :bind           [{:xt/id contract-id} 'xt/valid-from]}))
+       (map #(.toInstant ^java.time.ZonedDateTime (:xt/valid-from %)))
+       (remove #(.isAfter ^java.time.Instant % at))
+       sort
+       last))
 
 ;; ---------------------------------------------------------------- state
 
@@ -310,7 +348,8 @@
   "One attempt at trigger!'s clause run and write. Returns trigger!'s result,
   or ::stale if another execution wrote this contract's state in between --
   see assert-state-unchanged."
-  [node reg ctx contract-id contract src runtime request now at request-id by document]
+  [node reg ctx contract-id contract src runtime lc request now at
+   {:keys [request-id by document certification]}]
   ;; Asked again on every attempt, ahead of the order check: after a retry, a
   ;; concurrent copy of this same request may be the write that moved the
   ;; state, and its caller should hear "already executed", not "out of order".
@@ -318,9 +357,32 @@
     (duplicate! contract-id request-id prior))
   (let [version (state-version node contract-id)
         state   (current-state node contract-id :reg reg :at at)
-        result (run-clause runtime ctx src {:data contract :request request
-                                            :state state :now now})
+        fqn     (get contract "$class")
+        status  (get state "status")
+        ;; The template's lifecycle decides whether the event may happen at
+        ;; all -- before the clause, which decides what follows from it.
+        t       (when lc
+                  (lifecycle/transition lc status request
+                                        :certification certification
+                                        :entered-at (when status (state-entered-at node contract-id at))
+                                        :at at))
+        result  (if src
+                  (run-clause runtime ctx src {:data contract :request request
+                                               :state state :now now})
+                  (let [state-fqn (lifecycle/state-type lc fqn)]
+                    {:response (lifecycle/response status t now)
+                     :state    (lifecycle/state lc fqn contract-id
+                                                (mm/identity-field reg state-fqn) t)}))
         response (:response result)]
+
+    (when (and t src (not= (get t "to") (get (:state result) "status")))
+      (throw (ex-info (str "The clause did not leave the document in "
+                           (get t "to") ", where its lifecycle says "
+                           (get t "event") " leads")
+                      {:trustblocks/error :invalid-clause-output
+                       :contract          contract-id
+                       :expected-status   (get t "to")
+                       :status            (get (:state result) "status")})))
 
     (when-not response
       (throw (ex-info "Clause returned no :response"
@@ -362,7 +424,10 @@
                                :clause    src}
                         request-id (assoc :request-id request-id)
                         by         (assoc :by by)
-                        document   (assoc :document document))])
+                        document   (assoc :document document)
+                        certification (assoc :certification
+                                             (select-keys certification
+                                                          [:credential :authority :did])))])
 
          ;; The new state is valid from the moment the request took effect,
          ;; not from when the database learned of it. That separation is the
@@ -417,6 +482,15 @@
   writes this contract's state while the clause runs, the clause is run again
   against the new state -- see assert-state-unchanged.
 
+  A contract type whose template declares a lifecycle (see
+  com.trustblocks.lifecycle) has every request checked against it first: the
+  event must be one that can happen in the document's current status, and
+  `:certification` -- {:credential :authority :did}, supplied only by trusted
+  host code that has verified it, never by a caller -- must be one the
+  transition accepts. Refused as :no-transition, :certification-required or
+  :too-early. With a clause, the clause then runs and must leave the status
+  the lifecycle names; without one, the transition is the whole answer.
+
   `:by` records who submitted it. `:document` records which document of a
   matter the request came from (see com.trustblocks.xtdb.matter), so the
   audit trail says which pay application moved the state, not only that
@@ -427,7 +501,7 @@
   Errors carry a :trustblocks/error tag in their ex-data so a caller can tell
   a bad request from a refusal from a broken clause without reading messages.
   See com.trustblocks.app.trigger, which turns those tags into status codes."
-  [node contract-id request now & {:keys [reg ctx request-id by document]}]
+  [node contract-id request now & {:keys [reg ctx request-id by document certification]}]
   (let [;; A clause receives DateTimes as wire strings, never a platform date
         ;; (see com.trustblocks.clause), so an Instant or Date from a REPL is
         ;; normalised here. A string passes through untouched, keeping the
@@ -441,12 +515,15 @@
                                       :contract          contract-id})))
         fqn      (get contract "$class")
 
+        lc       (get-lifecycle node fqn)
+
         {src :source runtime :runtime}
         (or (get-clause node fqn)
-            (throw (ex-info "No clause stored for this contract type"
-                            {:trustblocks/error :no-clause
-                             :contract          contract-id
-                             :$class            fqn})))]
+            (when-not lc
+              (throw (ex-info "No clause stored for this contract type"
+                              {:trustblocks/error :no-clause
+                               :contract          contract-id
+                               :$class            fqn}))))]
 
     ;; Checked before the clause runs as well as inside the write, so an
     ;; obvious retry costs nothing and is answered with the execution it
@@ -463,8 +540,10 @@
 
     (let [at (->instant now)]
       (loop [attempt 1]
-        (let [outcome (run-and-record! node reg ctx contract-id contract src runtime
-                                       request now at request-id by document)]
+        (let [outcome (run-and-record! node reg ctx contract-id contract src runtime lc
+                                       request now at
+                                       {:request-id request-id :by by :document document
+                                        :certification certification})]
           (cond
             (not= ::stale outcome) outcome
 
