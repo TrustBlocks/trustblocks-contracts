@@ -106,7 +106,7 @@ report is received and certified by the Director. The machine is the same.
 
 | From | Event | To | Who | Authority |
 |---|---|---|---|---|
-| — | pay application received from the Contractor | `RECEIVED` | the Director | `RECEIVE_PAY_APPLICATIONS` |
+| — | pay application received from the Contractor | `RECEIVED` | the Director, or the Director's designee | `RECEIVE_PAY_APPLICATIONS` |
 | `RECEIVED` | inspection certified (or an engineer's inspection report received) | `INSPECTED` | Town Engineer, or the Director | `CERTIFY_INSPECTIONS` / `RECEIVE_INSPECTION_REPORTS` |
 | `INSPECTED` | quantities and amounts verified (Sec. 6) | `CERTIFIED` | the Director | `CERTIFY_PAY_APPLICATIONS` |
 | `CERTIFIED` | approved and payment recommended (Exhibit E) | `APPROVED` | Town Manager | `APPROVE_PAYMENTS` |
@@ -133,23 +133,29 @@ damages.
   certificate; approval lines for the Director and the Town Manager; and a
   **payment certificate** for the Finance Officer — every blank a field.
 
-**Drafting addition to the contract** (Trustblocks-drafted, for the Town
-Attorney's review, marked as such in the template): the Bid Form's pay items
-and General Conditions 16–18 say work is measured "as accepted", but nothing
-ties a quantity on a pay request to an inspection. Proposed:
+**Inspection before payment.** The Bid Form's pay items and General
+Conditions 16–18 say work is measured "as accepted", but nothing ties a
+quantity on a pay request to an inspection. This was first proposed as a new
+Special Provision (SC-16). The Town Attorney's memo instead revises **General
+Conditions 18**, so that no quantity is paid until it has been inspected and
+approved, and defines who verifies an inspection by type of work and contract
+size. The contract text will change when the Town adopts that revision; the
+pay application's **Approved by Engineer** box already records it.
 
-> **SC-16. Inspection of Pay Items.** No quantity of any pay item shall be
-> included in a Contractor Pay Request for payment unless the work has been
-> inspected by the Town Engineer, or by the Director's designated
-> representative, and approved as complete on that Pay Request. Payment for
-> a quantity so approved does not constitute final acceptance under SC-12.
+## Decisions
 
-## Open questions
-
-1. Which officeholder is "the Director" for China Grove pay applications — the
-   Director of Public Works, as the STR-27 documents say, or the Planning
-   Director?
-2. The SC-16 language, and whether it belongs in the Special Provisions or the
-   General Conditions.
-3. Repository layout for packages — `packages/<name>/` beside `templates/`, or
-   templates grouped by a manifest.
+1. **Who receives and verifies.** The Director of Public Works, as the STR-27
+   documents say. The Zoning Administrator acts on a matter as the Director's
+   designated representative (Sec. 6), under a **Designation** credential for
+   that matter. She receives the Contractor's pay applications and the
+   engineer's inspection certificate by signing a **Receipt** for each stored
+   file. Neither the Contractor nor an outside engineer needs a DID.
+   Implemented in #32.
+2. **Inspection language.** A revision of General Conditions 18, per the Town
+   Attorney's memo, not SC-16.
+3. **Repository layout.** `packages/<package>/templates/<name>/` in
+   trustblocks-templates. Each document is still its own template, archive and
+   namespace, because Accord allows exactly one `@template` per archive. Types
+   the documents share go in `packages/<package>/model/` once there are any.
+   Implemented in TrustBlocks/trustblocks-templates#3, with the pay
+   application.
