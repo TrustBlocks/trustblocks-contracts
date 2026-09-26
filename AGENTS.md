@@ -395,6 +395,17 @@ not a starting point to improve on.**
 - **No CI.** There's no `.github/workflows` or equivalent — `bin/clj -M:run
   code-quality` and the test suite are run manually, by a human or an agent,
   before merging. Nothing enforces that on GitHub itself.
+- **XTDB opens a new local JDBC connection for every query and
+  transaction** (`xt/q` on a node goes through `with-conn` to the node's own
+  pgwire server). Each closed socket lingers in TIME_WAIT, so a burst of
+  thousands -- back-to-back full test runs, or a stress loop of concurrent
+  triggers -- can exhaust macOS's 16,384 ephemeral ports and surface as a
+  rare `PSQLException: The connection attempt failed` / `BindException` in
+  whichever test is running. That is the environment, not trigger logic (a
+  150-round stress of eight concurrent triggers reproduced it at round 123).
+  Let the sockets drain before re-running. It is also a production question:
+  the app pays a TCP connect per query; holding or pooling a connection is
+  the fix to evaluate before any real load.
 - **This session's flakiness lesson, worth re-learning if you see it
   again**: a test that intermittently fails with what looks like an extra or
   duplicated row is not necessarily a race or a duplicate write — check
@@ -446,7 +457,7 @@ identity for this email".
 ```sh
 bin/clj -M:run test
 ```
-Currently 63 tests / 219 assertions, 0 failures. Focus a namespace or var
+Currently 66 tests / 248 assertions, 0 failures. Focus a namespace or var
 with `--focus <fully.qualified.name>`.
 
 **Lint + format + test together** (what to run before considering any change
