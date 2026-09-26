@@ -99,6 +99,15 @@
           [:p {:class ["mt-1 text-xs text-slate-400"]}
            "Counts only while the designator holds the authority themselves; cannot be passed on."]]))]))
 
+(defn- state-details
+  "Whatever else the document's state holds beyond its status, as its
+  template defines it -- 'approvedPayItems: 3.1, 5.1' for a pay request."
+  [state]
+  (->> (dissoc state "$class" "$identifier" "status")
+       (remove (fn [[k v]] (or (nil? v) (= v (get state "$identifier")) (str/ends-with? k "Id"))))
+       (map (fn [[k v]] (str k ": " (if (sequential? v) (str/join ", " v) v))))
+       (str/join "; ")))
+
 (defn- documents [node matter-id]
   (let [docs (matter/documents node matter-id)]
     [:section {:class section}
@@ -106,7 +115,7 @@
      [:table {:class ["w-full text-left text-sm"]}
       [:thead {:class ["text-xs uppercase tracking-wide text-slate-500"]}
        [:tr [:th {:class ["py-2"]} "Document"] [:th "Role"] [:th "Joined"] [:th "Status"]
-        [:th "Engineer approved"] [:th "File"]]]
+        [:th "State"] [:th "File"]]]
       [:tbody {:class ["divide-y divide-slate-100"]}
        (for [{:keys [xt/id role joined stored-document]} docs
              :let [state (execute/current-state node id)]]
@@ -116,7 +125,7 @@
           [:td role]
           [:td (date joined)]
           [:td (status-badge (get state "status"))]
-          [:td (str/join ", " (get state "approvedPayItems"))]
+          [:td {:class ["text-xs text-slate-600"]} (state-details state)]
           [:td (file-link node stored-document)]])]]]))
 
 (defn- evidence-line [node {:strs [type issuer credentialSubject]}]

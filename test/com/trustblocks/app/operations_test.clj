@@ -62,7 +62,7 @@
       (is (str/includes? contracts-html "View Contract"))
       (is (str/includes? contracts-html "Template Playground"))
       (is (str/includes? contracts-html "Concerto Viewer"))
-      (is (str/includes? clauses-html "Clause Listing"))
+      (is (str/includes? clauses-html "Installed Logic"))
       (is (str/includes? clauses-html fqn))
       (is (str/includes? authorizations-html "Pamela Mills"))
       (is (str/includes? authorizations-html "pmills@chinagrovenc.gov"))

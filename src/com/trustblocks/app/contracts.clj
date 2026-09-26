@@ -13,6 +13,7 @@
   docs/operator-runbook.md."
   (:require [clojure.string :as str]
             [com.trustblocks.app.auth :as auth]
+            [com.trustblocks.app.certify :as certify]
             [com.trustblocks.concerto.metamodel :as mm]
             [com.trustblocks.lib.middleware :as mid]
             [com.trustblocks.lib.ui :as ui]
@@ -116,6 +117,9 @@
         {:keys [url unavailable]} (pg/template-status node reg instance)]
     [:div {:class ["flex flex-wrap gap-2"]}
      (action-link (routes/contract-document id) "View Contract")
+     (if-let [template (archive/for-class node fqn)]
+       (action-link (routes/template-code (:xt/id template)) "View Code")
+       (disabled-action "View Code" "No template is on file for this contract type"))
      (if url
        (action-link url "View in Template Playground" :external true)
        (disabled-action "View in Template Playground" unavailable))
@@ -200,16 +204,16 @@
        [:p {:class ["text-xs text-gray-400 mt-1"]} "Based on an earlier certification."])]))
 
 (defn- certify-form
-  "The vote-then-minutes case's one form: statement, a document
-  reference, the meeting's own date, and -- once something has already
-  been certified about this contract -- a choice of which certification
-  this one rests on. required-authority is fixed to CERTIFY_MINUTES on
-  the server (com.trustblocks.app.certify); there is no picker for it
-  here because there is only the one act this project was built to
-  support."
-  [id attestations]
+  "The attestation form: statement, a document reference, the event's own
+  date, and -- once something has already been certified about this
+  contract -- a choice of which certification this one rests on. The
+  authority it requires is the contract template's (see
+  com.trustblocks.app.certify/required-authority), shown, not chosen."
+  [id attestations authority]
   [:form {:method "post" :action (routes/contract-certify id)
           :class ["space-y-3 border rounded p-4"]}
+   [:p {:class ["text-xs text-slate-500"]}
+    (str "The contract's template requires " authority " to attest to it.")]
    [:div
     [:label {:class ["block text-sm text-gray-600"]} "Statement"]
     [:textarea {:name "statement" :required true :rows 2
@@ -243,6 +247,7 @@
   [{:keys [biff.xtdb/node session] :as ctx} id]
   (let [attestations (cert/attestations-for-contract node id)
         officeholder (some->> (:uid session) (auth/user-email ctx) (identity/by-email node))
+        authority    (certify/required-authority node id)
         error        (query-param ctx "certify-error")]
     [:section {:class ["rounded-xl border border-slate-200 bg-white p-6 shadow-sm"]}
      [:h2 {:class ["mb-2 text-lg font-semibold text-slate-950"]} (str "Certifications (" (count attestations) ")")]
@@ -251,8 +256,15 @@
      (if (empty? attestations)
        [:p {:class ["mb-4 text-slate-500"]} "No certifications recorded."]
        [:div {:class ["mb-5 space-y-3"]} (map #(attestation-row node %) attestations)])
-     (if officeholder
-       (certify-form id attestations)
+     (cond
+       (not authority)
+       [:p {:class ["text-sm text-slate-400"]}
+        "This contract's template accepts no attestations."]
+
+       officeholder
+       (certify-form id attestations authority)
+
+       :else
        [:p {:class ["text-sm text-slate-400"]}
         "This account is not registered as an officeholder, so it cannot certify anything here."])]))
 

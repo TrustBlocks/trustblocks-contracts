@@ -39,6 +39,7 @@
   so a template's logic lands exactly as a hand-installed clause would."
   (:require [cheshire.core :as json]
             [clojure.java.io :as io]
+            [clojure.string :as str]
             [com.trustblocks.xtdb.execute :as execute]
             [com.trustblocks.xtdb.store :as store]
             [xtdb.api :as xt])
@@ -88,6 +89,10 @@
            (remove #(.contains (.getName ^File %) ".test."))
            (sort-by #(.getName ^File %))
            vec))))
+
+(defn- sample-text [dir]
+  (let [f (io/file dir "sample.json")]
+    (when (.exists f) (slurp f))))
 
 (defn- grammar-text [dir]
   (let [f (io/file dir "text" "grammar.tem.md")]
@@ -161,6 +166,9 @@
           logic   (logic-files dir)
           id      (or (:name pkg) (.getName dir))
           grammar (grammar-text dir)
+          sample  (sample-text dir)
+          root    (template-root node (mapv :namespace loaded))
+          attests (get-in pkg [:trustblocks :attestation :authority])
           record  (cond-> {:xt/id id
                            :archive/namespaces (mapv :namespace loaded)}
                     pkg
@@ -175,13 +183,44 @@
                            (mapv (fn [f] {:file (.getName ^File f) :source (slurp f)}) logic))
 
                     grammar
-                    (assoc :archive/grammar grammar))]
+                    (assoc :archive/grammar grammar)
+
+                    sample
+                    (assoc :archive/sample sample)
+
+                    attests
+                    (assoc :archive/attestation-authority attests))
+          record  (assoc record
+                         :archive/root root
+                         ;; Accord's own word: a template drafts a contract
+                         ;; or a clause (package.json accordproject.template).
+                         :archive/kind (or (get-in pkg [:accordproject :template]) "contract"))]
       (xt/execute-tx node [[:put-docs archive-table record]])
       {:name        id
        :namespaces  (:archive/namespaces record)
        :logic-files (mapv :file (:archive/logic record []))
        :clause      (install-clause! node dir (:archive/namespaces record) pkg)
        :lifecycle   (install-lifecycle! node dir (:archive/namespaces record) pkg)})))
+
+(declare by-namespace)
+
+(defn all
+  "Every ingested template, by name."
+  [node]
+  (->> (xt/q node (list 'from archive-table [(symbol "*")]))
+       (sort-by :xt/id)
+       vec))
+
+(defn by-name
+  "The ingested template called `template-name` (package.json's name), or nil."
+  [node template-name]
+  (first (xt/q node (list 'from archive-table [{:xt/id template-name} (symbol "*")]))))
+
+(defn for-class
+  "The ingested template whose model declares `fqn` -- a contract
+  instance's own template -- or nil. See by-namespace."
+  [node fqn]
+  (by-namespace node (subs fqn 0 (str/last-index-of fqn "."))))
 
 (defn by-namespace
   "The archive record whose :archive/namespaces includes `ns`, or nil.
