@@ -129,6 +129,7 @@
 
 (defn- record-entry [node entry]
   (let [cls (get entry "$class")
+
         [kind text]
         (condp = cls
           receipt/receipt-class

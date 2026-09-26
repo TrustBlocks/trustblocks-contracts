@@ -44,9 +44,9 @@
 
 (defn- find-transition [lifecycle status event]
   (first (filter #(and (= event (get % "event"))
-                        (if status
-                          (some #{status} (get % "from"))
-                          (empty? (get % "from"))))
+                       (if status
+                         (some #{status} (get % "from"))
+                         (empty? (get % "from"))))
                  (get lifecycle "transitions"))))
 
 (defn- no-transition! [event status]

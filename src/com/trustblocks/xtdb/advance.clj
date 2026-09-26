@@ -84,6 +84,7 @@
         document-hash (or document-hash
                           (some #(when (= document (:xt/id %)) (:stored-document %))
                                 (when matter-id (matter/documents node matter-id :at at))))
+
         {:keys [authority jwt]}
         (or (authorization node did credential requires at matter-id)
             (refuse! (str "Not authorized to certify " (lifecycle/event-name event)
@@ -103,6 +104,7 @@
                             :request-id (request-id document event at)
                             :by email
                             :certification {:credential credential :authority authority :did did})
+
           signed
           (if (= "Receipt" credential)
             (receipt/issue! node officeholder
