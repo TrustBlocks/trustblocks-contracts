@@ -118,8 +118,8 @@
     [:div {:class ["flex flex-wrap gap-2"]}
      (action-link (routes/contract-document id) "View Contract")
      (if-let [template (archive/for-class node fqn)]
-       (action-link (routes/template-code (:xt/id template)) "View Code")
-       (disabled-action "View Code" "No template is on file for this contract type"))
+       (action-link (routes/template-code (:xt/id template)) "View Logic")
+       (disabled-action "View Logic" "No template is on file for this contract type"))
      (if url
        (action-link url "View in Template Playground" :external true)
        (disabled-action "View in Template Playground" unavailable))

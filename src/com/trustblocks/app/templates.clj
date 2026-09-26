@@ -5,9 +5,11 @@
     Text   the TemplateMark, drafted against the template's sample, and
            the source beneath it
     Model  its Concerto, as ingested
-    Code   its logic -- the Clojure clause, the lifecycle it declares, the
-           authority it requires to attest to it, and any TypeScript it
-           carries -- or a plain statement that it has none.
+    Logic  its code, set apart from the application's: each request the
+           contract answers, what it means (the model's own comment), who
+           calls it and what the application checks first, and the clause
+           lines that handle it; then the lifecycle and the full clause
+           listing -- or a plain statement that it has none.
 
   There are no clauses here as such. Clauses -- a signature block, an
   indemnity -- live in TrustBlocks/trustblocks-templates as templates of
@@ -21,6 +23,7 @@
   library), not edited here."
   (:require [cheshire.core :as json]
             [clojure.string :as str]
+            [com.trustblocks.concerto.metamodel :as mm]
             [com.trustblocks.lib.middleware :as mid]
             [com.trustblocks.lib.ui :as ui]
             [com.trustblocks.routes :as routes]
@@ -38,7 +41,7 @@
 (def ^:private parts
   [[:text  routes/template-text  "Text"]
    [:model routes/template-model "Model"]
-   [:code  routes/template-code  "Code"]])
+   [:code  routes/template-code  "Logic"]])
 
 (defn- kind-badge [kind]
   [:span {:class ["w-fit rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide"
@@ -164,6 +167,115 @@
                      (if (= ns own) "the template's own namespace" "imported")]]
                    [:pre {:class code-block} (or (store/model-source node ns) "(source not available)")]])])))))
 
+(def ^:private request-type "org.accordproject.runtime@0.2.0.Request")
+(def ^:private attestation-request "com.trustblocks.attestation@1.0.0.AttestationRequest")
+
+(defn- short-name [fqn] (subs fqn (inc (str/last-index-of fqn "."))))
+
+(defn- source-lines [source] (str/split-lines (or source "")))
+
+(defn- lines-naming
+  "The 1-based lines of `source` that name request type `fqn` in a string
+  -- where the clause matches it, as \"...PaymentApproved\" or by its full
+  name."
+  [source fqn]
+  (let [needle (str (short-name fqn) "\"")]
+    (keep-indexed (fn [i line] (when (str/includes? line needle) (inc i)))
+                  (source-lines source))))
+
+(defn- events
+  "The requests the contract answers: every Request type its own namespace
+  declares, and any other its clause names (the shared AttestationRequest),
+  in the order the lifecycle lists them, then by name."
+  [reg own source lifecycle]
+  (let [request? #(some #{request-type} (rest (mm/super-chain reg %)))
+        declared (filter #(and (= own (:namespace (get reg %))) (request? %)) (keys reg))
+        named    (filter #(and (not= own (:namespace (get reg %))) (request? %)
+                               (seq (lines-naming source %)))
+                         (keys reg))
+        order    (into {} (map-indexed (fn [i t] [(get t "event") i]) (get lifecycle "transitions")))]
+    (sort-by (juxt #(get order (short-name %) 1000) short-name) (distinct (concat declared named)))))
+
+(defn- doc-comment
+  "The /** ... */ comment the model puts on `type-name`, as plain text."
+  [cto type-name]
+  (when cto
+    (when-let [[_ body] (re-find (re-pattern (str "(?s)/\\*\\*((?:(?!\\*/).)*)\\*/\\s*(?:@\\w+(?:\\([^)]*\\))?\\s*)*"
+                                                  "(?:abstract\\s+)?transaction\\s+" type-name "\\b"))
+                                 cto)]
+      (->> (str/split-lines body)
+           (map #(str/replace % #"^\s*\*\s?" ""))
+           (str/join " ")
+           str/trim
+           not-empty))))
+
+(defn- caller
+  "Who calls the contract with this event, and what the application does
+  first -- the application's side of the line."
+  [fqn transition attestation-authority]
+  (cond
+    (get transition "afterDays")
+    (str "Time. Once " (get transition "afterDays") " days have passed since the document entered "
+         (str/join " or " (get transition "from"))
+         ", a scheduler raises this event, certified by nobody. (No scheduler runs yet.)")
+
+    transition
+    (str "The application, when an officeholder signs "
+         (str/join " or " (map #(str "a " (get % "credential") " holding " (get % "authority"))
+                               (get transition "requires")))
+         " -- through their own office grant, or a designation for the document's matter. "
+         "It checks the authority as of the event's date, runs the contract, then signs the credential "
+         "(com.trustblocks.xtdb.advance).")
+
+    (= fqn attestation-request)
+    (str "The application's certify form, after checking the officeholder holds "
+         (or attestation-authority "the authority the template declares")
+         " as of the event's date; what the contract answers is what gets signed "
+         "(com.trustblocks.xtdb.certification/certify!).")
+
+    :else
+    (str "The trigger endpoint, POST /contracts/:id/trigger. The template requires no certification "
+         "for it, so the application checks only that the caller is signed in.")))
+
+(defn- transition-for [lifecycle fqn]
+  (first (filter #(= (short-name fqn) (get % "event")) (get lifecycle "transitions"))))
+
+(defn- event-card [node reg source lifecycle attestation-authority fqn]
+  (let [t     (transition-for lifecycle fqn)
+        doc   (doc-comment (store/model-source node (:namespace (get reg fqn))) (short-name fqn))
+        lines (lines-naming source fqn)]
+    [:article {:class ["rounded-lg border border-slate-200 p-4"]}
+     [:div {:class ["flex flex-wrap items-baseline justify-between gap-2"]}
+      [:h3 {:class ["font-mono text-sm font-semibold text-slate-950"]} (short-name fqn)]
+      (when t
+        [:span {:class ["text-xs text-slate-500"]}
+         (str (if (seq (get t "from")) (str/join ", " (get t "from")) "start") " → " (get t "to"))])]
+     (when doc [:p {:class ["mt-1 text-sm text-slate-700"]} doc])
+     [:dl {:class ["mt-3 grid gap-2 text-sm sm:grid-cols-[9rem_1fr]"]}
+      [:dt {:class ["text-xs font-semibold uppercase tracking-wide text-slate-500"]} "Called by"]
+      [:dd {:class ["text-slate-700"]} (caller fqn t attestation-authority)]
+      [:dt {:class ["text-xs font-semibold uppercase tracking-wide text-slate-500"]} "Contract code"]
+      [:dd {:class ["text-slate-700"]}
+       (cond
+         (seq lines)
+         [:span "Handled by the clause at "
+          (interpose ", " (for [l lines] [:a {:href (str "#L" l) :class ["font-mono text-blue-700 hover:underline"]}
+                                          (str "line " l)]))]
+
+         source "The clause records nothing beyond the lifecycle's move; it passes this event through."
+         :else "No clause: the lifecycle's move is the whole answer.")]]]))
+
+(defn- listing [source highlighted]
+  [:div {:class ["overflow-auto rounded-lg bg-slate-950 py-4 font-mono text-xs leading-6 text-slate-100"]}
+   (for [[i line] (map-indexed vector (source-lines source))
+         :let [n (inc i)]]
+     [:div {:id (str "L" n)
+            :class (cond-> ["flex whitespace-pre pr-5"]
+                     (highlighted n) (conj "bg-blue-900/60"))}
+      [:span {:class ["w-12 shrink-0 select-none pr-4 text-right text-slate-500"]} n]
+      [:span {:class (if (str/starts-with? (str/triml line) ";") ["text-emerald-300"] ["text-slate-100"])}
+       (if (str/blank? line) " " line)]])])
+
 (defn- lifecycle-table [{:strs [stateType states transitions]}]
   (let [accepting (set (map #(get % "name") (filter #(get % "accepting") states)))]
     [:div
@@ -183,46 +295,64 @@
                  (str afterDays " days pass")
                  (str/join " or " (map #(str (get % "credential") ", " (get % "authority")) requires)))]])]]]))
 
+(def ^:private division
+  "Where the line falls between the contract's code and the application's."
+  [:section {:class ["grid gap-4 md:grid-cols-2"]}
+   [:div {:class ["rounded-xl border border-blue-200 bg-blue-50 p-5"]}
+    [:h2 {:class ["text-sm font-semibold uppercase tracking-wide text-blue-800"]} "The contract's code"]
+    [:p {:class ["mt-2 text-sm leading-6 text-blue-950"]}
+     "From the template, part of the contract. Its lifecycle says which events can happen, in which states, certified by whom; its clause says what follows from each. The clause runs in a sandbox with the contract's data, the request, its state and the time -- no clock, no files, no network -- so the same event always has the same answer, wherever it runs."]]
+   [:div {:class ["rounded-xl border border-slate-200 bg-white p-5"]}
+    [:h2 {:class ["text-sm font-semibold uppercase tracking-wide text-slate-700"]} "The application"]
+    [:p {:class ["mt-2 text-sm leading-6 text-slate-700"]}
+     "The environment the contract runs in, the same for every contract. It verifies who is acting and that they held the authority on the event's date, supplies the time, stores the files a credential names, records every execution bitemporally, and signs the credential that records the act. It decides nothing the contract decides."]]])
+
 (defn code-page [ctx]
   (with-template
     ctx
     (fn [node {:archive/keys [root logic attestation-authority kind] :as template}]
-      (let [clause    (when root (execute/get-clause node root))
-            lifecycle (when root (execute/get-lifecycle node root))]
+      (let [reg       (store/registry-from-xtdb node)
+            clause    (when root (execute/get-clause node root))
+            source    (:source clause)
+            lifecycle (when root (execute/get-lifecycle node root))
+            evs       (events reg (own-namespace template) source lifecycle)
+            lines     (set (mapcat #(lines-naming source %) evs))]
         (shell template :code
-               (if-not (or clause lifecycle attestation-authority (seq logic))
-                 [:section {:class section}
-                  [:h2 {:class ["mb-2 text-lg font-semibold text-slate-950"]} "No code"]
-                  [:p {:class ["text-sm text-slate-600"]}
-                   (str "This " kind " template is text and model only: it drafts, and its data is validated against its model, but nothing executes.")]]
-                 [:div {:class ["space-y-6"]}
-                  (when lifecycle
-                    [:section {:class section}
-                     [:h2 {:class ["mb-1 text-lg font-semibold text-slate-950"]} "Lifecycle"]
-                     [:p {:class ["mb-4 text-sm text-slate-500"]}
-                      "Declared by the template (lifecycle.json). The application enforces it: each event only in the states listed, certified as shown."]
-                     (lifecycle-table lifecycle)])
-                  (when clause
-                    [:section {:class section}
-                     [:div {:class ["mb-3 flex flex-wrap items-baseline gap-3"]}
-                      [:h2 {:class ["text-lg font-semibold text-slate-950"]} "Clause"]
-                      [:span {:class ["rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-blue-700"]}
-                       (name (:runtime clause))]]
-                     [:p {:class ["mb-4 text-sm text-slate-500"]}
-                      "What follows from each event, run in the restricted sandbox with the document's data, the request, its state and the time."]
-                     [:pre {:class code-block} (:source clause)]])
-                  (when attestation-authority
-                    [:section {:class section}
-                     [:h2 {:class ["mb-1 text-lg font-semibold text-slate-950"]} "Attestation"]
-                     [:p {:class ["text-sm text-slate-600"]}
-                      (str "An officeholder attesting to this contract must hold " attestation-authority
-                           ". The clause decides whether what they attest can be said yet.")]])
-                  (for [{:keys [file source]} logic]
-                    [:section {:class section}
-                     [:h2 {:class ["mb-1 font-mono text-sm font-semibold text-slate-950"]} file]
-                     [:p {:class ["mb-3 text-sm text-slate-500"]}
-                      "Accord TypeScript logic, stored as ingested. Nothing runs it yet."]
-                     [:pre {:class code-block} source]])]))))))
+               [:div {:class ["space-y-6"]}
+                division
+                (if-not (or clause lifecycle (seq logic))
+                  [:section {:class section}
+                   [:h2 {:class ["mb-2 text-lg font-semibold text-slate-950"]} "No logic"]
+                   [:p {:class ["text-sm text-slate-600"]}
+                    (str "This " kind " template is text and model only: it drafts, and its data is validated against its model, but nothing executes.")]]
+                  [:div {:class ["space-y-6"]}
+                   (when (seq evs)
+                     [:section {:class section}
+                      [:h2 {:class ["mb-1 text-lg font-semibold text-slate-950"]} "What calls the contract"]
+                      [:p {:class ["mb-4 text-sm text-slate-500"]}
+                       "Each request the contract answers: what it means, who calls it and what the application checks first, and where the contract's code handles it."]
+                      [:div {:class ["space-y-3"]}
+                       (map #(event-card node reg source lifecycle attestation-authority %) evs)]])
+                   (when lifecycle
+                     [:section {:class section}
+                      [:h2 {:class ["mb-1 text-lg font-semibold text-slate-950"]} "Lifecycle"]
+                      [:p {:class ["mb-4 text-sm text-slate-500"]}
+                       "Declared by the template (lifecycle.json). Each event only in the states listed, certified as shown."]
+                      (lifecycle-table lifecycle)])
+                   (when clause
+                     [:section {:class section}
+                      [:div {:class ["mb-3 flex flex-wrap items-baseline gap-3"]}
+                       [:h2 {:class ["text-lg font-semibold text-slate-950"]} "Clause"]
+                       [:span {:class ["rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-blue-700"]}
+                        (name (:runtime clause))]
+                       [:span {:class ["text-xs text-slate-500"]} "highlighted: where each request is handled"]]
+                      (listing source lines)])
+                   (for [{:keys [file source]} logic]
+                     [:section {:class section}
+                      [:h2 {:class ["mb-1 font-mono text-sm font-semibold text-slate-950"]} file]
+                      [:p {:class ["mb-3 text-sm text-slate-500"]}
+                       "Accord TypeScript logic, stored as ingested. Nothing runs it yet."]
+                      (listing source #{})])])])))))
 
 (def module
   {:biff.ring/routes
