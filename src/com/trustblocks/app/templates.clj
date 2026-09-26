@@ -25,6 +25,7 @@
             [clojure.string :as str]
             [com.trustblocks.concerto.metamodel :as mm]
             [com.trustblocks.lib.middleware :as mid]
+            [com.trustblocks.lifecycle :as lifecycle]
             [com.trustblocks.lib.ui :as ui]
             [com.trustblocks.routes :as routes]
             [com.trustblocks.template.archive :as archive]
@@ -55,12 +56,12 @@
 
 (defn- logic-summary
   "What the template's Code page will show, in a phrase."
-  [node {:archive/keys [root logic attestation-authority]}]
+  [node {:archive/keys [root logic]}]
   (let [clause    (when root (execute/get-clause node root))
         lifecycle (when root (execute/get-lifecycle node root))
         pieces    (remove nil? [(when clause "clause")
                                 (when lifecycle "lifecycle")
-                                (when attestation-authority "attestation")
+                                (when (lifecycle/attestation-authority lifecycle) "attestation")
                                 (when (seq logic) "TypeScript")])]
     (if (seq pieces) (str/join " · " pieces) "text and model only")))
 
@@ -168,7 +169,7 @@
                    [:pre {:class code-block} (or (store/model-source node ns) "(source not available)")]])])))))
 
 (def ^:private request-type "org.accordproject.runtime@0.2.0.Request")
-(def ^:private attestation-request "com.trustblocks.attestation@1.0.0.AttestationRequest")
+(def ^:private attestation-request lifecycle/attestation-request)
 
 (defn- short-name [fqn] (subs fqn (inc (str/last-index-of fqn "."))))
 
@@ -214,6 +215,12 @@
   first -- the application's side of the line."
   [fqn transition attestation-authority]
   (cond
+    (= fqn attestation-request)
+    (str "The application's certify form, after checking the officeholder holds "
+         (or attestation-authority "the authority the template declares")
+         " as of the event's date; what the contract answers is what gets signed "
+         "(com.trustblocks.xtdb.certification/certify!).")
+
     (get transition "afterDays")
     (str "Time. Once " (get transition "afterDays") " days have passed since the document entered "
          (str/join " or " (get transition "from"))
@@ -221,17 +228,12 @@
 
     transition
     (str "The application, when an officeholder signs "
-         (str/join " or " (map #(str "a " (get % "credential") " holding " (get % "authority"))
+         (str/join " or " (map #(str (if (re-find #"^[AEIOU]" (str (get % "credential"))) "an " "a ")
+                                     (get % "credential") " holding " (get % "authority"))
                                (get transition "requires")))
          " -- through their own office grant, or a designation for the document's matter. "
          "It checks the authority as of the event's date, runs the contract, then signs the credential "
          "(com.trustblocks.xtdb.advance).")
-
-    (= fqn attestation-request)
-    (str "The application's certify form, after checking the officeholder holds "
-         (or attestation-authority "the authority the template declares")
-         " as of the event's date; what the contract answers is what gets signed "
-         "(com.trustblocks.xtdb.certification/certify!).")
 
     :else
     (str "The trigger endpoint, POST /contracts/:id/trigger. The template requires no certification "
@@ -310,11 +312,12 @@
 (defn code-page [ctx]
   (with-template
     ctx
-    (fn [node {:archive/keys [root logic attestation-authority kind] :as template}]
+    (fn [node {:archive/keys [root logic kind] :as template}]
       (let [reg       (store/registry-from-xtdb node)
             clause    (when root (execute/get-clause node root))
             source    (:source clause)
             lifecycle (when root (execute/get-lifecycle node root))
+            attestation-authority (lifecycle/attestation-authority lifecycle)
             evs       (events reg (own-namespace template) source lifecycle)
             lines     (set (mapcat #(lines-naming source %) evs))]
         (shell template :code

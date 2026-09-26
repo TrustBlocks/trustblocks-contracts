@@ -70,9 +70,7 @@
 
 (println "Seeding the manager-employment contract into the running app...")
 (me/load! node)
-(if (ex/current-state node me/contract-id)
-  (println "  already approved, skipping trigger")
-  (me/approve! node))
+(println "  (approved below, once the Town Clerk is provisioned to certify it)")
 
 (println "Seeding the Street Resurfacing contract (STR-27) into the running app...")
 (street/load! node)
@@ -80,9 +78,9 @@
 (println "Seeding the STR-27 matter: an illustrative award and three pay requests...")
 (str-27/load! node document/default-root)
 
-(println "Seeding the China Grove Clerk and the vote-then-minutes certifications...")
+(println "Seeding the China Grove Clerk: the Council's approval, then the minutes...")
 (cert-demo/load! node)
-(if (seq (cert/attestations-for-contract node cert-demo/contract-id))
+(if (< 1 (count (cert/attestations-for-contract node cert-demo/contract-id)))
   (println "  already certified, skipping")
   (cert-demo/certify! node))
 

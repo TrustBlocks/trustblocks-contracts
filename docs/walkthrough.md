@@ -614,9 +614,10 @@ happen, in this order:
    to have held the office then; whether she holds it today is a different
    question.
 3. **Ask the contract.** Run `ex/trigger!` with a standard
-   `AttestationRequest` ([`attestation.cto`](https://github.com/TrustBlocks/trustblocks-templates/blob/main/shared/model/attestation.cto)),
-   so the contract's own sandboxed clause decides whether the statement can be
-   true yet.
+   `AttestationRequest` ([`attestation.cto`](https://github.com/TrustBlocks/trustblocks-templates/blob/main/shared/model/attestation.cto))
+   and the certification just verified. The contract's lifecycle decides
+   whether an attestation can happen yet, and under which authority; its
+   sandboxed clause decides what is said.
 4. **Sign** the clause's *response*, not the caller's input, as an
    `Attestation` VC with the officeholder's key.
 
@@ -638,20 +639,21 @@ Try it before the Board has approved anything:
                              overrides)))
 
 (attest {})
-;; Cannot attest to a contract the Board has not yet approved
-;; {:trustblocks/error :clause-refused}
+;; AttestationRequest cannot happen before the lifecycle has begun
+;; {:trustblocks/error :no-transition}
 ```
 
-The Clerk's authority checked out; the *contract* refused. Its clause has one
-branch for `AttestationRequest`, and it will not attest to an approval that
-has not happened (see the template's
-[`logic/clause.clj`](https://github.com/TrustBlocks/trustblocks-templates/blob/main/templates/manager-employment-contract/logic/clause.clj)).
-Adding attestation support to any contract means adding that one branch.
+The Clerk's authority checked out; the *contract* refused. Its lifecycle
+([`lifecycle.json`](https://github.com/TrustBlocks/trustblocks-templates/blob/main/templates/manager-employment-contract/lifecycle.json))
+begins with the Board's approval, and allows an attestation only after it.
 
-Approve it, then certify:
+The approval itself is certified too. Nothing can approve the contract but an
+Attestation under `CERTIFY_MINUTES`, so it is the Clerk, recording the
+Council's vote, who approves it. `me/approve!` does that through
+`com.trustblocks.xtdb.advance`, which takes the authority from the lifecycle:
 
 ```clojure
-(me/approve! node)
+(me/approve! node "pmills@chinagrovenc.gov")
 
 (def vote (attest {}))
 (:vc (interop/jws-claims vote))
@@ -686,7 +688,8 @@ next to the Board approval:
 
 ```clojure
 (mapv #(select-keys % [:at :request-id]) (ex/history node me/contract-id))
-;; => [{:at "2025-12-02T00:00:00.000Z"}
+;; => [{:at "2025-12-02T00:00:00Z"
+;;      :request-id "advance:china-grove-gover-2025:BoardApprovalRequest:2025-12-02T00:00:00Z"}
 ;;     {:at "2025-12-02T00:00:00Z"
 ;;      :request-id "attestation:china-grove-gover-2025:CERTIFY_MINUTES:sha256:china-grove-vote-2025-12-02:2025-12-02T00:00:00Z"}]
 ```

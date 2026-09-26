@@ -168,7 +168,6 @@
           grammar (grammar-text dir)
           sample  (sample-text dir)
           root    (template-root node (mapv :namespace loaded))
-          attests (get-in pkg [:trustblocks :attestation :authority])
           record  (cond-> {:xt/id id
                            :archive/namespaces (mapv :namespace loaded)}
                     pkg
@@ -186,10 +185,7 @@
                     (assoc :archive/grammar grammar)
 
                     sample
-                    (assoc :archive/sample sample)
-
-                    attests
-                    (assoc :archive/attestation-authority attests))
+                    (assoc :archive/sample sample))
           record  (assoc record
                          :archive/root root
                          ;; Accord's own word: a template drafts a contract

@@ -43,12 +43,15 @@
     (let [{:keys [clause]} (archive/ingest-dir! node (library/dir "manager-employment-contract"))]
       (is (= "com.trustblocks.municipal.employment@1.0.0.ManagerEmployment" clause))
       (is (= :clojure (:runtime (execute/get-clause node clause))))
-      (testing "and it runs: the template's own request.json approves the contract"
+      (testing "and it runs: the template's own request.json approves the contract, certified as its lifecycle requires"
         (store/put-instance! node nil (sample "manager-employment-contract"))
         (let [request (json/parse-string
                        (slurp (io/file (library/dir "manager-employment-contract") "request.json")))
               {:keys [state]} (execute/trigger! node "china-grove-gover-2025" request
-                                                (get request "requestedAt"))]
+                                                (get request "requestedAt")
+                                                :certification {:credential "Attestation"
+                                                                :authority "CERTIFY_MINUTES"
+                                                                :did "did:key:z6MkExampleClerk"})]
           (is (= "APPROVED" (get state "status"))))))))
 
 (deftest a-template-without-logic-installs-no-clause

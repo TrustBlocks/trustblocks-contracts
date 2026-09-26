@@ -93,6 +93,19 @@
                   :given             (dissoc certification :jwt)})))
     t))
 
+(def attestation-request "com.trustblocks.attestation@1.0.0.AttestationRequest")
+
+(defn attestation-authority
+  "The authority `lifecycle` requires of an Attestation to the contract --
+  the shared AttestationRequest -- or nil when it accepts none."
+  [lifecycle]
+  (some (fn [t]
+          (when (= (subs attestation-request (inc (str/last-index-of attestation-request ".")))
+                   (get t "event"))
+            (some #(when (= "Attestation" (get % "credential")) (get % "authority"))
+                  (get t "requires"))))
+        (get lifecycle "transitions")))
+
 (defn state
   "The state a transition leaves document `id` in, for a template with no
   clause of its own: its state type, with its status. `identity-field` is

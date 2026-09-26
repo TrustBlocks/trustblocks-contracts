@@ -229,7 +229,13 @@
                             (str valid-from)
                             :request-id (attestation-request-id
                                          contract-id required-authority document-hash valid-from)
-                            :by email)]
+                            :by email
+                            ;; Verified above: the contract's lifecycle, when
+                            ;; it has one, checks it is the certification the
+                            ;; attestation requires.
+                            :certification {:credential "Attestation"
+                                            :authority required-authority
+                                            :did did})]
       (credential/issue!
        node (identity/keypair officeholder)
        {:issuer did :subject did

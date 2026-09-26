@@ -12,10 +12,11 @@
   is a refusal, read off the query string by the same page.
 
   The authority an officeholder needs is the contract's to say, not this
-  handler's: its template declares it (package.json
-  trustblocks.attestation.authority -- CERTIFY_MINUTES for the manager
-  employment contract), and a contract whose template declares none
-  accepts no attestations here.
+  handler's: its lifecycle declares who certifies an AttestationRequest
+  (CERTIFY_MINUTES for the manager employment contract), and a contract
+  whose lifecycle names none accepts no attestations here. Whether one can
+  be made *yet* -- not before the Board has approved -- is the lifecycle's
+  to refuse when it runs.
 
   certify! itself now runs as an execute/trigger! call against this
   contract (see com.trustblocks.xtdb.certification's own docstring), so
@@ -28,19 +29,19 @@
             [com.trustblocks.app.auth :as auth]
             [com.trustblocks.lib.middleware :as mid]
             [com.trustblocks.routes :as routes]
-            [com.trustblocks.template.archive :as archive]
+            [com.trustblocks.lifecycle :as lifecycle]
             [com.trustblocks.xtdb.certification :as cert]
             [com.trustblocks.xtdb.execute :as execute]
             [com.trustblocks.xtdb.store :as store]))
 
 (defn required-authority
-  "The authority `contract-id`'s own template requires of an officeholder
+  "The authority `contract-id`'s lifecycle requires of an officeholder
   attesting to it, or nil when it accepts no attestations."
   [node contract-id]
   (some->> (store/get-instance node contract-id)
            (#(get % "$class"))
-           (archive/for-class node)
-           :archive/attestation-authority))
+           (execute/get-lifecycle node)
+           (lifecycle/attestation-authority)))
 
 (def ^:private no-natural-expiry
   "An Attestation records that something happened; unlike an
