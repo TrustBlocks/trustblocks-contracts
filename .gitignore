@@ -19,6 +19,7 @@ pom.xml.asc
 .nrepl-port
 .lsp/
 .clj-kondo/.cache
+.clj-kondo/imports/
 .biff-dev-status.edn
 
 # Secrets -- generated from the TEMPLATE files, never committed

@@ -25,13 +25,33 @@
 
 ;; ---------------------------------------------------------------- schema
 
+(defn default-parser
+  "How CTO text becomes metamodel: :clojure -- concerto-clj's instaparse port
+  of Accord's grammar, in-process, no Node -- unless TRUSTBLOCKS_CTO_PARSER
+  says cli, for Accord's own `concerto` CLI.
+
+  The port is the default because loading a model then needs nothing outside
+  the JVM. It is held to the CLI, not trusted on its own:
+  test/com/trustblocks/xtdb/parser_test.clj parses every model this app
+  loads both ways and requires them identical, as concerto-clj's own
+  script/differential.clj does across Accord's template library. A function,
+  not a def, so the variable is read at call time."
+  []
+  (if (= "cli" (System/getenv "TRUSTBLOCKS_CTO_PARSER")) :cli :clojure))
+
+(defn- parse-cto [cto-path {:keys [parser concerto-cli]}]
+  (cto/parse cto-path :parser (or parser (default-parser)) :cli concerto-cli))
+
 (defn put-model!
   "Store a CTO model as data: the parsed metamodel plus the original source, and
   one record per declaration keyed by fully qualified name. Schemas then get
-  XTDB's bitemporal history for free, exactly like the contracts they describe."
-  [node cto-path & {:keys [concerto-cli]}]
+  XTDB's bitemporal history for free, exactly like the contracts they describe.
+
+  `:parser` overrides default-parser; `:concerto-cli` names the CLI when it is
+  the CLI parsing."
+  [node cto-path & {:as opts}]
   (let [raw    (slurp cto-path)
-        parsed (cto/parse cto-path :cli concerto-cli)
+        parsed (parse-cto cto-path opts)
         ns-    (:namespace parsed)
         decls  (mm/declarations parsed)]
     (xt/execute-tx
@@ -57,8 +77,8 @@
   "Build a declaration registry from CTO files on disk. The model directory of
   an Accord template vendors its imports alongside model.cto, so pointing at the
   directory resolves inheritance chains that cross namespaces."
-  [cto-paths & {:keys [concerto-cli]}]
-  (mm/registry (map #(cto/parse % :cli concerto-cli) cto-paths)))
+  [cto-paths & {:as opts}]
+  (mm/registry (map #(parse-cto % opts) cto-paths)))
 
 (defn registry-from-xtdb
   "Rebuild the declaration registry from XTDB itself, with no filesystem access.

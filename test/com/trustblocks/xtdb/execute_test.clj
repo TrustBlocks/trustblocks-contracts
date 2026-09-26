@@ -256,7 +256,9 @@
   ;; Triggers dated at or before one another, all reading the same state at
   ;; once: without a guard, several compute "one more than what I read" and
   ;; the last write wins, dropping visits. Every execution that lands must be
-  ;; counted; the rest are refused as out of order, never silently lost.
+  ;; counted; the rest are refused, never silently lost -- as out of order,
+  ;; or, when a trigger loses the optimistic race max-attempts times running
+  ;; (eight writers on one contract can do that), as :state-conflict.
   (with-open [node (xt.node/start-node)]
     (populate! node ["snow-i"])
     (let [attempts (->> (range 8)
@@ -269,7 +271,7 @@
                                                         at :request-id (str "r-" i)))))))
                         (mapv deref))
           landed   (count (execute/history node "snow-i"))]
-      (is (every? #{:out-of-order} (filter some? attempts)) (pr-str attempts))
+      (is (every? #{:out-of-order :state-conflict} (filter some? attempts)) (pr-str attempts))
       (is (= landed (count (remove some? attempts))))
       (is (= landed (visits-paid node "snow-i"))))))
 

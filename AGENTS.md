@@ -395,6 +395,17 @@ not a starting point to improve on.**
 - **No CI.** There's no `.github/workflows` or equivalent — `bin/clj -M:run
   code-quality` and the test suite are run manually, by a human or an agent,
   before merging. Nothing enforces that on GitHub itself.
+- **XTDB opens a new local JDBC connection for every query and
+  transaction** (`xt/q` on a node goes through `with-conn` to the node's own
+  pgwire server). Each closed socket lingers in TIME_WAIT, so a burst of
+  thousands -- back-to-back full test runs, or a stress loop of concurrent
+  triggers -- can exhaust macOS's 16,384 ephemeral ports and surface as a
+  rare `PSQLException: The connection attempt failed` / `BindException` in
+  whichever test is running. That is the environment, not trigger logic (a
+  150-round stress of eight concurrent triggers reproduced it at round 123).
+  Let the sockets drain before re-running. It is also a production question:
+  the app pays a TCP connect per query; holding or pooling a connection is
+  the fix to evaluate before any real load.
 - **This session's flakiness lesson, worth re-learning if you see it
   again**: a test that intermittently fails with what looks like an extra or
   duplicated row is not necessarily a race or a duplicate write — check
@@ -411,27 +422,22 @@ new machine):
   via `JAVA_HOME` (default `/opt/homebrew/opt/openjdk@21/...`, override with
   `TRUSTBLOCKS_JAVA_HOME`). **Always invoke `bin/clj`, never bare `clj`** —
   a bare `clj` uses the system JDK and XTDB will fail to start.
-- Node.js on `PATH`, with `npm install` run at least once (`node_modules/`
-  gitignored). This is a **real runtime dependency**:
-  `com.trustblocks.concerto.cto/parse` (in the
-  external `concerto-clj` dependency) shells out to Accord's own JS tooling
-  to parse `.cto` files, and that runs every time `put-model!`/`load-registry`
-  is called — including inside most of the test suite. `bin/clj` automatically
-  prefers the lockfile-pinned `node_modules/.bin/concerto` (CLI 4.2 backed by
-  Concerto Core/CTO 5) over an older global installation. If tests fail with
-  something about spawning a process or finding a CLI, check Node/npm first.
-
-  **That dependency is optional upstream, not yet here.** `concerto-clj` main
-  has an instaparse port of the CTO grammar (`(cto/parse f :parser :clojure)`,
-  no Node on the JVM), differential-tested against the CLI across all 237
-  models in Accord's template library. This app pins `concerto-clj` at
-  `d80655f`, which predates it, and calls the CLI default. Bumping the pin and
-  choosing `:clojure` would drop Node from model loading — though the planned
-  TypeScript clause runtime needs Node regardless. Accord's
-  `accordproject/concerto-rust` (0.1.0: model validation, no CTO parser yet)
-  is the one to watch: with a parser, run as WASM in the JVM, it would be a
-  grammar Accord maintains rather than a port we track. Malli stays our
-  instance validation either way.
+- **Node is not needed to load models.** `store/put-model!` and
+  `load-registry` parse `.cto` with `concerto-clj`'s instaparse port of Accord's
+  grammar (`store/default-parser` → `:clojure`), in-process, roughly 100×
+  faster than spawning the CLI per file (12 models: ~50 ms vs ~5 s). It is held
+  to the CLI, not trusted alone: `test/com/trustblocks/xtdb/parser_test.clj`
+  parses every model this app loads both ways and requires them identical.
+  `TRUSTBLOCKS_CTO_PARSER=cli` switches back to Accord's CLI.
+- Node.js on `PATH`, with `npm install` run once (`node_modules/` gitignored),
+  is still needed for: that differential test (it fails, not skips, without the
+  CLI); the babashka half of `docs/walkthrough.md` (instaparse cannot run under
+  babashka); and the planned TypeScript clause runtime. `bin/clj` points
+  `CONCERTO_CLI` at the lockfile-pinned `node_modules/.bin/concerto` (CLI 4.2,
+  Concerto Core/CTO 5). Accord's `accordproject/concerto-rust` (0.1.0: model
+  validation, no CTO parser yet) is the one to watch: with a parser, run as
+  WASM in the JVM, it would be a grammar Accord maintains rather than a port we
+  track. Malli stays our instance validation either way.
 
 **Run the app locally:**
 ```sh
@@ -451,7 +457,7 @@ identity for this email".
 ```sh
 bin/clj -M:run test
 ```
-Currently 63 tests / 219 assertions, 0 failures. Focus a namespace or var
+Currently 66 tests / 248 assertions, 0 failures. Focus a namespace or var
 with `--focus <fully.qualified.name>`.
 
 **Lint + format + test together** (what to run before considering any change
