@@ -24,7 +24,7 @@
       (let [list (body (templates/list-page {:biff.xtdb/node node}))]
         (is (str/includes? list "street-resurfacing-pay-application"))
         (is (str/includes? list "clause · lifecycle"))
-        (is (str/includes? list "clause · attestation"))
+        (is (str/includes? list "clause · lifecycle · attestation"))
         (is (str/includes? list "text and model only"))))
     (testing "Text: drafted from the sample, with the TemplateMark beneath"
       (let [text (page templates/text-page node "/templates/street-resurfacing-pay-application/text")]
@@ -44,10 +44,11 @@
         (is (str/includes? logic "passes this event through"))
         (is (str/includes? logic "Not approved by the engineer")))
       (let [logic (page templates/code-page node "/templates/manager-employment-contract/code")]
-        (is (str/includes? logic "The Town Council approves the contract, on councilActionDate."))
-        (is (str/includes? logic "The trigger endpoint"))
+        (is (str/includes? logic "The Town Council approves the contract, on councilActionDate"))
+        (is (str/includes? logic "an Attestation holding CERTIFY_MINUTES"))
+        (is (not (str/includes? logic "The trigger endpoint")))
         (is (str/includes? logic "after checking the officeholder holds CERTIFY_MINUTES"))
-        (is (str/includes? logic ";; BoardApprovalRequest -- called when the Town Council approves")))
+        (is (str/includes? logic ";; BoardApprovalRequest -- called when the Town Clerk certifies")))
       (is (str/includes? (page templates/code-page node "/templates/street-resurfacing-contract/code")
                          "text and model only")))
     (is (= 404 (:status (templates/code-page {:biff.xtdb/node node :uri "/templates/nope/code"}))))))

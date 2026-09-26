@@ -20,6 +20,7 @@
             [com.trustblocks.did.vc :as vc]
             [com.trustblocks.xtdb.certification :as cert]
             [com.trustblocks.xtdb.credential :as credential]
+            [com.trustblocks.xtdb.execute :as execute]
             [com.trustblocks.xtdb.identity :as identity]
             [com.trustblocks.xtdb.store :as store]
             [manager-employment-demo :as me]
@@ -27,21 +28,26 @@
             [xtdb.node :as xt.node])
   (:import [java.time Instant]))
 
-(def ^:private year-start (Instant/parse "2026-01-01T00:00:00Z"))
+(def ^:private year-start (Instant/parse "2025-07-01T00:00:00Z"))
 (def ^:private year-end (Instant/parse "2027-01-01T00:00:00Z"))
 (def ^:private vote-meeting (Instant/parse "2026-03-04T19:00:00Z"))
 (def ^:private next-meeting (Instant/parse "2026-04-01T19:00:00Z"))
 (def ^:private contract-id me/contract-id)
 
 (defn- populate! [node]
-  ;; certify! runs execute/trigger! against contract-id now (see
+  ;; certify! runs execute/trigger! against contract-id (see
   ;; com.trustblocks.xtdb.certification's own docstring), so this
-  ;; namespace's tests need the real employment contract on file and
-  ;; already Board-approved, not just the identity model -- 'the vote
-  ;; happened' can't be certified about a contract that doesn't exist.
+  ;; namespace's tests need the real employment contract on file, not just
+  ;; the identity model. Approving it takes the Clerk -- see approved! --
+  ;; so a test that certifies provisions first, then approves.
   (me/load! node)
-  (me/approve! node)
   (store/put-model! node "model/identity.cto"))
+
+(defn- approved!
+  "The Board's approval, certified by the provisioned Clerk: the contract's
+  lifecycle allows no attestation before it."
+  [node]
+  (me/approve! node "clerk@china-grove.example.gov"))
 
 (defn- provision! [node]
   (let [town (identity/provision-town! node {:slug "china-grove" :name "China Grove"})
@@ -160,7 +166,9 @@
   (with-open [node (xt.node/start-node)]
     (populate! node)
     (let [{:keys [clerk]} (provision! node)
-          [{grant-id :xt/id}] (credential/current-for-subject node (:xt/id clerk))]
+          _ (approved! node)
+          [{grant-id :xt/id}] (filter #(= cert/office-grant-class (:concerto/class %))
+                                      (credential/current-for-subject node (:xt/id clerk)))]
       ;; Revoke partway through the year: a meeting before the revocation is
       ;; still validly certified; one after is not, even though both calls
       ;; happen "now", long after either date.
@@ -183,6 +191,7 @@
     (populate! node)
     (let [{:keys [clerk]} (provision! node)
           did (:xt/id clerk)
+          _ (approved! node)
 
           vote-jwt (cert/certify! node {:email "clerk@china-grove.example.gov"
                                         :statement "The council voted 4-1 to approve the manager's contract"
@@ -206,13 +215,14 @@
         (is (= contract-id (get vote-subject "contractId"))))
       (testing "the minutes approval names the vote certification as evidence"
         (is (= vote-jwt (get minutes-subject "evidence"))))
-      (testing "both attestations are recorded, alongside the office grant that authorized them"
+      (testing "the approval and both attestations are recorded, alongside the office grant that authorized them"
         (let [records (credential/for-subject node did)]
-          (is (= [cert/office-grant-class cert/attestation-class cert/attestation-class]
+          (is (= [cert/office-grant-class cert/attestation-class cert/attestation-class cert/attestation-class]
                  (map :concerto/class records)))))
 
-      (testing "attestations-for-contract shows both, decoded, oldest first, evidence intact"
-        (let [[vote minutes] (cert/attestations-for-contract node contract-id)]
+      (testing "attestations-for-contract shows the Board approval, then both, decoded, oldest first, evidence intact"
+        (let [[approval vote minutes] (cert/attestations-for-contract node contract-id)]
+          (is (= "The Town Council approved the Town Manager's employment contract" (get approval "statement")))
           (is (= "The council voted 4-1 to approve the manager's contract" (get vote "statement")))
           (is (= "Minutes of the March 4 meeting were approved as written" (get minutes "statement")))
           (is (= vote-jwt (get minutes "evidence")))
@@ -221,3 +231,28 @@
           (is (= next-meeting (get minutes "valid-from")))
           (is (= vote-jwt (get vote "jwt")))
           (is (= minutes-jwt (get minutes "jwt"))))))))
+
+(deftest the-board-approval-is-certified-by-the-clerk
+  (with-open [node (xt.node/start-node)]
+    (populate! node)
+    (provision! node)
+    (testing "nothing can be attested before the Board has approved"
+      (is (= :no-transition
+             (refusal #(cert/certify! node {:email "clerk@china-grove.example.gov" :statement "x"
+                                            :document-hash "h" :contract-id contract-id
+                                            :required-authority "CERTIFY_MINUTES"
+                                            :valid-from vote-meeting :valid-until year-end})))))
+    (testing "an uncertified approval -- as the trigger endpoint would send it -- is refused"
+      (is (= :certification-required
+             (refusal #(execute/trigger! node contract-id
+                                         {"$class" "com.trustblocks.municipal.employment@1.0.0.BoardApprovalRequest"
+                                          "requestedAt" me/board-meeting-date}
+                                         me/board-meeting-date)))))
+    (testing "an officeholder without CERTIFY_MINUTES cannot approve it"
+      (identity/provision-officeholder! node {:email "nobody@china-grove.example.gov"
+                                              :name "No One" :office "Nobody"})
+      (is (= :missing-authority (refusal #(me/approve! node "nobody@china-grove.example.gov")))))
+    (testing "the Clerk can, once"
+      (is (= "APPROVED" (get-in (approved! node) [:state "status"])))
+      (is (= :no-transition
+             (refusal #(me/approve! node "clerk@china-grove.example.gov" :at "2026-01-05T00:00:00.000Z")))))))

@@ -40,13 +40,14 @@
 
 (deftest certify-redirects-to-the-contract-page-either-way
   (with-open [node (xt.node/start-node)]
-    ;; certify runs execute/trigger! against contract-id now -- see
+    ;; certify runs execute/trigger! against contract-id -- see
     ;; com.trustblocks.xtdb.certification's own docstring -- so the real
-    ;; contract needs to be on file and already Board-approved.
+    ;; contract needs to be on file and already Board-approved, which the
+    ;; Clerk certifies.
     (me/load! node)
-    (me/approve! node)
     (store/put-model! node "model/identity.cto")
     (provision-clerk! node)
+    (me/approve! node clerk-email)
 
     (testing "a missing field redirects with a certify-error, not a 500"
       (let [ctx (ctx-for node clerk-email {:documentHash "h" :validFrom "2026-03-04T19:00"})
@@ -68,14 +69,15 @@
             {:keys [status headers]} (certify/certify ctx)]
         (is (= 303 status))
         (is (= (str "/contracts/" contract-id) (get headers "location")))
-        (is (= 1 (count (cert/attestations-for-contract node contract-id))))))
+        ;; The Board approval, then this.
+        (is (= 2 (count (cert/attestations-for-contract node contract-id))))))
 
     (testing "a second certification can name the first as evidence"
-      (let [[first-jwt] (map #(get % "jwt") (cert/attestations-for-contract node contract-id))
+      (let [[_ first-jwt] (map #(get % "jwt") (cert/attestations-for-contract node contract-id))
             ctx (ctx-for node clerk-email
                          {:statement "Minutes approved" :documentHash "sha256:minutes"
                           :validFrom "2026-04-01T19:00" :evidence first-jwt})
             {:keys [status]} (certify/certify ctx)]
         (is (= 303 status))
-        (let [[_ minutes] (cert/attestations-for-contract node contract-id)]
+        (let [[_ _ minutes] (cert/attestations-for-contract node contract-id)]
           (is (= first-jwt (get minutes "evidence"))))))))

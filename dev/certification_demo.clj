@@ -98,36 +98,32 @@
   the same identity re-saved."
   [node]
   (me/load! node)
-  (when-not (ex/current-state node me/contract-id)
-    (me/approve! node))
   (store/put-model! node "model/identity.cto")
   (let [town (ensure-town! node)]
     (doseq [officeholder officeholders]
       (ensure-officeholder! node town officeholder))
+    ;; The Clerk certifies the Council's approval -- the contract's
+    ;; lifecycle requires it before anything can be attested about it.
+    (when-not (ex/current-state node me/contract-id)
+      (me/approve! node clerk-email))
     (identity/by-email node clerk-email)))
 
 (defn certify!
-  "The vote, then the minutes approving it. Redo-safe now the same way
-  every other trigger! call is (each certify! derives its own
-  request-id from its contract/authority/documentHash/valid-from), but
-  dev/seed.clj still checks whether this has already run first rather
-  than relying on that -- cert/certify!'s second call would otherwise
-  throw a :duplicate-request refusal (correct, but noisy) instead of
-  quietly doing nothing."
+  "The minutes approving the Council's vote, attested by the Clerk and
+  naming the Clerk's certification of the vote -- the Board approval
+  load! recorded -- as evidence. dev/seed.clj checks whether this has
+  already run first: cert/certify!'s second call would otherwise throw a
+  :duplicate-request refusal (correct, but noisy) instead of quietly
+  doing nothing."
   [node]
-  (let [vote-jwt (cert/certify! node {:email clerk-email
-                                      :statement "The council voted to approve the manager's employment contract"
-                                      :document-hash "sha256:china-grove-vote-2025-12-02"
-                                      :contract-id contract-id
-                                      :required-authority "CERTIFY_MINUTES"
-                                      :valid-from vote-meeting :valid-until grant-valid-until})]
+  (let [approval-jwt (get (first (cert/attestations-for-contract node contract-id)) "jwt")]
     (cert/certify! node {:email clerk-email
-                         :statement "Minutes of the December 2 meeting were approved as written"
+                         :statement "Minutes of the December 2 meeting, recording the Council's vote to approve the manager's employment contract, were approved as written"
                          :document-hash "sha256:china-grove-minutes-2026-01-06"
                          :contract-id contract-id
                          :required-authority "CERTIFY_MINUTES"
                          :valid-from next-meeting :valid-until grant-valid-until
-                         :evidence vote-jwt})))
+                         :evidence approval-jwt})))
 
 (defn run []
   (let [node (xt.node/start-node)]

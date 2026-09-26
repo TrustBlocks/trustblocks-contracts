@@ -2,10 +2,10 @@
   "Ingests the real China Grove / Gover manager employment contract -- the
   manager-employment-contract template from TrustBlocks/trustblocks-templates
   (see com.trustblocks.template.library): its model, sample, and the clause
-  in its logic/clause.clj -- and runs a Board-approval
-  trigger against it -- an authorization/certification execution, not a
-  monetary one, exercising a different shape of `trigger!` than
-  dev/late_delivery_demo.clj's penalty calculation.
+  in its logic/clause.clj -- and approves it: the Town Clerk certifies the
+  Council's vote, which the contract's lifecycle requires before anything
+  else can happen to it (an Attestation under CERTIFY_MINUTES). An
+  authorization/certification execution, not a monetary one.
 
   Also surfaces a real bitemporal wrinkle sitting in the source data: the
   contract's own effectiveDate (2025-07-01, when its terms -- including
@@ -21,7 +21,10 @@
   (:require [cheshire.core :as json]
             [com.trustblocks.template.archive :as archive]
             [com.trustblocks.template.library :as library]
+            [com.trustblocks.xtdb.advance :as advance]
+            [com.trustblocks.xtdb.certification :as cert]
             [com.trustblocks.xtdb.execute :as ex]
+            [com.trustblocks.xtdb.identity :as identity]
             [com.trustblocks.xtdb.store :as store]
             [xtdb.node :as xt.node]))
 
@@ -32,6 +35,11 @@
 ;; since dev/certification_demo.clj now also needs the contract already
 ;; approved before it can attest to that fact.
 (def board-meeting-date "2025-12-02T00:00:00.000Z")
+
+;; The record of the Council's vote the Clerk's certification names. The
+;; minutes themselves are not on file here, so this is a reference, not a
+;; stored document's hash.
+(def vote-reference "sha256:china-grove-vote-2025-12-02")
 
 (defn load!
   "Ingests the model + logic archive, and loads the contract instance and
@@ -57,17 +65,36 @@
    node nil (json/parse-string (library/sample "manager-employment-contract"))))
 
 (defn approve!
-  "The one real Board-approval event this contract ever had. Its own
-  function, not just a call inlined at each site, because dev/seed.clj
-  and dev/certification_demo.clj (which needs the contract already
-  approved before certify! can attest to that fact -- see this file's
-  own clause, above) both need to trigger it, idempotently, without
-  each repeating the same literal date."
+  "The Board's approval, certified by the Town Clerk signed in as
+  `clerk-email` -- who must hold CERTIFY_MINUTES on the Board's meeting
+  date, as the contract's lifecycle requires. Its own function because
+  dev/seed.clj, dev/certification_demo.clj and the tests all need the
+  contract approved before anything can be attested about it. `:at`
+  defaults to the Board's meeting date."
+  [node clerk-email & {:keys [at] :or {at board-meeting-date}}]
+  (advance/advance! node {:email clerk-email
+                          :document contract-id
+                          :credential "Attestation"
+                          :event {"$class" "com.trustblocks.municipal.employment@1.0.0.BoardApprovalRequest"
+                                  "requestedAt" at}
+                          :at (ex/->instant at)
+                          :statement "The Town Council approved the Town Manager's employment contract"
+                          :document-hash vote-reference}))
+
+(defn- provision-clerk!
+  "A Town and a Clerk holding CERTIFY_MINUTES, for this demo's own
+  throwaway node; certification-demo provisions the real ledger."
   [node]
-  (ex/trigger! node contract-id
-               {"$class" "com.trustblocks.municipal.employment@1.0.0.BoardApprovalRequest"
-                "requestedAt" board-meeting-date}
-               board-meeting-date))
+  (store/put-model! node "model/identity.cto")
+  (let [town  (identity/provision-town! node {:slug "china-grove" :name "China Grove"})
+        clerk (identity/provision-officeholder! node {:email "pmills@chinagrovenc.gov"
+                                                      :name "Pamela Mills" :office "Town Clerk"})]
+    (cert/grant-office! node (:xt/id town)
+                        {:officeholder-did (:xt/id clerk) :name "Pamela Mills" :office "Town Clerk"
+                         :authority ["CERTIFY_MINUTES"]
+                         :valid-from (ex/->instant "2025-07-01T00:00:00Z")
+                         :valid-until (ex/->instant "2029-06-30T00:00:00Z")})
+    "pmills@chinagrovenc.gov"))
 
 (defn run []
   (let [node (xt.node/start-node)]
@@ -78,7 +105,8 @@
 
       ;; now = the Board's own meeting date, not wall-clock time -- see
       ;; the ns docstring.
-      (let [{:keys [response state]} (approve! node)]
+      (let [clerk (provision-clerk! node)
+            {:keys [response state]} (approve! node clerk)]
         (println "\nBoard-approval response:" response)
         (println "New state:" state))
 
@@ -89,11 +117,17 @@
 
       (println "\nTriggering a second Board approval on the same contract...")
       (try
+        (approve! node "pmills@chinagrovenc.gov" :at "2026-01-05T00:00:00.000Z")
+        (println "BUG: a second approval should have been refused")
+        (catch Exception e
+          (println "Refused, as it should be:" (ex-message e))))
+      (println "\nTriggering Board approval with no certification, as the trigger endpoint would...")
+      (try
         (ex/trigger! node contract-id
                      {"$class"      "com.trustblocks.municipal.employment@1.0.0.BoardApprovalRequest"
                       "requestedAt" "2026-01-05T00:00:00.000Z"}
                      "2026-01-05T00:00:00.000Z")
-        (println "BUG: a second approval should have been refused")
+        (println "BUG: an uncertified approval should have been refused")
         (catch Exception e
           (println "Refused, as it should be:" (ex-message e))))
 
