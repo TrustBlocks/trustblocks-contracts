@@ -112,19 +112,33 @@
 
 (defn- install-clause!
   "Installs a Clojure-logic template's clause -- see the ns docstring.
-  Returns the root type it was installed for, or nil when the template
-  declares no Trustblocks runtime."
+  Returns the root type it was installed for, or nil when the template's
+  trustblocks section names no logic."
   [node dir namespaces {:keys [trustblocks]}]
-  (when trustblocks
+  (when (:logic trustblocks)
     (let [{:keys [runtime logic]} trustblocks
-          f (when logic (io/file dir logic))]
+          f (io/file dir logic)]
       (when-not (= "clojure" runtime)
         (throw (ex-info "Unsupported trustblocks.runtime" {:dir (str dir) :runtime runtime})))
-      (when-not (and f (.exists f))
+      (when-not (.exists f)
         (throw (ex-info "trustblocks.logic names no file in the template"
                         {:dir (str dir) :logic logic})))
       (let [root (template-root node namespaces)]
         (execute/put-clause! node root (slurp f) :runtime :clojure)
+        root))))
+
+(defn- install-lifecycle!
+  "Stores the lifecycle a template declares (trustblocks.lifecycle) for its
+  root type -- see com.trustblocks.lifecycle. Returns the root type, or nil
+  when it declares none."
+  [node dir namespaces {:keys [trustblocks]}]
+  (when-let [lifecycle (:lifecycle trustblocks)]
+    (let [f (io/file dir lifecycle)]
+      (when-not (.exists f)
+        (throw (ex-info "trustblocks.lifecycle names no file in the template"
+                        {:dir (str dir) :lifecycle lifecycle})))
+      (let [root (template-root node namespaces)]
+        (execute/put-lifecycle! node root (json/parse-string (slurp f)))
         root))))
 
 (defn ingest-dir!
@@ -133,8 +147,9 @@
   docstring) under archive-table, keyed by the package name. A template
   with Clojure logic also has its clause installed.
 
-  Returns {:name :namespaces :logic-files :clause}, :clause being the root
-  type a clause was installed for, or nil."
+  Returns {:name :namespaces :logic-files :clause :lifecycle}, :clause and
+  :lifecycle being the root type a clause or lifecycle was installed for, or
+  nil."
   [node dir]
   (let [dir       (io/file dir)
         model-dir (io/file dir "model")
@@ -165,7 +180,8 @@
       {:name        id
        :namespaces  (:archive/namespaces record)
        :logic-files (mapv :file (:archive/logic record []))
-       :clause      (install-clause! node dir (:archive/namespaces record) pkg)})))
+       :clause      (install-clause! node dir (:archive/namespaces record) pkg)
+       :lifecycle   (install-lifecycle! node dir (:archive/namespaces record) pkg)})))
 
 (defn by-namespace
   "The archive record whose :archive/namespaces includes `ns`, or nil.

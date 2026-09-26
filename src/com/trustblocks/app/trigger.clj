@@ -104,6 +104,13 @@
    :state-conflict        409
    :no-clause             422
    :clause-refused        422
+   ;; The template's lifecycle declined. A certified event cannot come
+   ;; through this endpoint at all: only host code that has verified a
+   ;; certification can pass one, so it is 403, not something to fix and
+   ;; resend here.
+   :no-transition          422
+   :too-early              422
+   :certification-required 403
    :runtime-unavailable   501
    :invalid-clause-output 500})
 
