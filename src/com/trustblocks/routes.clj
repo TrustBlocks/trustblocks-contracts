@@ -23,6 +23,10 @@
 (defpath contract-model-concerto "/contracts/:id/model/concerto")
 (defpath contract-trigger "/contracts/:id/trigger")
 (defpath contract-certify "/contracts/:id/certify")
+(defpath templates "/templates")
+(defpath template-text "/templates/:name/text")
+(defpath template-model "/templates/:name/model")
+(defpath template-code "/templates/:name/code")
 (defpath matters "/matters")
 (defpath matter "/matters/:id")
 (defpath stored-document "/documents/:id")
@@ -37,6 +41,7 @@
       first))
 
 (defn matter-id [ctx] (path-segment ctx #"^/matters/"))
+(defn template-name [ctx] (path-segment ctx #"^/templates/"))
 (defn stored-document-id [ctx] (path-segment ctx #"^/documents/"))
 
 (defn contract-id

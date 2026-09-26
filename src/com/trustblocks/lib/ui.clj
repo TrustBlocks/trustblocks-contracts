@@ -22,12 +22,12 @@
 (def ^:private workspace-nav
   [[:contracts routes/contracts "Contracts"]
    [:matters routes/matters "Matters"]
-   [:clauses routes/clauses "Clause Listing"]
+   [:templates routes/templates "Templates"]
    [:authorizations routes/authorizations "Signature Authorizations"]])
 
 (defn workspace-header
   "The shared product header for signed-in operational pages. `active` is
-  one of :contracts, :matters, :clauses, or :authorizations; keeping the navigation
+  one of :contracts, :matters, :templates, :clauses, or :authorizations; keeping the navigation
   here rather than repeating it in each handler is what makes those three
   views feel like one application rather than unrelated demo pages."
   [active]

@@ -11,10 +11,11 @@
   certification listed is success; a redirect back with ?certify-error=
   is a refusal, read off the query string by the same page.
 
-  Scoped to exactly the vote-then-minutes case this project was built
-  around, not a general authority picker: required-authority is always
-  CERTIFY_MINUTES here. A second act needing a different authority is a
-  second literal, not a redesign, once one actually exists.
+  The authority an officeholder needs is the contract's to say, not this
+  handler's: its template declares it (package.json
+  trustblocks.attestation.authority -- CERTIFY_MINUTES for the manager
+  employment contract), and a contract whose template declares none
+  accepts no attestations here.
 
   certify! itself now runs as an execute/trigger! call against this
   contract (see com.trustblocks.xtdb.certification's own docstring), so
@@ -27,12 +28,19 @@
             [com.trustblocks.app.auth :as auth]
             [com.trustblocks.lib.middleware :as mid]
             [com.trustblocks.routes :as routes]
+            [com.trustblocks.template.archive :as archive]
             [com.trustblocks.xtdb.certification :as cert]
-            [com.trustblocks.xtdb.execute :as execute]))
+            [com.trustblocks.xtdb.execute :as execute]
+            [com.trustblocks.xtdb.store :as store]))
 
-(def ^:private required-authority
-  "The one authority this form ever asks for -- see the ns docstring."
-  "CERTIFY_MINUTES")
+(defn required-authority
+  "The authority `contract-id`'s own template requires of an officeholder
+  attesting to it, or nil when it accepts no attestations."
+  [node contract-id]
+  (some->> (store/get-instance node contract-id)
+           (#(get % "$class"))
+           (archive/for-class node)
+           :archive/attestation-authority))
 
 (def ^:private no-natural-expiry
   "An Attestation records that something happened; unlike an
@@ -85,14 +93,16 @@
         document-hash (form-value ctx "documentHash")
         valid-from-raw (form-value ctx "validFrom")
         evidence (form-value ctx "evidence")]
-    (if-let [problem (envelope-problem {:statement statement :document-hash document-hash
-                                        :valid-from valid-from-raw})]
+    (if-let [problem (or (envelope-problem {:statement statement :document-hash document-hash
+                                            :valid-from valid-from-raw})
+                         (when-not (required-authority node id)
+                           "This contract's template accepts no attestations."))]
       (back-to-contract id problem)
       (let [valid-from (execute/->instant valid-from-raw)
             email      (auth/user-email ctx (:uid session))]
         (try
           (cert/certify! node {:email email :statement statement :document-hash document-hash
-                               :contract-id id :required-authority required-authority
+                               :contract-id id :required-authority (required-authority node id)
                                :valid-from valid-from :valid-until (.plus ^java.time.Instant valid-from no-natural-expiry)
                                :evidence evidence})
           (back-to-contract id)
