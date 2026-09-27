@@ -24,6 +24,7 @@
   (:require [cheshire.core :as json]
             [clojure.string :as str]
             [com.trustblocks.concerto.metamodel :as mm]
+            [com.trustblocks.app.contracts :as contracts]
             [com.trustblocks.lib.code :as code]
             [com.trustblocks.lib.middleware :as mid]
             [com.trustblocks.lifecycle :as lifecycle]
@@ -31,6 +32,7 @@
             [com.trustblocks.routes :as routes]
             [com.trustblocks.template.archive :as archive]
             [com.trustblocks.template.render :as render]
+            [com.trustblocks.template.word :as word]
             [com.trustblocks.xtdb.execute :as execute]
             [com.trustblocks.xtdb.store :as store]))
 
@@ -139,6 +141,10 @@
     (fn [_ {:archive/keys [grammar sample] :as template}]
       (shell template :text
              [:div {:class ["space-y-6"]}
+              [:div {:class ["flex justify-end"]}
+               [:a {:href (routes/template-blank-docx (:xt/id template))
+                    :class ["rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:border-blue-400 hover:text-blue-700"]}
+                "Blank form (Word)"]]
               [:section {:class section}
                [:h2 {:class ["mb-1 text-lg font-semibold text-slate-950"]} "Drafted from its sample"]
                [:p {:class ["mb-5 text-sm text-slate-500"]}
@@ -360,10 +366,23 @@
                        "Accord TypeScript logic, stored as ingested. Nothing runs it yet."]
                       (listing source #{})])])])))))
 
+(defn blank-docx
+  "The template's blank form -- every blank left blank -- as a Word document,
+  to send out to be filled in."
+  [{:keys [biff.xtdb/node] :as ctx}]
+  (if-let [{:keys [xt/id] :archive/keys [grammar sample]} (archive/by-name node (routes/template-name ctx))]
+    (if-not (and grammar sample)
+      (ui/on-error {:status 404})
+      (contracts/docx-response
+       (str id "-blank.docx")
+       #(word/docx grammar (word/blank (store/registry-from-xtdb node) (json/parse-string sample)))))
+    (ui/on-error {:status 404})))
+
 (def module
   {:biff.ring/routes
    [["" {:middleware [mid/wrap-signed-in]}
      [(routes/templates) {:get list-page}]
      [(routes/template-text) {:get text-page}]
      [(routes/template-model) {:get model-page}]
-     [(routes/template-code) {:get code-page}]]]})
+     [(routes/template-code) {:get code-page}]
+     [(routes/template-blank-docx) {:get blank-docx}]]]})
