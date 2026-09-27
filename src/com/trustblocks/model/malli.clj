@@ -21,7 +21,8 @@
   either from and no JSON Schema to give them. This namespace supplies
   both, as properties on the same schemas, and uses them only here:
   validation everywhere else is unchanged."
-  (:require [clojure.test.check.generators :as gen]
+  (:require [clojure.string :as str]
+            [clojure.test.check.generators :as gen]
             [clojure.walk :as walk]
             [com.trustblocks.concerto.malli :as cm]
             [malli.core :as m]
@@ -106,7 +107,49 @@
                     %)
                  form))
 
+(defn- named-root
+  "malli.dot draws a registry of named types when the root names one of
+  them -- [:schema {:registry ...} \"Root\"], as its own examples do.
+  concerto-clj ends in [:ref \"Root\"], which malli.dot takes for one
+  anonymous type and draws as a single box holding the whole schema."
+  [fqn form]
+  (cond
+    (and (vector? form) (= :schema (first form)) (vector? (last form)) (= :ref (first (last form))))
+    (conj (pop form) (second (last form)))
+
+    ;; A model with nothing nested is a bare :map; give it a registry of one,
+    ;; so its box is named for its type too.
+    (and (vector? form) (= :map (first form)))
+    [:schema {:registry {fqn form}} fqn]
+
+    :else form))
+
+(defn- short-names
+  "The diagram's labels: each type by its own name (PayItemLine, not its
+  namespace), without the $class and $identifier entries every Concerto
+  object carries -- bookkeeping, not the model -- and a long enum
+  abbreviated."
+  [form]
+  (let [names (set (keys (get-in form [1 :registry])))
+        short #(subs % (inc (str/last-index-of % ".")))]
+    (walk/postwalk
+     (fn [x]
+       (cond
+         (and (string? x) (names x)) (short x)
+
+         (and (vector? x) (= :map (first x)))
+         (into [] (remove #(and (vector? %) (#{:$class :$identifier} (first %)))) x)
+
+         ;; A long enum -- the 50 USStates -- as its first few and a count,
+         ;; so one line does not set the width of the whole box.
+         (and (vector? x) (= :enum (first x)) (< 7 (count (rest x))))
+         (let [[props values] (if (map? (second x)) [[(second x)] (drop 2 x)] [[] (rest x)])]
+           (into [:enum] (concat props (take 4 values) [(str "… " (- (count values) 4) " more")])))
+
+         :else x))
+     form)))
+
 (defn dot
   "The model's types and their references, as Graphviz DOT, by Malli."
   [reg fqn]
-  (md/transform (plain-types (m/form (cm/->schema reg fqn)))))
+  (md/transform (short-names (named-root fqn (plain-types (m/form (cm/->schema reg fqn)))))))

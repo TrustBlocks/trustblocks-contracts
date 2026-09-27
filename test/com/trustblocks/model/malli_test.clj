@@ -42,7 +42,17 @@
           (testing "JSON Schema and DOT"
             (is (map? (model.malli/json-schema schema)))
             (is (str/starts-with? (model.malli/dot reg fqn) "digraph"))
-            (is (str/includes? (model.malli/dot reg fqn) fqn))))))))
+            (is (str/includes? (model.malli/dot reg fqn) (subs fqn (inc (str/last-index-of fqn "."))))))))
+      (testing "the diagram draws each type as its own box, linked to the types it refers to"
+        (let [d (model.malli/dot reg "com.trustblocks.municipal.construction.payapplication@1.0.0.ContractorPayRequest")]
+          (is (str/includes? d "\"PayItemLine\" ["))
+          (is (str/includes? d "\"ContractorPayRequest\" -> \"PayItemLine\""))
+          (is (not (str/includes? d ":registry")))
+          (is (not (str/includes? d ":$class")))))
+      (testing "a long enum is abbreviated, not drawn in full"
+        (let [d (model.malli/dot reg "com.trustblocks.municipal.construction@1.0.0.StreetResurfacingContract")]
+          (is (str/includes? d "… 46 more"))
+          (is (not (str/includes? d "\"WY\""))))))))
 
 (deftest a-contract-that-does-not-conform-is-told-why
   (with-open [node (xt.node/start-node)]
