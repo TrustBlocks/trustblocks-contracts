@@ -15,11 +15,15 @@
                   approval, the Completion Date -- shown, never acted on
                   (com.trustblocks.model.deadlines)
     :note         a note, at the day it is about (com.trustblocks.xtdb.note)
+    :advisory     an AI agent's signed advice on a document, under its
+                  designation (com.trustblocks.xtdb.advisory) -- advice,
+                  never a determination
 
   When the contract anchors a matter (com.trustblocks.xtdb.matter), its
   documents' events and deadlines are on its timeline too -- STR-27's pay
   requests on STR-27 -- each marked with the document it belongs to."
   (:require [clojure.string :as str]
+            [com.trustblocks.xtdb.advisory :as advisory]
             [com.trustblocks.model.deadlines :as deadlines]
             [com.trustblocks.model.graph :as model.graph]
             [com.trustblocks.xtdb.certification :as cert]
@@ -92,6 +96,16 @@
   (for [{:keys [author text about recorded]} (note/for-contract node contract)]
     {:at about :kind :note :title text :who (who node {:email author}) :recorded recorded}))
 
+(defn- advisories [node id]
+  (for [a (advisory/for-document node id)]
+    {:at       (get a "valid-from")
+     :kind     :advisory
+     :document (get a "contractId")
+     :title    (get a "text")
+     :who      (str (:identity/name (identity/by-did node (get a "issuer"))) " (AI agent)")
+     :detail   (str "Advice, not a determination -- designated to advise by "
+                    (who node {:did (get-in a ["evidence" "issuer"])}))}))
+
 (defn matter-of-terms
   "The matter `id` anchors, or nil."
   [node id]
@@ -108,7 +122,8 @@
                  (when matter-id (designations node matter-id))
                  (contract-dates reg instance)
                  (deadline-items node reg id now)
-                 (notes node id))
+                 (notes node id)
+                 (advisories node id))
          (sort-by :at)
          vec)))
 
