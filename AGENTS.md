@@ -424,6 +424,11 @@ new machine):
   via `JAVA_HOME` (default `/opt/homebrew/opt/openjdk@21/...`, override with
   `TRUSTBLOCKS_JAVA_HOME`). **Always invoke `bin/clj`, never bare `clj`** —
   a bare `clj` uses the system JDK and XTDB will fail to start.
+- Pandoc on `PATH` (`brew install pandoc`) for Word export only
+  (`com.trustblocks.template.word`: a contract, or a template's blank form,
+  as .docx, styled by `resources/word/reference.docx`). Without it those two
+  downloads answer 501 and nothing else is affected;
+  `test/com/trustblocks/template/word_test.clj` fails, not skips.
 - **Node is not needed to load models.** `store/put-model!` and
   `load-registry` parse `.cto` with `concerto-clj`'s instaparse port of Accord's
   grammar (`store/default-parser` → `:clojure`), in-process, roughly 100×
