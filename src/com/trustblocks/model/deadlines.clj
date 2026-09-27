@@ -40,6 +40,7 @@
     (vec
      (for [{:strs [name description fromField fromState days daysField source metBy]}
            (get declared "deadlines")
+
            :let [data    (if (= "TERMS" source) @terms instance)
                  start   (if fromField
                            (instant (get data fromField))

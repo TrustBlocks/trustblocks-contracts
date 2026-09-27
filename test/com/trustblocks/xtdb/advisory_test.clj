@@ -104,6 +104,6 @@
         (is (nil? (cert/authority-for node (:xt/id agent) "CERTIFY_PAY_APPLICATIONS" at :matter demo/matter-id)))
         (is (= :no-such-officeholder
                (refusal #(advance/advance! node {:email nil :document "str-27-pay-3" :credential "Attestation"
-                                                  :event {"$class" "com.trustblocks.municipal.construction.payapplication@1.0.0.InspectionCertified"
-                                                          "approvedPayItems" ["3.1"]}
-                                                  :at at :statement "x"}))))))))
+                                                 :event {"$class" "com.trustblocks.municipal.construction.payapplication@1.0.0.InspectionCertified"
+                                                         "approvedPayItems" ["3.1"]}
+                                                 :at at :statement "x"}))))))))
