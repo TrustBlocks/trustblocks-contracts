@@ -67,4 +67,6 @@
       (is (str/includes? authorizations-html "Pamela Mills"))
       (is (str/includes? authorizations-html "pmills@chinagrovenc.gov"))
       (is (str/includes? authorizations-html "Certify minutes"))
-      (is (str/includes? document-html "Export to Word — Coming soon")))))
+      ;; A contract with no template text has nothing to export.
+      (is (str/includes? document-html "No contract template text is on file"))
+      (is (not (str/includes? document-html "Export to Word"))))))
