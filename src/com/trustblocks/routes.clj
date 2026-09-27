@@ -24,6 +24,7 @@
 (defpath contract-model-malli "/contracts/:id/model/malli")
 (defpath contract-trigger "/contracts/:id/trigger")
 (defpath contract-certify "/contracts/:id/certify")
+(defpath contract-notes "/contracts/:id/notes")
 (defpath templates "/templates")
 (defpath template-text "/templates/:name/text")
 (defpath template-model "/templates/:name/model")

@@ -159,7 +159,7 @@
           :lifecycle/json
           json/parse-string))
 
-(defn- state-entered-at
+(defn state-entered-at
   "When the state in force at `at` was written -- the time the document
   entered its current status, which a timed event counts from."
   [node contract-id at]
