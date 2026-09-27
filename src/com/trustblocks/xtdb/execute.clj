@@ -303,6 +303,24 @@
                "WHERE _id = ?)")
      [contract-id]]))
 
+(def ^:private max-index-waits
+  "How many times trigger! waits for XTDB to finish indexing before it gives
+  up -- see unindexed?. Each wait is a millisecond longer than the last, so
+  this is well under a quarter of a second in all."
+  20)
+
+(defn- unindexed?
+  "XTDB 2.1's :xtdb/unindexed-tx: a query asked to read as of a transaction
+  the node has not finished indexing -- \"system-time ... is after the latest
+  completed tx\". Seen when several triggers race on one contract: straight
+  after a writer's transaction is aborted by assert-state-unchanged, the
+  next read can be handed that transaction's time as its basis before it
+  is indexed. Transient -- the same read succeeds a moment later -- and
+  nothing has been written when it happens, so trigger! waits and reads
+  again rather than failing the request."
+  [e]
+  (= :xtdb/unindexed-tx (:xtdb.error/code (ex-data e))))
+
 (def ^:private max-attempts
   "How many times trigger! re-runs a clause whose state changed underneath it
   before giving up. Each retry means another writer committed in between, so
@@ -546,15 +564,26 @@
                                            reg (get request "$class") errs)})))
 
     (let [at (->instant now)]
-      (loop [attempt 1]
-        (let [outcome (run-and-record! node reg ctx contract-id contract src runtime lc
-                                       request now at
-                                       {:request-id request-id :by by :document document
-                                        :certification certification})]
+      (loop [attempt 1, waits 0]
+        (let [outcome (try
+                        (run-and-record! node reg ctx contract-id contract src runtime lc
+                                         request now at
+                                         {:request-id request-id :by by :document document
+                                          :certification certification})
+                        (catch Exception e
+                          (if (and (unindexed? e) (< waits max-index-waits))
+                            ::unindexed
+                            (throw e))))]
           (cond
+            ;; Nothing was written; read again once XTDB has caught up.
+            ;; Not an attempt: no other writer won anything.
+            (= ::unindexed outcome)
+            (do (Thread/sleep (inc waits))
+                (recur attempt (inc waits)))
+
             (not= ::stale outcome) outcome
 
-            (< attempt max-attempts) (recur (inc attempt))
+            (< attempt max-attempts) (recur (inc attempt) waits)
 
             :else
             (throw (ex-info "The contract's state kept changing while this request ran"

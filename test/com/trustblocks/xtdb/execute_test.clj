@@ -259,6 +259,10 @@
   ;; counted; the rest are refused, never silently lost -- as out of order,
   ;; or, when a trigger loses the optimistic race max-attempts times running
   ;; (eight writers on one contract can do that), as :state-conflict.
+  ;;
+  ;; It also exercises XTDB 2.1's :xtdb/unindexed-tx, which failed this test
+  ;; about one run in several before trigger! learned to wait it out -- see
+  ;; execute/unindexed? and dev/xtdb_unindexed_tx_repro.clj.
   (with-open [node (xt.node/start-node)]
     (populate! node ["snow-i"])
     (let [attempts (->> (range 8)
