@@ -113,6 +113,7 @@ dev/                       runnable scripts; on the classpath for both direct ex
                              exposes approve!
   snow_removal_demo.clj        the synthetic snow-plowing contract + three visit triggers
   street_resurfacing_matter_demo.clj  the STR-27 matter: illustrative award, 3 pay requests through their lifecycle, signed record
+  xtdb_unindexed_tx_repro.clj  XTDB 2.1 on its own: concurrent ASSERT-guarded writes make reads throw :xtdb/unindexed-tx (upstream report)
   street_resurfacing_demo.clj  loads STR-27 (street-resurfacing package: contract, plus the pay-application model) as its bid package as issued
   certification_demo.clj       provisions Town+Clerk+OfficeGrant, certifies vote then minutes;
                              depends on manager_employment_demo.clj (needs a real, approved contract to attest to)
@@ -423,6 +424,11 @@ new machine):
   via `JAVA_HOME` (default `/opt/homebrew/opt/openjdk@21/...`, override with
   `TRUSTBLOCKS_JAVA_HOME`). **Always invoke `bin/clj`, never bare `clj`** —
   a bare `clj` uses the system JDK and XTDB will fail to start.
+- Pandoc on `PATH` (`brew install pandoc`) for Word export only
+  (`com.trustblocks.template.word`: a contract, or a template's blank form,
+  as .docx, styled by `resources/word/reference.docx`). Without it those two
+  downloads answer 501 and nothing else is affected;
+  `test/com/trustblocks/template/word_test.clj` fails, not skips.
 - **Node is not needed to load models.** `store/put-model!` and
   `load-registry` parse `.cto` with `concerto-clj`'s instaparse port of Accord's
   grammar (`store/default-parser` → `:clojure`), in-process, roughly 100×

@@ -28,6 +28,7 @@
             [com.trustblocks.routes :as routes]
             [com.trustblocks.template.archive :as archive]
             [com.trustblocks.template.render :as render]
+            [com.trustblocks.template.word :as word]
             [com.trustblocks.xtdb.certification :as cert]
             [com.trustblocks.xtdb.execute :as execute]
             [com.trustblocks.xtdb.identity :as identity]
@@ -728,15 +729,39 @@
             [:a {:href (routes/contract id) :class ["text-sm font-medium text-blue-700 hover:underline"]}
              (str "← " id)]
             [:h1 {:class ["mt-2 text-3xl font-semibold tracking-tight text-slate-950"]} "Contract Document"]]
-           [:button {:type "button" :disabled true
-                     :title "Word export is planned but not implemented yet"
-                     :class ["cursor-not-allowed rounded-md border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-400"]}
-            "Export to Word — Coming soon"]]
+           (when grammar
+             [:a {:href (routes/contract-document-docx id)
+                  :class ["rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:border-blue-400 hover:text-blue-700"]}
+              "Export to Word"])]
           (if grammar
             (into [:article {:class ["rounded-xl border border-slate-200 bg-white p-7 shadow-sm"]}]
                   (render/render grammar instance))
             [:div {:class ["rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500"]}
              "No contract template text is on file for this model."])])))))
+
+(defn docx-response
+  "A .docx download, or the reason it could not be made."
+  [filename make]
+  (try
+    {:status  200
+     :headers {"content-type" "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+               "content-disposition" (str "attachment; filename=\"" filename "\"")}
+     :body    (java.io.ByteArrayInputStream. (make))}
+    (catch clojure.lang.ExceptionInfo e
+      (if (#{:pandoc-unavailable :pandoc-failed} (:trustblocks/error (ex-data e)))
+        {:status 501 :headers {"content-type" "text/plain; charset=utf-8"} :body (ex-message e)}
+        (throw e)))))
+
+(defn document-docx
+  "The contract as drafted from its data, as a Word document."
+  [{:keys [biff.xtdb/node] :as ctx}]
+  (let [id       (routes/contract-id ctx)
+        reg      (store/registry-from-xtdb node)
+        instance (store/get-instance node id :reg reg)
+        grammar  (some->> (get instance "$class") (archive/for-class node) :archive/grammar)]
+    (if-not (and instance grammar)
+      (ui/on-error {:status 404})
+      (docx-response (str id ".docx") #(word/docx grammar instance)))))
 
 (def module
   {:biff.ring/routes
@@ -746,6 +771,7 @@
      [(routes/contract) {:get show-page}]
      [(routes/contract-notes) {:post add-note}]
      [(routes/contract-document) {:get document-page}]
+     [(routes/contract-document-docx) {:get document-docx}]
      [(routes/contract-model) {:get model-page}]
      [(routes/contract-model-concerto) {:get model-concerto-page}]
      [(routes/contract-model-malli) {:get model-malli-page}]]]})
