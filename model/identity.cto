@@ -37,6 +37,9 @@ enum Authority {
   o CERTIFY_PAY_APPLICATIONS
   o APPROVE_PAYMENTS
   o CERTIFY_PAYMENTS
+  // Advisory only: to sign an Advisory on a matter's documents. The one
+  // authority an AI agent can be designated -- see Advisory.
+  o ADVISE
 }
 
 /**
@@ -94,6 +97,28 @@ concept Designation {
   @description("The one matter the designation covers")
   o String matterId
   o Authority[] authority
+}
+
+/**
+ * An agent's advice on a document of a matter -- a summary, an anomaly it
+ * noticed, a question for the officeholder who decides. Signed by the
+ * agent's own DID, under a Designation for the matter carrying only
+ * ADVISE, which is its evidence.
+ *
+ * Advice, never a determination: an Advisory moves nothing, certifies
+ * nothing, and no lifecycle step accepts one. Whether the deadline was
+ * missed or the figures agree is the contract's code; what the Town does
+ * about it is an officeholder's decision.
+ */
+concept Advisory {
+  o String id
+  o String matterId
+  @description("The document of the matter it concerns")
+  o String contractId
+  @description("The stored file it read, when it read one")
+  o String documentHash optional
+  o String text
+  o DateTime certifiedAt
 }
 
 /**

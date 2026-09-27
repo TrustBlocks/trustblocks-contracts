@@ -55,6 +55,10 @@
 (def attestation-request-class "com.trustblocks.attestation@1.0.0.AttestationRequest")
 (def designation-class "com.trustblocks.identity@1.0.0.Designation")
 
+(def advisory-authorities
+  "The only authority an AI agent can be designated: to advise."
+  #{"ADVISE"})
+
 (defn grant-office!
   "The Town grants `officeholder-did` an office and a set of authorities,
   valid from `valid-from` until `valid-until`. Returns the signed VC."
@@ -62,6 +66,9 @@
   (let [town (or (identity/by-did node town-did)
                  (throw (ex-info "No such town"
                                  {:trustblocks/error :no-such-town :did town-did})))]
+    (when (some-> (identity/by-did node officeholder-did) identity/agent?)
+      (throw (ex-info "An AI agent holds no office; it acts only by designation, and only to advise"
+                      {:trustblocks/error :agent-cannot-hold-office :did officeholder-did})))
     (credential/issue!
      node (identity/keypair town)
      {:issuer town-did :subject officeholder-did
@@ -133,7 +140,9 @@
 
   Refused unless the matter is open (:no-such-matter), the designee has an
   identity, and the designator holds every authority delegated, at
-  `valid-from`, through their own OfficeGrant (:missing-authority)."
+  `valid-from`, through their own OfficeGrant (:missing-authority). An AI
+  agent can be designated ADVISE and nothing else
+  (:agent-authority-not-advisory)."
   [node {:keys [designator-email designee-did name capacity matter authority
                 valid-from valid-until]}]
   (let [designator (or (identity/by-email node designator-email)
@@ -147,6 +156,11 @@
     (when-not (identity/by-did node designee-did)
       (throw (ex-info "No identity for the designee"
                       {:trustblocks/error :no-such-officeholder :did designee-did})))
+    (when (and (identity/agent? (identity/by-did node designee-did))
+               (not-every? advisory-authorities authority))
+      (throw (ex-info "An AI agent can be designated only to advise"
+                      {:trustblocks/error :agent-authority-not-advisory
+                       :did designee-did :delegating authority})))
     (when (or (empty? authority) (some nil? grants))
       (throw (ex-info "A designator can delegate only authority they hold"
                       {:trustblocks/error :missing-authority :did did :delegating authority})))

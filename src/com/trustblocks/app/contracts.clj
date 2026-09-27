@@ -300,7 +300,8 @@
    :designation ["bg-violet-50 text-violet-700 ring-violet-200" "Designation"]
    :date        ["bg-slate-100 text-slate-700 ring-slate-200" "Contract date"]
    :deadline    ["bg-amber-50 text-amber-800 ring-amber-200" "Deadline"]
-   :note        ["bg-yellow-50 text-yellow-800 ring-yellow-300" "Note"]})
+   :note        ["bg-yellow-50 text-yellow-800 ring-yellow-300" "Note"]
+   :advisory    ["bg-fuchsia-50 text-fuchsia-800 ring-fuchsia-200" "AI advisory"]})
 
 (defn- kind-badge [kind]
   (let [[classes label] (kind-styles kind)]

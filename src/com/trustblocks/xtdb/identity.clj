@@ -68,6 +68,36 @@
                 :identity/public-key   public
                 :identity/private-key  private})))
 
+(declare by-did)
+
+(defn provision-agent!
+  "A new AI agent identity: a fresh Ed25519 keypair and a did:key of its
+  own, like an officeholder's -- but no email, so it can never sign in or
+  act through any officeholder path, and `operator`, the DID of the person
+  accountable for it.
+
+  An agent holds no office (certification/grant-office! refuses it); it acts
+  only by Designation, and only with ADVISE (certification/designate!), and
+  what it can do is sign an Advisory (com.trustblocks.xtdb.advisory)."
+  [node {:keys [name operator purpose]}]
+  (when-not (by-did node operator)
+    (throw (ex-info "An agent's operator must be an identity on file"
+                    {:trustblocks/error :no-such-officeholder :did operator})))
+  (let [{:keys [public private]} (interop/generate-keypair)
+        did (key/from-public-key public)]
+    (put! node (cond-> {:xt/id                 did
+                        :identity/kind         :agent
+                        :identity/name         name
+                        :identity/operator     operator
+                        :identity/public-key   public
+                        :identity/private-key  private}
+                 purpose (assoc :identity/purpose purpose)))))
+
+(defn agent?
+  "Whether identity record `identity` is an AI agent's."
+  [identity]
+  (= :agent (:identity/kind identity)))
+
 (defn by-did
   "The identity record for `did`, or nil."
   [node did]
@@ -97,3 +127,11 @@
   [identity]
   {:public  (:identity/public-key identity)
    :private (:identity/private-key identity)})
+
+(defn agents
+  "Every provisioned AI agent, by name, without private keys."
+  [node]
+  (->> (xt/q node (list 'from identity-table [{:identity/kind :agent} (symbol "*")]))
+       (map #(dissoc % :identity/private-key))
+       (sort-by :identity/name)
+       vec))
