@@ -146,15 +146,28 @@
         (execute/put-lifecycle! node root (json/parse-string (slurp f)))
         root))))
 
+(defn- install-deadlines!
+  "Stores the deadlines a template declares (trustblocks.deadlines) for its
+  root type -- see com.trustblocks.model.deadlines. Returns the root type,
+  or nil when it declares none."
+  [node dir namespaces {:keys [trustblocks]}]
+  (when-let [deadlines (:deadlines trustblocks)]
+    (let [f (io/file dir deadlines)]
+      (when-not (.exists f)
+        (throw (ex-info "trustblocks.deadlines names no file in the template"
+                        {:dir (str dir) :deadlines deadlines})))
+      (let [root (template-root node namespaces)]
+        (execute/put-deadlines! node root (json/parse-string (slurp f)))
+        root))))
+
 (defn ingest-dir!
   "Loads every model/*.cto in `dir` into XTDB and records the template's
   package.json metadata plus its logic source (unexecuted -- see ns
   docstring) under archive-table, keyed by the package name. A template
   with Clojure logic also has its clause installed.
 
-  Returns {:name :namespaces :logic-files :clause :lifecycle}, :clause and
-  :lifecycle being the root type a clause or lifecycle was installed for, or
-  nil."
+  Returns {:name :namespaces :logic-files :clause :lifecycle :deadlines},
+  the last three being the root type each was installed for, or nil."
   [node dir]
   (let [dir       (io/file dir)
         model-dir (io/file dir "model")
@@ -196,7 +209,8 @@
        :namespaces  (:archive/namespaces record)
        :logic-files (mapv :file (:archive/logic record []))
        :clause      (install-clause! node dir (:archive/namespaces record) pkg)
-       :lifecycle   (install-lifecycle! node dir (:archive/namespaces record) pkg)})))
+       :lifecycle   (install-lifecycle! node dir (:archive/namespaces record) pkg)
+       :deadlines   (install-deadlines! node dir (:archive/namespaces record) pkg)})))
 
 (declare by-namespace)
 

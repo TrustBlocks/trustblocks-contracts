@@ -67,30 +67,27 @@
 (defn transition
   "The transition `request` takes from `status` (nil before the lifecycle
   has begun), given the verified `certification` -- {:credential
-  \"Receipt\"|\"Attestation\" :authority :did} -- and, for a timed event,
-  `entered-at`, when the document entered `status`, and `at`, the event's
-  time (Instants). Returns the transition; refuses otherwise:
+  \"Receipt\"|\"Attestation\" :authority :did}. Returns the transition;
+  refuses otherwise:
 
   - :no-transition -- the event cannot happen in this state, or is not one
     of this lifecycle's events at all;
-  - :certification-required -- no certification the transition accepts;
-  - :too-early -- a timed event before its days have passed."
-  [lifecycle status request & {:keys [certification entered-at at]}]
+  - :certification-required -- no certification the transition accepts.
+
+  Every transition is certified: nothing moves a document on its own. A
+  date passing is a deadline (com.trustblocks.model.deadlines), shown and
+  never acted on."
+  [lifecycle status request & {:keys [certification]}]
   (let [event (event-name request)
         t     (or (find-transition lifecycle status event) (no-transition! event status))]
-    (if-let [days (get t "afterDays")]
-      (let [due (.plus ^java.time.Instant entered-at (java.time.Duration/ofDays days))]
-        (when (.isBefore ^java.time.Instant at due)
-          (refuse! (str event " cannot happen until " days " days after " status)
-                   {:trustblocks/error :too-early :event event :status status :due (str due)})))
-      (when-not (some #(meets? certification %) (get t "requires"))
-        (refuse! (str event " must be certified by "
-                      (str/join " or " (map #(str (get % "credential") " under " (get % "authority"))
-                                            (get t "requires"))))
-                 {:trustblocks/error :certification-required
-                  :event             event
-                  :requires          (get t "requires")
-                  :given             (dissoc certification :jwt)})))
+    (when-not (some #(meets? certification %) (get t "requires"))
+      (refuse! (str event " must be certified by "
+                    (str/join " or " (map #(str (get % "credential") " under " (get % "authority"))
+                                          (get t "requires"))))
+               {:trustblocks/error :certification-required
+                :event             event
+                :requires          (get t "requires")
+                :given             (dissoc certification :jwt)}))
     t))
 
 (def attestation-request "com.trustblocks.attestation@1.0.0.AttestationRequest")

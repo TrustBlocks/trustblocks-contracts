@@ -76,3 +76,18 @@
         (let [{:keys [status body]} (post! node uid "v-2" "2026-02-20T06:00:00Z")]
           (is (= 409 status))
           (is (= "duplicate-request" (get body "error"))))))))
+
+(deftest a-request-of-an-unknown-type-is-refused-with-400
+  ;; No model declares it -- the caller's mistake, not the platform's.
+  (with-open [node (xt.node/start-node)]
+    (populate! node)
+    (let [uid (auth/create-user! {:biff.xtdb/node node} {:email "ops@example.gov"})
+
+          {:keys [status body]}
+          (trigger/trigger {:biff.xtdb/node node
+                            :uri            (str "/contracts/" contract-id "/trigger")
+                            :session        {:uid uid}
+                            :body-params    {:requestId "r-1" :at "2026-02-20T06:00:00Z"
+                                             :request   {:$class "com.trustblocks.snow@1.0.0.NoSuchRequest"}}})]
+      (is (= 400 status))
+      (is (= "invalid-request" (get (json/parse-string body) "error"))))))

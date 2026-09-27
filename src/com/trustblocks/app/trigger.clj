@@ -109,7 +109,6 @@
    ;; certification can pass one, so it is 403, not something to fix and
    ;; resend here.
    :no-transition          422
-   :too-early              422
    :certification-required 403
    :runtime-unavailable   501
    :invalid-clause-output 500})
