@@ -64,6 +64,7 @@
         lifecycle (when root (execute/get-lifecycle node root))
         pieces    (remove nil? [(when clause "clause")
                                 (when lifecycle "lifecycle")
+                                (when (execute/get-deadlines node root) "deadlines")
                                 (when (lifecycle/attestation-authority lifecycle) "attestation")
                                 (when (seq logic) "TypeScript")])]
     (if (seq pieces) (str/join " · " pieces) "text and model only")))
@@ -230,11 +231,6 @@
          " as of the event's date; what the contract answers is what gets signed "
          "(com.trustblocks.xtdb.certification/certify!).")
 
-    (get transition "afterDays")
-    (str "Time. Once " (get transition "afterDays") " days have passed since the document entered "
-         (str/join " or " (get transition "from"))
-         ", a scheduler raises this event, certified by nobody. (No scheduler runs yet.)")
-
     transition
     (str "The application, when an officeholder signs "
          (str/join " or " (map #(str (if (re-find #"^[AEIOU]" (str (get % "credential"))) "an " "a ")
@@ -297,14 +293,26 @@
       [:thead {:class ["text-xs uppercase tracking-wide text-slate-500"]}
        [:tr [:th {:class ["py-2"]} "From"] [:th "Event"] [:th "To"] [:th "Certified by"]]]
       [:tbody {:class ["divide-y divide-slate-100"]}
-       (for [{:strs [event from to requires afterDays]} transitions]
+       (for [{:strs [event from to requires]} transitions]
          [:tr
           [:td {:class ["py-2"]} (if (seq from) (str/join ", " from) "—")]
           [:td {:class ["font-mono"]} event]
           [:td to]
-          [:td (if afterDays
-                 (str afterDays " days pass")
-                 (str/join " or " (map #(str (get % "credential") ", " (get % "authority")) requires)))]])]]]))
+          [:td (str/join " or " (map #(str (get % "credential") ", " (get % "authority")) requires))]])]]]))
+
+(defn- deadlines-table [{:strs [deadlines]}]
+  [:table {:class ["w-full text-left text-sm"]}
+   [:thead {:class ["text-xs uppercase tracking-wide text-slate-500"]}
+    [:tr [:th {:class ["py-2"]} "Deadline"] [:th "Counted from"] [:th "Days"] [:th "Met by"]]]
+   [:tbody {:class ["divide-y divide-slate-100"]}
+    (for [{:strs [name description fromField fromState days daysField source metBy]} deadlines
+          :let [of (if (= "TERMS" source) " (the terms)" "")]]
+      [:tr {:class ["align-top"]}
+       [:td {:class ["py-2 pr-4"]} [:p {:class ["font-medium text-slate-900"]} name]
+        (when description [:p {:class ["text-xs text-slate-500"]} description])]
+       [:td {:class ["pr-4"]} (if fromField (str fromField of) (str "entering " fromState))]
+       [:td {:class ["pr-4"]} (or (some-> days str) (str daysField of))]
+       [:td (if (seq metBy) (str/join ", " metBy) "--")]])]])
 
 (def ^:private division
   "Where the line falls between the contract's code and the application's."
@@ -327,12 +335,13 @@
             source    (:source clause)
             lifecycle (when root (execute/get-lifecycle node root))
             attestation-authority (lifecycle/attestation-authority lifecycle)
+            deadlines (when root (execute/get-deadlines node root))
             evs       (events reg (own-namespace template) source lifecycle)
             lines     (set (mapcat #(lines-naming source %) evs))]
         (shell template :code
                [:div {:class ["space-y-6"]}
                 division
-                (if-not (or clause lifecycle (seq logic))
+                (if-not (or clause lifecycle deadlines (seq logic))
                   [:section {:class section}
                    [:h2 {:class ["mb-2 text-lg font-semibold text-slate-950"]} "No logic"]
                    [:p {:class ["text-sm text-slate-600"]}
@@ -345,6 +354,12 @@
                        "Each request the contract answers: what it means, who calls it and what the application checks first, and where the contract's code handles it."]
                       [:div {:class ["space-y-3"]}
                        (map #(event-card node reg source lifecycle attestation-authority %) evs)]])
+                   (when deadlines
+                     [:section {:class section}
+                      [:h2 {:class ["mb-1 text-lg font-semibold text-slate-950"]} "Deadlines"]
+                      [:p {:class ["mb-4 text-sm text-slate-500"]}
+                       "Declared by the template (deadlines.json): the dates the contract sets. Shown on the timeline and the dashboard; never acted on -- no step happens, and no notice goes out, because one passes."]
+                      (deadlines-table deadlines)])
                    (when lifecycle
                      [:section {:class section}
                       [:h2 {:class ["mb-1 text-lg font-semibold text-slate-950"]} "Lifecycle"]

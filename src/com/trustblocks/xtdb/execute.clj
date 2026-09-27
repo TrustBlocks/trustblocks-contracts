@@ -78,6 +78,7 @@
 (def state-table     :contract-state)
 (def execution-table :execution)
 (def lifecycle-table :lifecycle)
+(def deadline-table :deadline)
 
 ;; ---------------------------------------------------------------- clauses
 
@@ -158,6 +159,39 @@
   (some-> (first (xt/q node (list 'from lifecycle-table [{:xt/id fqn} (symbol "*")])))
           :lifecycle/json
           json/parse-string))
+
+(defn put-deadlines!
+  "Store the deadlines a template declares for its root type `fqn` -- see
+  com.trustblocks.model.deadlines -- after checking them against
+  com.trustblocks.deadline@1.0.0.Deadlines. Kept as JSON text, as the
+  lifecycle is."
+  [node fqn deadlines & {:keys [reg]}]
+  (let [reg (or reg (store/registry-from-xtdb node))]
+    (when-let [errs (store/validate reg deadlines)]
+      (throw (ex-info "Deadlines failed validation" {:$class fqn :errors errs})))
+    (xt/execute-tx node [[:put-docs deadline-table
+                          {:xt/id fqn :deadlines/json (json/generate-string deadlines)}]])
+    {:$class fqn}))
+
+(defn get-deadlines
+  "The deadlines declared for contract type `fqn`, as Concerto JSON, or nil."
+  [node fqn]
+  (some-> (first (xt/q node (list 'from deadline-table [{:xt/id fqn} (symbol "*")])))
+          :deadlines/json
+          json/parse-string))
+
+(defn status-history
+  "Each status `contract-id` has had, in time order: [{:status :from}], :from
+  the Instant it entered that status. A status repeated by a step that
+  leaves it unchanged counts from when it was first entered."
+  [node contract-id]
+  (->> (xt/q node (list 'from state-table
+                        {:for-valid-time :all-time
+                         :bind           [{:xt/id contract-id} 'status 'xt/valid-from]}))
+       (map (fn [r] {:status (:status r)
+                     :from   (.toInstant ^java.time.ZonedDateTime (:xt/valid-from r))}))
+       (sort-by :from)
+       (reduce (fn [acc r] (if (= (:status (peek acc)) (:status r)) acc (conj acc r))) [])))
 
 (defn state-entered-at
   "When the state in force at `at` was written -- the time the document
@@ -380,10 +414,7 @@
         ;; The template's lifecycle decides whether the event may happen at
         ;; all -- before the clause, which decides what follows from it.
         t       (when lc
-                  (lifecycle/transition lc status request
-                                        :certification certification
-                                        :entered-at (when status (state-entered-at node contract-id at))
-                                        :at at))
+                  (lifecycle/transition lc status request :certification certification))
         result  (let [clause-result (when src
                                       (run-clause runtime ctx src {:data contract :request request
                                                                    :state state :now now}))]
@@ -512,8 +543,8 @@
   event must be one that can happen in the document's current status, and
   `:certification` -- {:credential :authority :did}, supplied only by trusted
   host code that has verified it, never by a caller -- must be one the
-  transition accepts. Refused as :no-transition, :certification-required or
-  :too-early. With a clause, the clause then runs and must leave the status
+  transition accepts. Refused as :no-transition or :certification-required.
+  With a clause, the clause then runs and must leave the status
   the lifecycle names; without one, the transition is the whole answer.
 
   `:by` records who submitted it. `:document` records which document of a
@@ -556,7 +587,19 @@
     (when-let [prior (execution-for-request node contract-id request-id)]
       (duplicate! contract-id request-id prior))
 
-    (when-let [errs (store/validate reg request)]
+    (when-let [errs (try
+                      (store/validate reg request)
+                      (catch clojure.lang.ExceptionInfo e
+                        ;; A request of a type no loaded model declares is the
+                        ;; caller's mistake, like any other invalid request --
+                        ;; not the platform failing.
+                        (if (and (:fqn (ex-data e)) (not (:trustblocks/error (ex-data e))))
+                          (throw (ex-info (str "No model declares the request type "
+                                               (get request "$class"))
+                                          {:trustblocks/error :invalid-request
+                                           :$class            (get request "$class")}
+                                          e))
+                          (throw e))))]
       (throw (ex-info "Request failed validation"
                       {:trustblocks/error :invalid-request
                        :$class            (get request "$class")

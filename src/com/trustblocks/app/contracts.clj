@@ -20,6 +20,7 @@
             [com.trustblocks.lib.code :as code]
             [com.trustblocks.lib.middleware :as mid]
             [com.trustblocks.lib.ui :as ui]
+            [com.trustblocks.model.deadlines :as deadlines]
             [com.trustblocks.model.graph :as model.graph]
             [com.trustblocks.model.malli :as model.malli]
             [com.trustblocks.model.playground :as pg]
@@ -298,7 +299,7 @@
   {:event       ["bg-blue-50 text-blue-700 ring-blue-200" "Event"]
    :designation ["bg-violet-50 text-violet-700 ring-violet-200" "Designation"]
    :date        ["bg-slate-100 text-slate-700 ring-slate-200" "Contract date"]
-   :due         ["bg-amber-50 text-amber-800 ring-amber-200" "Due"]
+   :deadline    ["bg-amber-50 text-amber-800 ring-amber-200" "Deadline"]
    :note        ["bg-yellow-50 text-yellow-800 ring-yellow-300" "Note"]})
 
 (defn- kind-badge [kind]
@@ -334,12 +335,41 @@
       [:span (day (java.time.Instant/ofEpochSecond (* 86400 lo)))]
       [:span (day (java.time.Instant/ofEpochSecond (* 86400 hi)))]]]))
 
-(defn- requirement-text [{:keys [requires days]}]
-  (if days
-    (str "happens by itself " days " days later")
-    (str "needs " (str/join " or " (map #(str (if (re-find #"^[AEIOU]" (str (get % "credential"))) "an " "a ")
-                                              (get % "credential") " under " (get % "authority"))
-                                        requires)))))
+(defn- requirement-text [{:keys [requires]}]
+  (str "needs " (str/join " or " (map #(str (if (re-find #"^[AEIOU]" (str (get % "credential"))) "an " "a ")
+                                            (get % "credential") " under " (get % "authority"))
+                                      requires))))
+
+(def ^:private deadline-status
+  {:passed   ["bg-rose-50 text-rose-700 ring-rose-200" "Passed"]
+   :upcoming ["bg-amber-50 text-amber-800 ring-amber-200" "Upcoming"]
+   :met      ["bg-emerald-50 text-emerald-700 ring-emerald-200" "Met"]})
+
+(defn- deadlines-section
+  "The watch list: each deadline the contract sets, and its documents set,
+  with where it stands. Shown, never acted on -- what follows a passed
+  deadline is the Town's decision."
+  [node reg id today]
+  (let [ds (->> (deadlines/for-contract node reg id today)
+                (filter :due)
+                (sort-by (juxt #(case (:status %) :passed 0 :upcoming 1 :met 2) :due)))]
+    (when (seq ds)
+      [:section {:class ["rounded-xl border border-slate-200 bg-white p-6 shadow-sm"]}
+       [:h2 {:class ["mb-1 text-lg font-semibold text-slate-950"]} "Deadlines"]
+       [:p {:class ["mb-3 text-sm text-slate-500"]}
+        "The dates the contract sets, and where each stands. Nothing happens on its own when one passes: what follows is the Town's decision."]
+       [:ul {:class ["divide-y divide-slate-100"]}
+        (for [{:keys [name description document due status met-at]} ds
+              :let [[classes label] (deadline-status status)]]
+          [:li {:class ["flex items-start gap-4 py-3"]}
+           [:span {:class ["w-28 shrink-0 font-mono text-xs text-slate-500"]} (day due)]
+           [:span {:class ["inline-flex w-24 shrink-0 justify-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset" classes]} label]
+           [:div {:class ["min-w-0"]}
+            [:p {:class ["text-sm text-slate-900"]} name
+             (when (not= document id)
+               [:a {:href (routes/contract document) :class ["ml-2 font-mono text-xs text-blue-700 hover:underline"]} document])]
+            [:p {:class ["text-xs text-slate-500"]}
+             (str/join " -- " (remove nil? [description (when met-at (str "Met " (day met-at)))]))]]])]])))
 
 (defn- where-it-stands [node reg id as-of today]
   (let [state  (execute/current-state node id :reg reg :at as-of)
@@ -404,7 +434,7 @@
     [:section {:class ["rounded-xl border border-slate-200 bg-white p-6 shadow-sm"]}
      [:h2 {:class ["mb-1 text-lg font-semibold text-slate-950"]} "Timeline"]
      [:p {:class ["mb-3 text-sm text-slate-500"]}
-      "Every step, the dates the contract names, what falls due, and notes. Faded: after the slider's day, or a note not yet written by then."]
+      "Every step, the dates the contract names, its deadlines, and notes. Faded: after the slider's day, or a note not yet written by then."]
      (if (empty? items)
        [:p {:class ["text-slate-500"]} "Nothing on record yet."]
        [:ol {:class ["divide-y divide-slate-100"]}
@@ -477,6 +507,7 @@
 
           (as-of-slider id (timeline/items node reg id today) as-of today)
           (where-it-stands node reg id as-of today)
+          (deadlines-section node reg id today)
           [:div {:id "timeline"} (timeline-section node reg id as-of today)]
           (note-form id today)
 

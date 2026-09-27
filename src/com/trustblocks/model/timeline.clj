@@ -11,16 +11,16 @@
     :designation  an officeholder designated to act on the matter
     :date         the dates the contract itself names (Notice to Proceed,
                   the Council's action ...), from its DateTime properties
-    :due          a timed step the lifecycle will take if nothing else
-                  happens first -- a payment overdue 30 days after
-                  approval -- counted from when the document entered its
-                  current status
+    :deadline     a date the contract sets -- a payment due 30 days after
+                  approval, the Completion Date -- shown, never acted on
+                  (com.trustblocks.model.deadlines)
     :note         a note, at the day it is about (com.trustblocks.xtdb.note)
 
   When the contract anchors a matter (com.trustblocks.xtdb.matter), its
-  documents' events and due dates are on its timeline too -- STR-27's pay
+  documents' events and deadlines are on its timeline too -- STR-27's pay
   requests on STR-27 -- each marked with the document it belongs to."
   (:require [clojure.string :as str]
+            [com.trustblocks.model.deadlines :as deadlines]
             [com.trustblocks.model.graph :as model.graph]
             [com.trustblocks.xtdb.certification :as cert]
             [com.trustblocks.xtdb.execute :as execute]
@@ -78,20 +78,15 @@
         :when t]
     {:at t :kind :date :title (words (:name prop)) :detail "A date the contract names"}))
 
-(defn- due [node document now]
-  (let [instance (store/get-instance node document)
-        lc       (some->> (get instance "$class") (execute/get-lifecycle node))
-        status   (get (execute/current-state node document) "status")
-        entered  (when status (execute/state-entered-at node document now))]
-    (for [t (get lc "transitions")
-          :let [days (get t "afterDays")]
-          :when (and days status entered (some #{status} (get t "from")))]
-      {:at       (.plus ^java.time.Instant entered (java.time.Duration/ofDays days))
-       :kind     :due
-       :document document
-       :title    (str (words (get t "event")) " -- if still " status)
-       :detail   (str days " days after it became " status
-                      "; the lifecycle's timed step, raised by the scheduler")})))
+(defn- deadline-items [node reg id now]
+  (for [{:keys [name description document due status]} (deadlines/for-contract node reg id now)
+        :when due]
+    {:at       due
+     :kind     :deadline
+     :document document
+     :status   status
+     :title    (str name (case status :met " -- met" :passed " -- passed" ""))
+     :detail   description}))
 
 (defn- notes [node contract]
   (for [{:keys [author text about recorded]} (note/for-contract node contract)]
@@ -112,14 +107,14 @@
                  (mapcat #(events node %) documents)
                  (when matter-id (designations node matter-id))
                  (contract-dates reg instance)
-                 (mapcat #(due node % now) (cons id documents))
+                 (deadline-items node reg id now)
                  (notes node id))
          (sort-by :at)
          vec)))
 
 (defn next-steps
   "What can happen to `id` next, from its lifecycle and its status as of
-  `at`: each transition with the certification it needs, or its days."
+  `at`: each transition with the certification it needs."
   [node id at]
   (let [instance (store/get-instance node id)
         lc       (some->> (get instance "$class") (execute/get-lifecycle node))
@@ -128,8 +123,7 @@
           :when (if status (some #{status} (get t "from")) (empty? (get t "from")))]
       {:event    (get t "event")
        :to       (get t "to")
-       :requires (get t "requires")
-       :days     (get t "afterDays")})))
+       :requires (get t "requires")})))
 
 (defn accepting?
   "Whether `status` is final in `id`'s lifecycle."

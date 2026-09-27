@@ -72,10 +72,8 @@
       (is (= "INSPECTED" (status node))))
     (trigger! node (event "PayRequestCertified") "2026-04-02T14:00:00Z" (by "Attestation" "CERTIFY_PAY_APPLICATIONS"))
     (trigger! node (event "PaymentApproved") "2026-04-05T14:00:00Z" (by "Attestation" "APPROVE_PAYMENTS"))
-    (testing "overdue only thirty days after approval, and certified by nobody"
-      (is (= :too-early (refusal #(trigger! node (event "PaymentOverdue") "2026-04-20T00:00:00Z"))))
-      (trigger! node (event "PaymentOverdue") "2026-05-05T14:00:00Z")
-      (is (= "OVERDUE" (status node))))
+    (testing "nothing moves on its own: a payment due is a deadline, not an event -- there is no such request"
+      (is (= :invalid-request (refusal #(trigger! node (event "PaymentOverdue") "2026-05-05T14:00:00Z")))))
     (trigger! node (event "PaymentCertified") "2026-05-07T14:00:00Z" (by "Attestation" "CERTIFY_PAYMENTS"))
     (testing "paid is final"
       (is (= "PAID" (status node)))
@@ -85,12 +83,12 @@
       (is (= "INSPECTED" (status node "2026-04-01T20:00:00Z")))
       (is (= "APPROVED" (status node "2026-04-20T00:00:00Z")))
       (let [certs (mapv :certification (execute/history node id))]
-        (is (= 6 (count certs)))
+        (is (= 5 (count certs)))
         (is (= {:credential "Receipt" :authority "RECEIVE_PAY_APPLICATIONS" :did "did:key:z6MkExample"}
                (first certs)))
         (is (= "RECEIVE_INSPECTION_REPORTS" (:authority (second certs))))
-        (testing "and the timed event, certified by nobody"
-          (is (nil? (nth certs 4))))))))
+        (testing "every step certified"
+          (is (every? some? certs)))))))
 
 (deftest a-returned-request-is-finished
   (with-open [node (xt.node/start-node)]

@@ -48,8 +48,7 @@
 
 (def ^:private status-classes
   {"PAID"      ["bg-emerald-50 text-emerald-700 ring-emerald-200"]
-   "RETURNED"  ["bg-slate-100 text-slate-600 ring-slate-200"]
-   "OVERDUE"   ["bg-rose-50 text-rose-700 ring-rose-200"]})
+   "RETURNED"  ["bg-slate-100 text-slate-600 ring-slate-200"]})
 
 (defn- status-badge [status]
   [:span {:class (into ["inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset"]

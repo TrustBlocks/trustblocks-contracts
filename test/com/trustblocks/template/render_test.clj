@@ -91,10 +91,10 @@
     (let [out (html (slurp (io/file (library/dir t) "text" "grammar.tem.md"))
                     (json/parse-string (library/sample t)))]
       (is (not (re-find #"\{\{" out)) t)))
-  (testing "STR-27's 37 pay items, four bullet lists, and two tables"
+  (testing "STR-27's 37 pay items, its SC-16 verifiers, and two tables"
     (let [out (html (slurp (io/file (library/dir "street-resurfacing/contract") "text" "grammar.tem.md"))
                     (json/parse-string (library/sample "street-resurfacing/contract")))]
-      (is (= 50 (count (re-seq #"<li>" out))))
+      (is (= 59 (count (re-seq #"<li>" out))))
       (is (= 2 (count (re-seq #"<table>" out)))))))
 
 (deftest a-pay-request-renders-its-checkboxes

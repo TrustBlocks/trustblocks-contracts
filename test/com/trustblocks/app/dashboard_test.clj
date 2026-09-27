@@ -33,10 +33,19 @@
       (testing "the designation, and the dates the contract names"
         (is (= 1 (:designation kinds)))
         (is (some #(= "Notice to proceed date" (:title %)) items)))
-      (testing "what falls due: pay request 2, approved Sept 3, overdue 30 days later"
-        (is (some #(and (= :due (:kind %)) (= "str-27-pay-2" (:document %))
+      (testing "the deadlines: pay request 2's payment due 30 days after its Sept 3 approval"
+        (is (some #(and (= :deadline (:kind %)) (= "str-27-pay-2" (:document %))
+                        (= "Payment due" (:title %))
                         (= (Instant/parse "2026-10-03T15:00:00Z") (:at %)))
-                  items)))
+                  items))
+        (testing "pay request 1's, met when it was paid"
+          (is (some #(and (= :deadline (:kind %)) (= "str-27-pay-1" (:document %))
+                          (= "Payment due -- met" (:title %)))
+                    items)))
+        (testing "the contract's Completion Date: Notice to Proceed + 270 days"
+          (is (some #(and (= "Completion Date" (:title %))
+                          (= (Instant/parse "2027-03-28T04:00:00Z") (:at %)))
+                    items))))
       (testing "oldest first"
         (is (= (sort-by :at items) items))))))
 
@@ -49,7 +58,10 @@
         (is (str/includes? body ">APPROVED<"))
         (is (str/includes? body "PaymentCertified"))
         (is (str/includes? body "needs an Attestation under CERTIFY_PAYMENTS"))
-        (is (str/includes? body "happens by itself 30 days later"))))
+        (is (not (str/includes? body "PaymentOverdue")))
+        (testing "and the watch list: payment due, upcoming"
+          (is (str/includes? body ">Deadlines<"))
+          (is (re-find #"(?s)Oct 3, 2026.*?Upcoming.*?Payment due" body)))))
     (testing "as of Aug 26: only received"
       (let [body (page node "str-27-pay-2" "2026-08-26")]
         (is (str/includes? body "Where it stood on Aug 26, 2026"))
