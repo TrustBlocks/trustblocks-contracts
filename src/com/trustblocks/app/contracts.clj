@@ -23,12 +23,14 @@
             [com.trustblocks.model.graph :as model.graph]
             [com.trustblocks.model.malli :as model.malli]
             [com.trustblocks.model.playground :as pg]
+            [com.trustblocks.model.timeline :as timeline]
             [com.trustblocks.routes :as routes]
             [com.trustblocks.template.archive :as archive]
             [com.trustblocks.template.render :as render]
             [com.trustblocks.xtdb.certification :as cert]
             [com.trustblocks.xtdb.execute :as execute]
             [com.trustblocks.xtdb.identity :as identity]
+            [com.trustblocks.xtdb.note :as note]
             [com.trustblocks.xtdb.store :as store]
             [dev.onionpancakes.chassis.core :as chassis]))
 
@@ -273,14 +275,188 @@
        [:p {:class ["text-sm text-slate-400"]}
         "This account is not registered as an officeholder, so it cannot certify anything here."])]))
 
-(defn show-page [{:keys [biff.xtdb/node] :as ctx}]
+;; ---------------------------------------------------------------- dashboard
+
+(def ^:private day-formatter
+  (java.time.format.DateTimeFormatter/ofPattern "MMM d, yyyy"))
+
+(defn- day [^java.time.Instant t]
+  (.format ^java.time.format.DateTimeFormatter day-formatter (.atZone t java.time.ZoneOffset/UTC)))
+
+(defn- epoch-day [^java.time.Instant t]
+  (.toEpochDay (.toLocalDate (.atZone t java.time.ZoneOffset/UTC))))
+
+(defn- end-of-day
+  "The last instant of the UTC day `yyyy-mm-dd`, so a slider set to a day
+  shows everything that happened on it."
+  [s]
+  (-> (java.time.LocalDate/parse s) (.plusDays 1) (.atStartOfDay java.time.ZoneOffset/UTC)
+      .toInstant (.minusMillis 1)))
+
+(def ^:private kind-styles
+  {:event       ["bg-blue-50 text-blue-700 ring-blue-200" "Event"]
+   :designation ["bg-violet-50 text-violet-700 ring-violet-200" "Designation"]
+   :date        ["bg-slate-100 text-slate-700 ring-slate-200" "Contract date"]
+   :due         ["bg-amber-50 text-amber-800 ring-amber-200" "Due"]
+   :note        ["bg-yellow-50 text-yellow-800 ring-yellow-300" "Note"]})
+
+(defn- kind-badge [kind]
+  (let [[classes label] (kind-styles kind)]
+    [:span {:class ["inline-flex w-28 shrink-0 justify-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset" classes]}
+     label]))
+
+(defn- status-badge [status]
+  [:span {:class ["inline-flex rounded-full bg-slate-900 px-3 py-1 text-sm font-semibold text-white"]}
+   (or status "Not started")])
+
+(defn- as-of-slider
+  "A day slider over the timeline's span. Moving it reloads the page as of
+  that day (?as-of=yyyy-mm-dd) -- the state, and which events had happened."
+  [id items as-of today]
+  (let [days  (map (comp epoch-day :at) items)
+        lo    (apply min (epoch-day today) days)
+        hi    (apply max (epoch-day today) days)
+        value (epoch-day as-of)]
+    [:form {:method "get" :action (routes/contract id) :id "as-of-form"
+            :class ["rounded-xl border border-slate-200 bg-white p-5 shadow-sm"]}
+     [:div {:class ["flex flex-wrap items-baseline justify-between gap-2"]}
+      [:label {:for "as-of-slider" :class ["text-sm font-semibold text-slate-950"]}
+       "As of " [:span {:id "as-of-label"} (day as-of)]]
+      (when (not= (epoch-day as-of) (epoch-day today))
+        [:a {:href (routes/contract id) :class ["text-sm font-medium text-blue-700 hover:underline"]} "Back to today"])]
+     [:input {:type "range" :id "as-of-slider" :min lo :max hi :value value :step 1
+              :class ["mt-3 w-full accent-blue-700"]
+              :oninput "document.getElementById('as-of-label').textContent = new Date(this.value * 86400000).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC'})"
+              :onchange "document.getElementById('as-of').value = new Date(this.value * 86400000).toISOString().slice(0, 10); this.form.submit()"}]
+     [:input {:type "hidden" :name "as-of" :id "as-of" :value (subs (str as-of) 0 10)}]
+     [:div {:class ["mt-1 flex justify-between text-xs text-slate-500"]}
+      [:span (day (java.time.Instant/ofEpochSecond (* 86400 lo)))]
+      [:span (day (java.time.Instant/ofEpochSecond (* 86400 hi)))]]]))
+
+(defn- requirement-text [{:keys [requires days]}]
+  (if days
+    (str "happens by itself " days " days later")
+    (str "needs " (str/join " or " (map #(str (if (re-find #"^[AEIOU]" (str (get % "credential"))) "an " "a ")
+                                              (get % "credential") " under " (get % "authority"))
+                                        requires)))))
+
+(defn- where-it-stands [node reg id as-of today]
+  (let [state  (execute/current-state node id :reg reg :at as-of)
+        status (get state "status")
+        steps  (timeline/next-steps node id as-of)
+        matter (timeline/matter-of-terms node id)]
+    [:section {:class ["rounded-xl border border-slate-200 bg-white p-6 shadow-sm"]}
+     [:div {:class ["mb-4 flex flex-wrap items-center justify-between gap-3"]}
+      [:h2 {:class ["text-lg font-semibold text-slate-950"]}
+       (if (= (epoch-day as-of) (epoch-day today)) "Where it stands" (str "Where it stood on " (day as-of)))]
+      (when (or status (seq steps)) (status-badge status))]
+     (when matter
+       [:p {:class ["mb-4 text-sm text-slate-600"]}
+        "The terms of matter "
+        [:a {:href (routes/matter (:xt/id matter)) :class ["font-medium text-blue-700 hover:underline"]}
+         (or (:matter/name matter) (:xt/id matter))]
+        " -- its documents' steps are on this timeline."])
+     (cond
+       (seq steps)
+       [:div
+        [:p {:class ["mb-2 text-sm font-semibold text-slate-700"]} "What can happen next"]
+        [:ul {:class ["space-y-1 text-sm text-slate-700"]}
+         (for [{:keys [event to] :as step} steps]
+           [:li [:span {:class ["font-mono"]} event] (str " → " to ", " (requirement-text step))])]]
+
+       (and status (timeline/accepting? node id status))
+       [:p {:class ["text-sm text-slate-600"]} "Its lifecycle is complete."]
+
+       (not status)
+       [:p {:class ["text-sm text-slate-600"]}
+        "Its template declares no lifecycle of its own"
+        (if matter ", so nothing moves it directly; its matter's documents do." ".")]
+
+       :else nil)
+     (when state
+       [:details {:class ["mt-4"]}
+        [:summary {:class ["cursor-pointer text-sm text-slate-600"]} "The recorded state"]
+        [:div {:class ["mt-2"]} (render-instance reg state)]])]))
+
+(defn- timeline-entry [{:keys [at kind title who detail document recorded]} as-of id]
+  (let [later?          (.isAfter ^java.time.Instant at ^java.time.Instant as-of)
+        recorded-later? (and recorded (.isAfter ^java.time.Instant recorded ^java.time.Instant as-of))]
+    [:li {:class (cond-> ["flex items-start gap-4 py-3"] (or later? recorded-later?) (conj "opacity-40"))}
+     [:span {:class ["w-28 shrink-0 font-mono text-xs text-slate-500"]} (day at)]
+     (kind-badge kind)
+     [:div {:class ["min-w-0"]}
+      [:p {:class ["text-sm text-slate-900" (when (= kind :note) "italic")]}
+       title
+       (when (and document (not= document id))
+         [:a {:href (routes/contract document) :class ["ml-2 font-mono text-xs text-blue-700 hover:underline"]} document])]
+      (when (or who detail)
+        [:p {:class ["text-xs text-slate-500"]} (str/join " -- " (remove nil? [who detail]))])
+      (when recorded
+        [:p {:class ["text-xs text-slate-500"]}
+         (str "Recorded " (day recorded)
+              (when (> (epoch-day recorded) (epoch-day at)) " -- after the day it is about")
+              (when (< (epoch-day recorded) (epoch-day at)) " -- before the day it is about"))])]]))
+
+(defn- timeline-section [node reg id as-of today]
+  (let [items  (timeline/items node reg id today)
+        [past future] (split-with #(not (.isAfter ^java.time.Instant (:at %) ^java.time.Instant as-of)) items)]
+    [:section {:class ["rounded-xl border border-slate-200 bg-white p-6 shadow-sm"]}
+     [:h2 {:class ["mb-1 text-lg font-semibold text-slate-950"]} "Timeline"]
+     [:p {:class ["mb-3 text-sm text-slate-500"]}
+      "Every step, the dates the contract names, what falls due, and notes. Faded: after the slider's day, or a note not yet written by then."]
+     (if (empty? items)
+       [:p {:class ["text-slate-500"]} "Nothing on record yet."]
+       [:ol {:class ["divide-y divide-slate-100"]}
+        (map #(timeline-entry % as-of id) past)
+        [:li {:class ["flex items-center gap-3 py-2"]}
+         [:span {:class ["h-px flex-1 bg-blue-600"]}]
+         [:span {:class ["text-xs font-semibold uppercase tracking-wide text-blue-700"]}
+          (if (= (epoch-day as-of) (epoch-day today)) "Today" (str "As of " (day as-of)))]
+         [:span {:class ["h-px flex-1 bg-blue-600"]}]]
+        (map #(timeline-entry % as-of id) future)])]))
+
+(defn- note-form [id today]
+  [:section {:class ["rounded-xl border border-slate-200 bg-white p-6 shadow-sm"]}
+   [:h2 {:class ["mb-1 text-lg font-semibold text-slate-950"]} "Add a note"]
+   [:p {:class ["mb-4 text-sm text-slate-500"]}
+    "Context for the record, not a change to the contract. The day it is about places it on the timeline; the day it was recorded is set by the database and cannot be changed -- so a note shows what was known, and when."]
+   [:form {:method "post" :action (routes/contract-notes id) :class ["space-y-3"]}
+    [:textarea {:name "text" :required true :rows 3
+                :placeholder "e.g. The Contractor appears to be in financial trouble -- two suppliers report unpaid invoices."
+                :class ["w-full rounded-md border border-slate-300 px-3 py-2 text-sm"]}]
+    [:div {:class ["flex flex-wrap items-end gap-4"]}
+     [:label {:class ["text-sm text-slate-600"]} "About the day"
+      [:input {:type "date" :name "about" :value (subs (str today) 0 10)
+               :class ["ml-2 rounded-md border border-slate-300 px-2 py-1 text-sm"]}]]
+     [:button {:type "submit" :class ["rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white"]}
+      "Add note"]]]])
+
+(defn add-note
+  "POST /contracts/:id/notes -- a signed-in user's note on the contract."
+  [{:keys [biff.xtdb/node session] :as ctx}]
+  (let [id    (routes/contract-id ctx)
+        text  (some-> (query-param ctx "text") str/trim)
+        about (some-> (query-param ctx "about") not-empty
+                      (#(-> (java.time.LocalDate/parse %) (.atStartOfDay java.time.ZoneOffset/UTC) .toInstant)))]
+    (when (and (store/get-instance node id) (not (str/blank? text)))
+      (note/add! node {:contract id :author (auth/user-email ctx (:uid session)) :text text :about about}))
+    {:status 303 :headers {"location" (str (routes/contract id) "#timeline")}}))
+
+(defn show-page
+  "The contract dashboard: where it stands as of a day (the slider, ?as-of=),
+  its timeline, notes, its data, and its certifications."
+  [{:keys [biff.xtdb/node] :as ctx}]
   (let [id       (routes/contract-id ctx)
         reg      (store/registry-from-xtdb node)
         instance (store/get-instance node id :reg reg)]
     (if-not instance
       (ui/on-error {:status 404})
       (let [fqn     (get instance "$class")
-            state   (execute/current-state node id :reg reg)
+            today   (java.time.Instant/now)
+            as-of   (or (some-> (query-param ctx "as-of") not-empty
+                                (#(try (end-of-day %) (catch Exception _ nil))))
+                        today)
+            as-of   (if (.isAfter ^java.time.Instant as-of today) today as-of)
             history (execute/history node id)]
         (ui/page
          {:ui/title (str id " — Trustblocks")}
@@ -291,30 +467,30 @@
             "← All contracts"]]
           [:div {:class ["flex flex-col gap-5 border-b border-slate-200 pb-7 lg:flex-row lg:items-end lg:justify-between"]}
            [:div
-            [:p {:class ["text-sm font-semibold uppercase tracking-widest text-blue-700"]} "Contract Record"]
+            [:p {:class ["text-sm font-semibold uppercase tracking-widest text-blue-700"]} "Contract Dashboard"]
             [:h1 {:class ["mt-1 text-3xl font-semibold tracking-tight text-slate-950"]} (type-name fqn)]
             [:p {:class ["mt-2 font-mono text-sm text-slate-500"]} id]
             [:a {:href (routes/contract-model id) :class ["mt-2 inline-block text-sm font-medium text-blue-700 hover:underline"]}
              "Inspect stored model"]]
            (contract-actions node reg instance id)]
 
+          (as-of-slider id (timeline/items node reg id today) as-of today)
+          (where-it-stands node reg id as-of today)
+          [:div {:id "timeline"} (timeline-section node reg id as-of today)]
+          (note-form id today)
+
           [:section {:class ["rounded-xl border border-slate-200 bg-white p-6 shadow-sm"]}
            [:h2 {:class ["mb-2 text-lg font-semibold text-slate-950"]} "Contract Data"]
            (render-instance reg instance)]
 
-          [:section {:class ["rounded-xl border border-slate-200 bg-white p-6 shadow-sm"]}
-           [:h2 {:class ["mb-2 text-lg font-semibold text-slate-950"]} "Current State"]
-           (if state
-             (render-instance reg state)
-             [:p {:class ["text-slate-500"]} "Not yet executed."])]
+          (certifications-section ctx id)
 
-          [:section {:class ["rounded-xl border border-slate-200 bg-white p-6 shadow-sm"]}
-           [:h2 {:class ["mb-3 text-lg font-semibold text-slate-950"]} (str "Execution History (" (count history) ")")]
+          [:details {:class ["rounded-xl border border-slate-200 bg-white p-6 shadow-sm"]}
+           [:summary {:class ["cursor-pointer text-lg font-semibold text-slate-950"]}
+            (str "Execution records (" (count history) ")")]
            (if (empty? history)
-             [:p {:class ["text-slate-500"]} "No executions recorded."]
-             [:div {:class ["space-y-4"]} (map history-entry history)])]
-
-          (certifications-section ctx id)])))))
+             [:p {:class ["mt-3 text-slate-500"]} "No executions recorded."]
+             [:div {:class ["mt-4 space-y-4"]} (map history-entry history)])]])))))
 
 ;; ---------------------------------------------------------------- model
 
@@ -537,6 +713,7 @@
    [["" {:middleware [mid/wrap-signed-in]}
      [(routes/contracts) {:get list-page}]
      [(routes/contract) {:get show-page}]
+     [(routes/contract-notes) {:post add-note}]
      [(routes/contract-document) {:get document-page}]
      [(routes/contract-model) {:get model-page}]
      [(routes/contract-model-concerto) {:get model-concerto-page}]
