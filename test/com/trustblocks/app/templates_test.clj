@@ -18,7 +18,7 @@
 (deftest the-library
   (with-open [node (xt.node/start-node)]
     (doseq [t ["manager-employment-contract" "street-resurfacing/contract"
-               "street-resurfacing/pay-application"]]
+               "street-resurfacing/pay-application" "street-resurfacing/notice-to-proceed"]]
       (archive/ingest-dir! node (library/dir t)))
     (testing "every template, its kind and what code it has"
       (let [list (body (templates/list-page {:biff.xtdb/node node}))]
@@ -51,9 +51,10 @@
         (is (not (str/includes? logic "The trigger endpoint")))
         (is (str/includes? logic "after checking the officeholder holds CERTIFY_MINUTES"))
         (is (str/includes? logic ";; BoardApprovalRequest -- called when the Town Clerk certifies")))
-      (let [logic (page templates/code-page node "/templates/street-resurfacing-contract/code")]
-        (is (str/includes? logic "Completion Date"))
-        (is (str/includes? logic "noticeToProceedDate"))))
+      (testing "the Completion Date is the Notice to Proceed's to declare, not the contract's"
+        (let [logic (page templates/code-page node "/templates/street-resurfacing-notice-to-proceed/code")]
+          (is (str/includes? logic "Completion Date"))
+          (is (str/includes? logic "commencementDate")))))
     (is (= 404 (:status (templates/code-page {:biff.xtdb/node node :uri "/templates/nope/code"}))))))
 
 (deftest the-contract-says-who-may-attest

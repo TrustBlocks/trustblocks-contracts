@@ -9,6 +9,10 @@
                   clause moving it -- with who certified it and how
                   (com.trustblocks.xtdb.execute/history)
     :designation  an officeholder designated to act on the matter
+    :receipt      a document received on the matter that moves no
+                  lifecycle -- an insurance certificate, a W-9 -- with the
+                  role it plays in the package (com.trustblocks.xtdb.receipt);
+                  a receipt that moved a lifecycle is already its :event
     :date         the dates the contract itself names (Notice to Proceed,
                   the Council's action ...), from its DateTime properties
     :deadline     a date the contract sets -- a payment due 30 days after
@@ -31,6 +35,7 @@
             [com.trustblocks.xtdb.identity :as identity]
             [com.trustblocks.xtdb.matter :as matter]
             [com.trustblocks.xtdb.note :as note]
+            [com.trustblocks.xtdb.receipt :as receipt]
             [com.trustblocks.xtdb.store :as store]))
 
 (defn- instant [x]
@@ -74,6 +79,16 @@
      :detail (str (get d "capacity") " -- "
                   (str/join ", " (map #(str/lower-case (words (str/replace % "_" " ")))
                                       (get d "authority"))))}))
+
+(defn- receipts [node matter-id]
+  (for [r (receipt/receipts-for-matter node matter-id)
+        :when (not (get r "contractId"))]
+    {:at     (get r "received-at")
+     :kind   :receipt
+     :title  (str "Received: " (or (get r "description") (get r "documentRole") "a document"))
+     :who    (who node {:did (get r "issuer")})
+     :detail (str "From " (get r "receivedFrom")
+                  (when-let [role (get r "documentRole")] (str " -- " role)))}))
 
 (defn- contract-dates [reg instance]
   (for [prop (model.graph/own-properties reg (get instance "$class"))
@@ -120,6 +135,7 @@
     (->> (concat (events node id)
                  (mapcat #(events node %) documents)
                  (when matter-id (designations node matter-id))
+                 (when matter-id (receipts node matter-id))
                  (contract-dates reg instance)
                  (deadline-items node reg id now)
                  (notes node id)

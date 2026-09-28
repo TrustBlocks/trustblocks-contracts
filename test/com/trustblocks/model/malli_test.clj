@@ -80,5 +80,5 @@
       (is (str/includes? body "viz-standalone.js"))
       (is (str/includes? body "?seed=2"))
       (testing "another seed, another contract"
-        (is (not= (re-find #"(?s)A contract made up.*?</pre>" body)
-                  (re-find #"(?s)A contract made up.*?</pre>" (page 5))))))))
+        (is (not= (re-find #"(?s)A contract made up.*?seed \d+" body)
+                  (re-find #"(?s)A contract made up.*?seed \d+" (page 5))))))))

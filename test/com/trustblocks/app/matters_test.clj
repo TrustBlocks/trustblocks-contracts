@@ -26,11 +26,11 @@
           (is (str/includes? page "Designated Representative of the Director of Public Works"))
           (is (str/includes? page "Under designation by David Ketner, Director of Public Works"))
           (is (str/includes? page "Rebekah Newsome, Finance Director"))
-          (is (= 11 (count (re-seq #"signature verified" page)))))
+          (is (= 16 (count (re-seq #"signature verified" page)))))
         (testing "the list"
-          (is (str/includes? (body (matters/list-page ctx)) "3 documents")))
+          (is (str/includes? (body (matters/list-page ctx)) "6 documents")))
         (testing "a stored file is served, re-hashed; a corrupted one is not"
-          (let [file (:stored-document (first (matter/documents node demo/matter-id)))
+          (let [file (some :stored-document (matter/documents node demo/matter-id))
                 ok   (matters/stored-document (assoc ctx :uri (str "/documents/" file)))]
             (is (= 200 (:status ok)))
             (is (str/starts-with? (body ok) "%PDF-1.4"))

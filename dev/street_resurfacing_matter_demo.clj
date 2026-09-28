@@ -16,7 +16,16 @@
                                                  engineer's certificates, as the
                                                  Director's designated representative
     Town Manager              Franklin Gover     approves and recommends payment
-    Finance Director          Rebekah Newsome    certifies payment made
+    Finance Director          Rebekah Newsome    receives the finance forms and
+                                                 assigns the vendor number;
+                                                 certifies payment made
+
+  At award: the Notice of Award, then the Contractor's finance forms --
+  the insurance certificate, E-Verify affidavit and W-9 received and
+  nothing more, the vendor form received and given a vendor number -- and
+  the Notice to Proceed, from whose Commence Date the Completion Date
+  counts. The bonds and the bid-phase documents are left off the record,
+  so the matter page shows what the package still calls for.
 
   Pay request 1 (July) is paid; 2 (August) is approved and awaiting payment
   -- overdue if not paid within 30 days (Sec. 6); 3 (September) has just
@@ -38,6 +47,7 @@
             [com.trustblocks.xtdb.execute :as execute]
             [com.trustblocks.xtdb.identity :as identity]
             [com.trustblocks.xtdb.matter :as matter]
+            [com.trustblocks.xtdb.receipt :as receipt]
             [com.trustblocks.xtdb.store :as store]
             [xtdb.node :as xt.node])
   (:import [java.math BigDecimal RoundingMode]
@@ -53,6 +63,7 @@
 (def newsome "rnewsome@chinagrovenc.gov")
 
 (def ^:private pay "com.trustblocks.municipal.construction.payapplication@1.0.0.")
+(def ^:private vendor "com.trustblocks.municipal.construction.vendorform@1.0.0.")
 
 (defn- at [s] (Instant/parse s))
 
@@ -67,7 +78,7 @@
    {:email gover :name "Franklin Gover" :office "Town Manager"
     :authority ["APPROVE_PAYMENTS"]}
    {:email newsome :name "Rebekah Newsome" :office "Finance Director"
-    :authority ["CERTIFY_PAYMENTS"]}])
+    :authority ["CERTIFY_PAYMENTS" "RECEIVE_FINANCE_FORMS"]}])
 
 ;; ------------------------------------------------------------------ people
 
@@ -202,7 +213,8 @@
 ;; ------------------------------------------------------------------ the story
 
 (def ^:private statements
-  {"PayRequestCertified" "Quantities and amounts verified (Sec. 6)."
+  {"VendorNumberAssigned" "Vendor number V-10482 assigned."
+   "PayRequestCertified" "Quantities and amounts verified (Sec. 6)."
    "PaymentApproved"     "Approved and payment recommended."
    "PaymentCertified"    "Payment made to the Contractor in the net amount due."})
 
@@ -217,7 +229,7 @@
                                    :at (at when)
                                    :event (or (:event s) (event event-name))
                                    :statement (statements event-name)}
-                                  (select-keys s [:document-hash :received-from :description])))))
+                                  (select-keys s [:document-hash :received-from :description :role])))))
 
 (defn- submit!
   "Pay request `request` received on `received` -- stored as a PDF and an
@@ -242,9 +254,84 @@
                                 :media-type "application/pdf")]
     (step! node id {:email barringer :event-name "InspectionCertified" :credential "Receipt"
                     :event (event "InspectionCertified" "approvedPayItems" approved)
-                    :when when :document-hash (:xt/id stored)
+                    :when when :document-hash (:xt/id stored) :role "inspection-certificate"
                     :received-from "the Town's consulting engineer"
                     :description (str "Engineer's Inspection Certificate, Pay Request No. " n)})))
+
+;; ------------------------------------------------------------------ award
+
+(defn- sample [template & {:as fields}]
+  (merge (json/parse-string (library/sample (str "street-resurfacing/" template))) fields))
+
+(def ^:private notice-of-award
+  (sample "notice-of-award"
+          "noticeId" "str-27-notice-of-award"
+          "councilMeetingDate" "2026-06-16T04:00:00.000Z"
+          "dated" "2026-06-17T04:00:00.000Z"))
+
+(def ^:private notice-to-proceed
+  (sample "notice-to-proceed"
+          "noticeId" "str-27-notice-to-proceed"
+          "commencementDate" "2026-07-01T04:00:00.000Z"
+          "dated" "2026-06-24T04:00:00.000Z"))
+
+(def ^:private vendor-form
+  (sample "vendor-form"
+          "vendorFormId" "str-27-vendor-form-example-paving"
+          "legalName" "Example Paving, LLC"
+          "northCarolinaCorporation" "YES"
+          "federalTaxId" "00-0000000 (illustrative)"
+          "invoicePaymentTerms" "Net 30"))
+
+(def ^:private received-forms
+  "Received and nothing more: [role title filename]."
+  [["certificate-of-insurance" "Certificate of Insurance" "certificate-of-insurance.pdf"]
+   ["e-verify-and-certifications" "E-Verify Affidavit and Certifications (Exhibit B)" "exhibit-b-affidavit.pdf"]
+   ["tax-forms" "IRS Form W-9" "w-9.pdf"]])
+
+(defn- illustrative-pdf [title]
+  (pdf [(str (str/upper-case title) " -- Contract No. STR-27")
+        "ILLUSTRATIVE -- a Trustblocks demonstration document, not a real form."
+        ""
+        "Example Paving, LLC"]))
+
+(defn- issue-notice!
+  "A Town notice: an instance joined to the matter with `role` on its date."
+  [node instance id-key role]
+  (let [id (get instance id-key)]
+    (store/put-instance! node nil instance)
+    (when-not (matter/matter-of node id)
+      (matter/add-document! node matter-id id :role role :at (at (get instance "dated"))))
+    id))
+
+(defn- receive-forms!
+  "The Contractor's finance forms, received by the Finance Director on
+  `when`: the vendor form, received and then given a vendor number on
+  `numbered`, and the rest received and nothing more."
+  [node root when numbered]
+  (let [id     (get vendor-form "vendorFormId")
+        stored (document/store! node root (illustrative-pdf "Vendor Information Form")
+                                :filename "vendor-form.pdf" :media-type "application/pdf")]
+    (store/put-instance! node nil vendor-form)
+    (when-not (matter/matter-of node id)
+      (matter/add-document! node matter-id id :role "vendor-form"
+                            :stored-document (:xt/id stored) :at when))
+    (step! node id {:email newsome :event-name "VendorFormReceived" :credential "Receipt"
+                    :event {"$class" (str vendor "VendorFormReceived")}
+                    :when when :document-hash (:xt/id stored)
+                    :received-from "Example Paving, LLC" :description "Vendor Information Form"})
+    (step! node id {:email newsome :event-name "VendorNumberAssigned" :credential "Attestation"
+                    :event {"$class" (str vendor "VendorNumberAssigned") "vendorNumber" "V-10482"}
+                    :when numbered}))
+  (let [received (set (keep #(get % "documentRole") (receipt/receipts-for-matter node matter-id)))]
+    (doseq [[role title filename] received-forms
+            :when (not (received role))]
+      (receipt/receive! node {:email newsome :matter matter-id
+                              :document-hash (:xt/id (document/store! node root (illustrative-pdf title)
+                                                                      :filename filename
+                                                                      :media-type "application/pdf"))
+                              :received-from "Example Paving, LLC" :description title :role role
+                              :required-authority "RECEIVE_FINANCE_FORMS" :received-at (at when)}))))
 
 (defn load!
   "The whole STR-27 matter, into `node`, storing files under `root`."
@@ -252,6 +339,8 @@
   (println "Ingesting the street-resurfacing package's templates ...")
   (archive/ingest-dir! node (library/dir "street-resurfacing/contract"))
   (archive/ingest-dir! node (library/dir "street-resurfacing/pay-application"))
+  (doseq [t ["notice-of-award" "notice-to-proceed" "vendor-form"]]
+    (archive/ingest-dir! node (library/dir (str "street-resurfacing/" t))))
   (store/put-model! node "model/identity.cto")
   (let [town     (ensure-town! node)
         _        (doseq [o officeholders] (ensure-officeholder! node town o))
@@ -268,6 +357,10 @@
                              :matter matter-id
                              :authority ["RECEIVE_PAY_APPLICATIONS" "RECEIVE_INSPECTION_REPORTS"]
                              :valid-from awarded-at :valid-until grants-until}))
+    (println "Award: the notices and the finance forms ...")
+    (issue-notice! node notice-of-award "noticeId" "notice-of-award")
+    (receive-forms! node root "2026-06-26T15:00:00Z" "2026-06-29T15:00:00Z")
+    (issue-notice! node notice-to-proceed "noticeId" "notice-to-proceed")
     (let [pr1 (pay-request contract 1 "2026-07-01T04:00:00.000Z" "2026-07-24T04:00:00.000Z"
                            {"3.1" [4800.0 4800.0] "5.1" [320.0 320.0]} 0.0)
           pr2 (pay-request contract 2 "2026-07-25T04:00:00.000Z" "2026-08-24T04:00:00.000Z"

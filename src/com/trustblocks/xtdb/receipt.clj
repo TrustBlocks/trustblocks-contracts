@@ -72,8 +72,9 @@
 (defn issue!
   "Sign and record `officeholder`'s Receipt -- no checks; see receive! and
   com.trustblocks.xtdb.advance, which make them first. `evidence` is the
-  credential that authorized it."
-  [node officeholder {:keys [matter document-hash received-from description received-at evidence]}]
+  credential that authorized it; `contract`, the document instance whose
+  lifecycle the receipt moves, when it moves one."
+  [node officeholder {:keys [matter document-hash received-from description role contract received-at evidence]}]
   (let [did (:xt/id officeholder)]
     (credential/issue!
      node (identity/keypair officeholder)
@@ -84,7 +85,9 @@
                                    "matterId"     matter
                                    "receivedFrom" received-from
                                    "certifiedAt"  (str (java.time.Instant/now))}
-                            description (assoc "description" description))
+                            description (assoc "description" description)
+                            role        (assoc "documentRole" role)
+                            contract    (assoc "contractId" contract))
       :valid-from received-at :valid-until open-ended
       :evidence evidence})))
 
@@ -92,7 +95,9 @@
   "The officeholder signed in as `email` certifies that stored document
   `document-hash` was received on matter `matter` from `received-from` at
   `received-at`, under `required-authority` (e.g. RECEIVE_PAY_APPLICATIONS).
-  Returns the signed Receipt VC.
+  `role`, optionally, is the role the document plays in the matter's
+  package manifest (\"certificate-of-insurance\") -- how the matter page
+  finds a stored document the manifest lists. Returns the signed Receipt VC.
 
   A receipt that also moves a document through its lifecycle -- a pay
   request received -- goes through com.trustblocks.xtdb.advance instead,

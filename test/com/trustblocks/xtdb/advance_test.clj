@@ -10,6 +10,7 @@
             [com.trustblocks.xtdb.credential :as credential]
             [com.trustblocks.xtdb.document :as document]
             [com.trustblocks.xtdb.execute :as execute]
+            [com.trustblocks.xtdb.identity :as identity]
             [com.trustblocks.xtdb.matter :as matter]
             [com.trustblocks.xtdb.receipt :as receipt]
             [com.trustblocks.xtdb.store :as store]
@@ -67,13 +68,23 @@
     (testing "the engineer's approvals are the pay request's state"
       (is (= ["3.1" "5.1"] (get (execute/current-state node "str-27-pay-1") "approvedPayItems"))))
     (testing "the matter's record: the designation, a receipt for each file, an attestation for each act"
-      (is (= {cert/designation-class 1 receipt/receipt-class 5 cert/attestation-class 5}
+      (is (= {cert/designation-class 1 receipt/receipt-class 9 cert/attestation-class 6}
              (frequencies (map :concerto/class (credential/for-matter node demo/matter-id))))))
     (testing "the Zoning Administrator's receipts rest on the Director's designation"
       (let [designation (:jwt (first (filter #(= cert/designation-class (:concerto/class %))
                                              (credential/for-matter node demo/matter-id))))]
         (is (every? #(= designation (get-in (interop/jws-claims (get % "jwt")) [:vc "evidence"]))
-                    (receipt/receipts-for-matter node demo/matter-id)))))
+                    (filter #(= (:xt/id (identity/by-email node demo/barringer)) (get % "issuer"))
+                            (receipt/receipts-for-matter node demo/matter-id))))))
+    (testing "the finance forms rest on the Finance Director's own office grant"
+      (is (= 4 (count (filter #(= (:xt/id (identity/by-email node demo/newsome)) (get % "issuer"))
+                              (receipt/receipts-for-matter node demo/matter-id))))))
+    (testing "a receipt names the document's role in the package, and the lifecycle it moved"
+      (let [rs (receipt/receipts-for-matter node demo/matter-id)]
+        (is (= {"pay-application" 3 "inspection-certificate" 2 "vendor-form" 1
+                "certificate-of-insurance" 1 "e-verify-and-certifications" 1 "tax-forms" 1}
+               (frequencies (map #(get % "documentRole") rs))))
+        (is (= 6 (count (filter #(get % "contractId") rs))))))
     (testing "each execution records who certified it, and how"
       (is (= [["Receipt" "RECEIVE_PAY_APPLICATIONS"] ["Receipt" "RECEIVE_INSPECTION_REPORTS"]
               ["Attestation" "CERTIFY_PAY_APPLICATIONS"] ["Attestation" "APPROVE_PAYMENTS"]
