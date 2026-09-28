@@ -102,6 +102,19 @@
                  "--enable-native-access=ALL-UNNAMED"
                  "-Dio.netty.tryReflectionSetAccessible=true"]}
 
+;; Clay notebooks (notebooks/): a guided tour of Trustblocks' Clojure,
+  ;; Malli and XTDB, rendered to HTML with every expression's value beside
+  ;; it. Usage: bin/notebook
+  :notebook
+  {:extra-paths ["notebooks" "dev"]
+   ;; rewrite-clj: dev/clay_reader.clj, standing in for Clay's parcera, whose
+   ;; ANTLR 4.7 grammar cannot load beside XTDB's ANTLR 4.13.
+   :extra-deps  {org.scicloj/clay          {:mvn/version "2.0.23"}
+                 rewrite-clj/rewrite-clj   {:mvn/version "1.1.49"}}
+   :jvm-opts    ["--add-opens=java.base/java.nio=ALL-UNNAMED"
+                 "--enable-native-access=ALL-UNNAMED"
+                 "-Dio.netty.tryReflectionSetAccessible=true"]}
+
   :prod
   {:main-opts ["-m" "com.trustblocks"]
    :jvm-opts  ["--add-opens=java.base/java.nio=ALL-UNNAMED"
