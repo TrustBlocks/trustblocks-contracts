@@ -37,6 +37,10 @@ enum Authority {
   o CERTIFY_PAY_APPLICATIONS
   o APPROVE_PAYMENTS
   o CERTIFY_PAYMENTS
+  // The finance forms a matter's package names -- vendor forms, W-9s,
+  // insurance certificates, E-Verify affidavits -- received by the Finance
+  // Director (trustblocks-templates' packages/street-resurfacing).
+  o RECEIVE_FINANCE_FORMS
   // Advisory only: to sign an Advisory on a matter's documents. The one
   // authority an AI agent can be designated -- see Advisory.
   o ADVISE
@@ -136,5 +140,9 @@ concept Receipt {
   @description("Who the document was received from, as named on it, e.g. \"Example Paving, LLC\"")
   o String receivedFrom
   o String description optional
+  @description("The role the document plays in the matter's package manifest, e.g. \"certificate-of-insurance\"")
+  o String documentRole optional
+  @description("The document instance whose lifecycle this receipt moved -- a pay request received -- when it moved one")
+  o String contractId optional
   o DateTime certifiedAt
 }

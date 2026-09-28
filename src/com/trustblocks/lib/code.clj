@@ -1,7 +1,8 @@
 (ns com.trustblocks.lib.code
   "Source listings: numbered lines, each rendered on its own with its
   whitespace kept exactly -- so a model's indentation survives whatever
-  styles surround it -- and Concerto (.cto) syntax highlighted.
+  styles surround it -- and Concerto (.cto), EDN and JSON syntax
+  highlighted.
 
   The highlighter is a small line tokenizer, not a parser: it colours what
   a reader scans for -- keywords, the `o` and `-->` of each property, type
@@ -93,3 +94,37 @@
                                                   [:span {:class (token-classes kind)} text])))))]))
             [false []]
             (map-indexed vector (str/split-lines (or source "")))))])
+
+;; ------------------------------------------------------------------ data
+
+(def ^:private data-token-re
+  "EDN or JSON, one token at a time: a ; comment, a string, a :keyword, a
+  number, a word, whitespace, or any other single character."
+  #";.*|\"(?:[^\"\\]|\\.)*\"|:[\w.*+!?/<>=-]+|-?\d+(?:\.\d+)?|[A-Za-z_][\w-]*|\s+|.")
+
+(defn- data-classify [tok next-tok]
+  (cond
+    (str/starts-with? tok ";")               :comment
+    ;; A JSON key is a string followed, past any spaces, by a colon.
+    (and (str/starts-with? tok "\"") (= ":" next-tok)) :keyword
+    (str/starts-with? tok "\"")              :string
+    (str/starts-with? tok ":")               :keyword
+    (re-matches #"-?\d+(?:\.\d+)?" tok)      :number
+    (#{"true" "false" "nil" "null"} tok)     :decorator
+    :else                                    :text))
+
+(defn data-listing
+  "An EDN or JSON source, numbered and highlighted like cto-listing: keys,
+  strings, numbers, literals and ; comments."
+  [source]
+  [:div {:class ["overflow-auto rounded-lg bg-slate-950 py-4 font-mono text-xs leading-6"]}
+   (for [[i line] (map-indexed vector (str/split-lines (or source "")))
+         :let [lead (re-find #"^ *" line)
+               toks (re-seq data-token-re (subs line (count lead)))]]
+     (line-row (inc i)
+               (if (and (empty? toks) (empty? lead))
+                 " "
+                 (concat (indentation lead)
+                         (for [[tok more] (map vector toks (iterate rest (rest toks)))
+                               :let [next-tok (first (remove str/blank? more))]]
+                           [:span {:class (token-classes (data-classify tok next-tok))} tok])))))])

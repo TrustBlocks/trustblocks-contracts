@@ -27,8 +27,8 @@
     (loaded! node)
     (let [items (timeline/items node (store/registry-from-xtdb node) demo/contract-id (Instant/now))
           kinds (frequencies (map :kind items))]
-      (testing "the pay requests' certified steps, each with its document"
-        (is (= 10 (:event kinds)))
+      (testing "the pay requests' and the vendor form's certified steps, each with its document"
+        (is (= 12 (:event kinds)))
         (is (some #(and (= "Payment certified" (:title %)) (= "str-27-pay-1" (:document %))) items)))
       (testing "the designation, and the dates the contract names"
         (is (= 1 (:designation kinds)))
@@ -42,8 +42,8 @@
           (is (some #(and (= :deadline (:kind %)) (= "str-27-pay-1" (:document %))
                           (= "Payment due -- met" (:title %)))
                     items)))
-        (testing "the contract's Completion Date: Notice to Proceed + 270 days"
-          (is (some #(and (= "Completion Date" (:title %))
+        (testing "the Completion Date: the Notice to Proceed's Commence Date + 270 days"
+          (is (some #(and (= "Completion Date" (:title %)) (= "str-27-notice-to-proceed" (:document %))
                           (= (Instant/parse "2027-03-28T04:00:00Z") (:at %)))
                     items))))
       (testing "oldest first"

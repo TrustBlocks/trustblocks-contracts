@@ -56,7 +56,7 @@
         ;; and Clojure clause logic -- each on the classpath under its own
         ;; name. See com.trustblocks.template.library, and the :templates-local
         ;; alias below for editing them alongside the app.
-        io.github.TrustBlocks/trustblocks-templates {:git/sha "d264813726556a6259d26f3385af4c287bc98333"}
+        io.github.TrustBlocks/trustblocks-templates {:git/sha "dac298a70a0b9ec75857e4e44edffa9c2bc1580f"}
 
         dev.onionpancakes/chassis     {:mvn/version "1.0.365"}
         ;; CommonMark + pipe tables -- exactly the markdown TemplateMark is

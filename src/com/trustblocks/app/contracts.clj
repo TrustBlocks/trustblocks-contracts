@@ -86,7 +86,7 @@
       (str/includes? (str/lower-case (str id)) (str/lower-case q))
       (str/includes? (str/lower-case (str class)) (str/lower-case q))))
 
-(defn- query-param
+(defn query-param
   "biff.ring's default middleware may or may not keywordize :params
   depending on content type, so check both spellings rather than guess --
   the same defensive pattern com.biffweb.ring.impl.middleware/wrap-nippy-params
@@ -288,7 +288,7 @@
 (defn- epoch-day [^java.time.Instant t]
   (.toEpochDay (.toLocalDate (.atZone t java.time.ZoneOffset/UTC))))
 
-(defn- end-of-day
+(defn end-of-day
   "The last instant of the UTC day `yyyy-mm-dd`, so a slider set to a day
   shows everything that happened on it."
   [s]
@@ -298,6 +298,7 @@
 (def ^:private kind-styles
   {:event       ["bg-blue-50 text-blue-700 ring-blue-200" "Event"]
    :designation ["bg-violet-50 text-violet-700 ring-violet-200" "Designation"]
+   :receipt     ["bg-emerald-50 text-emerald-700 ring-emerald-200" "Receipt"]
    :date        ["bg-slate-100 text-slate-700 ring-slate-200" "Contract date"]
    :deadline    ["bg-amber-50 text-amber-800 ring-amber-200" "Deadline"]
    :note        ["bg-yellow-50 text-yellow-800 ring-yellow-300" "Note"]
@@ -312,21 +313,22 @@
   [:span {:class ["inline-flex rounded-full bg-slate-900 px-3 py-1 text-sm font-semibold text-white"]}
    (or status "Not started")])
 
-(defn- as-of-slider
-  "A day slider over the timeline's span. Moving it reloads the page as of
-  that day (?as-of=yyyy-mm-dd) -- the state, and which events had happened."
-  [id items as-of today]
+(defn as-of-slider
+  "A day slider over the timeline's span. Moving it reloads the page at
+  `href` as of that day (?as-of=yyyy-mm-dd) -- the state, and which events
+  had happened. The matter page shares it."
+  [href items as-of today]
   (let [days  (map (comp epoch-day :at) items)
         lo    (apply min (epoch-day today) days)
         hi    (apply max (epoch-day today) days)
         value (epoch-day as-of)]
-    [:form {:method "get" :action (routes/contract id) :id "as-of-form"
+    [:form {:method "get" :action href :id "as-of-form"
             :class ["rounded-xl border border-slate-200 bg-white p-5 shadow-sm"]}
      [:div {:class ["flex flex-wrap items-baseline justify-between gap-2"]}
       [:label {:for "as-of-slider" :class ["text-sm font-semibold text-slate-950"]}
        "As of " [:span {:id "as-of-label"} (day as-of)]]
       (when (not= (epoch-day as-of) (epoch-day today))
-        [:a {:href (routes/contract id) :class ["text-sm font-medium text-blue-700 hover:underline"]} "Back to today"])]
+        [:a {:href href :class ["text-sm font-medium text-blue-700 hover:underline"]} "Back to today"])]
      [:input {:type "range" :id "as-of-slider" :min lo :max hi :value value :step 1
               :class ["mt-3 w-full accent-blue-700"]
               :oninput "document.getElementById('as-of-label').textContent = new Date(this.value * 86400000).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC'})"
@@ -346,9 +348,10 @@
    :upcoming ["bg-amber-50 text-amber-800 ring-amber-200" "Upcoming"]
    :met      ["bg-emerald-50 text-emerald-700 ring-emerald-200" "Met"]})
 
-(defn- deadlines-section
+(defn deadlines-section
   "The watch list: each deadline the contract sets, and its documents set,
-  with where it stands. Shown, never acted on -- what follows a passed
+  with where it stands -- on the dashboard, and on the matter page for the
+  matter's terms. Shown, never acted on -- what follows a passed
   deadline is the Town's decision."
   [node reg id today]
   (let [ds (->> (deadlines/for-contract node reg id today)
@@ -429,7 +432,10 @@
               (when (> (epoch-day recorded) (epoch-day at)) " -- after the day it is about")
               (when (< (epoch-day recorded) (epoch-day at)) " -- before the day it is about"))])]]))
 
-(defn- timeline-section [node reg id as-of today]
+(defn timeline-section
+  "Contract `id`'s timeline (com.trustblocks.model.timeline), divided at
+  `as-of` -- on the dashboard, and on the matter page for its terms."
+  [node reg id as-of today]
   (let [items  (timeline/items node reg id today)
         [past future] (split-with #(not (.isAfter ^java.time.Instant (:at %) ^java.time.Instant as-of)) items)]
     [:section {:class ["rounded-xl border border-slate-200 bg-white p-6 shadow-sm"]}
@@ -506,7 +512,7 @@
              "Inspect stored model"]]
            (contract-actions node reg instance id)]
 
-          (as-of-slider id (timeline/items node reg id today) as-of today)
+          (as-of-slider (routes/contract id) (timeline/items node reg id today) as-of today)
           (where-it-stands node reg id as-of today)
           (deadlines-section node reg id today)
           [:div {:id "timeline"} (timeline-section node reg id as-of today)]

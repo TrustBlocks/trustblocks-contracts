@@ -57,7 +57,9 @@
   For a Receipt: `document-hash` is the stored file received, from
   `received-from`, optionally with a `description`. For an Attestation:
   `statement`, and `document-hash` when it is not the document's own stored
-  file, which it names by default.
+  file, which it names by default. A Receipt's `role` is the document's
+  role in the matter's manifest; receiving the document's own stored file,
+  it defaults to the role the document joined the matter with.
 
   Refusals: :no-such-officeholder, :no-such-instance, :no-lifecycle,
   :no-transition, :missing-authority (holds none of the authorities the
@@ -65,7 +67,7 @@
   :no-such-stored-document and :already-received -- then any of
   execute/trigger!'s, including a clause's refusal."
   [node {:keys [email document event credential at document-hash statement
-                received-from description]}]
+                received-from description role]}]
   (let [officeholder (or (identity/by-email node email)
                          (refuse! "No officeholder identity for this email"
                                   {:trustblocks/error :no-such-officeholder :email email}))
@@ -79,11 +81,12 @@
         matter-id (matter/matter-of node document :at at)
         status    (get (execute/current-state node document :at at) "status")
         requires  (lifecycle/requirements lc status event)
+        membership (some #(when (= document (:xt/id %)) %)
+                         (when matter-id (matter/documents node matter-id :at at)))
         ;; An attestation names the file of the document it certifies,
         ;; unless the caller names another.
-        document-hash (or document-hash
-                          (some #(when (= document (:xt/id %)) (:stored-document %))
-                                (when matter-id (matter/documents node matter-id :at at))))
+        document-hash (or document-hash (:stored-document membership))
+        role (or role (when (= document-hash (:stored-document membership)) (:role membership)))
 
         {:keys [authority jwt]}
         (or (authorization node did credential requires at matter-id)
@@ -110,7 +113,7 @@
             (receipt/issue! node officeholder
                             {:matter matter-id :document-hash document-hash
                              :received-from received-from :description description
-                             :received-at at :evidence jwt})
+                             :role role :contract document :received-at at :evidence jwt})
             (credential/issue!
              node (identity/keypair officeholder)
              {:issuer did :subject did
