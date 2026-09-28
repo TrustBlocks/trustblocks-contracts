@@ -122,5 +122,6 @@
                                    (not required)                  :optional
                                    (<= (order phase 0) begun)      :not-on-record
                                    :else                           :not-yet))))
+
      :unlisted
      (into (sorted-map) (apply dissoc record (map :role docs)))}))

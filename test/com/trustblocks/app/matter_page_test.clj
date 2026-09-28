@@ -5,6 +5,7 @@
   (:require [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
             [com.trustblocks.app.matters :as matters]
+            [com.trustblocks.lib.code :as code]
             [com.trustblocks.model.manifest :as manifest]
             [com.trustblocks.model.timeline :as timeline]
             [com.trustblocks.xtdb.matter :as matter]
@@ -102,7 +103,7 @@
     (is (= 404 (:status (matters/show-page {:biff.xtdb/node node :uri "/matters/nope" :params {}}))))))
 
 (deftest data-listings-colour-keys
-  (let [spans (fn [src] (->> (com.trustblocks.lib.code/data-listing src) flatten
+  (let [spans (fn [src] (->> (code/data-listing src) flatten
                              (partition 2 1)
                              (keep (fn [[a b]] (when (and (map? a) (string? b)) [b (first (:class a))])))
                              (into {})))]
@@ -112,4 +113,5 @@
       (is (= "text-orange-300" (get (spans "{\"id\": \"x\"}") "\"x\""))))
     (testing "an EDN keyword, and a comment"
       (is (= "text-sky-300" (get (spans "{:role \"x\"}") ":role")))
+      (is (= "text-sky-300" (get (spans "[:$class :string]") ":$class")))
       (is (= "text-emerald-300" (get (spans ";; note") ";; note"))))))

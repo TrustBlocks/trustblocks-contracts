@@ -622,6 +622,12 @@
 (def ^:private malli-block
   ["max-h-[32rem] overflow-auto whitespace-pre-wrap rounded-lg bg-slate-950 p-5 font-mono text-xs leading-6 text-slate-100"])
 
+(defn- malli-listing
+  "EDN or JSON as a numbered, highlighted listing (com.trustblocks.lib.code),
+  scrolling past 32rem."
+  [source]
+  [:div {:class ["max-h-[32rem] overflow-auto rounded-lg"]} (code/data-listing source)])
+
 (defn- edn-text [x]
   (binding [pprint/*print-right-margin* 100]
     (with-out-str (pprint/pprint x))))
@@ -670,7 +676,7 @@
           (malli-section
            "1. The schema"
            "The Concerto model, compiled to a Malli schema by our own Clojure parser and compiler (concerto-clj). It is plain EDN -- data, not code -- so everything below is done with that one value."
-           [:pre {:class malli-block} (edn-text (model.malli/form reg fqn))])
+           (malli-listing (edn-text (model.malli/form reg fqn))))
           (malli-section
            "2. This contract, validated"
            "The stored contract checked against the schema -- the same check that guards every write to XTDB. Errors come back as data, humanized by Malli."
@@ -685,7 +691,7 @@
            "Malli generates a valid instance from the schema alone -- the raw material of property-based testing. Nonsense by design: any string the model allows, any number. Every one validates."
            (if-let [made (:ok sample)]
              [:div {:class ["space-y-2"]}
-              [:pre {:class malli-block} (json/generate-string made {:pretty true})]
+              (malli-listing (json/generate-string made {:pretty true}))
               [:p {:class ["text-sm"]}
                [:span {:class ["mr-3 font-mono text-xs text-slate-500"]} (str "seed " seed)]
                [:a {:href (str (routes/contract-model-malli id) "?seed=" (inc seed))
@@ -695,7 +701,7 @@
           (malli-section
            "4. As JSON Schema"
            "The same model exported by Malli to JSON Schema, for anything outside Clojure that validates JSON. Concerto has its own exporter; this one is ours, from the schema above."
-           [:pre {:class malli-block} (json/generate-string (model.malli/json-schema schema) {:pretty true})])
+           (malli-listing (json/generate-string (model.malli/json-schema schema) {:pretty true})))
           (malli-section
            "5. As a diagram"
            "Malli's own Graphviz export: each type, its properties, and which types refer to which -- drawn in the page by Graphviz compiled to WebAssembly."

@@ -100,7 +100,7 @@
 (def ^:private data-token-re
   "EDN or JSON, one token at a time: a ; comment, a string, a :keyword, a
   number, a word, whitespace, or any other single character."
-  #";.*|\"(?:[^\"\\]|\\.)*\"|:[\w.*+!?/<>=-]+|-?\d+(?:\.\d+)?|[A-Za-z_][\w-]*|\s+|.")
+  #";.*|\"(?:[^\"\\]|\\.)*\"|:[\w.*+!?/<>=$-]+|-?\d+(?:\.\d+)?|[A-Za-z_][\w-]*|\s+|.")
 
 (defn- data-classify [tok next-tok]
   (cond
