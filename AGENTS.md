@@ -34,8 +34,8 @@ code around it.
 deps.edn                  Clojure CLI deps + aliases (see §7)
 bb.edn                    babashka deps for the no-database half of docs/walkthrough.md
 bin/clj                   ALWAYS use this, never bare `clj` — pins JAVA_HOME to JDK 21 (XTDB needs 21-24)
-bin/playground            runs Accord's WebMCP Template Playground (webmcp-poc, pinned) locally on :5173 -- parked,
-                          see docs/template-playground-webmcp.md; .mcp.json declares its agent relay
+bin/playground            runs Trustblocks' Template Playground (the TrustBlocks/template-playground fork, pinned)
+                          locally on :5173; see docs/template-playground-webmcp.md; .mcp.json declares its agent relay
 repl.clj                  REPL scratch: (get-node), (refresh)
 resources/config.edn      Biff config (port, cookie secret, css paths, main-ns, nrepl-port)
 tests.edn                 kaocha config
@@ -66,9 +66,9 @@ src/com/trustblocks/
   model/                    (NOTE: src/com/trustblocks/model/, distinct from the repo-root model/ below)
     contract.clj               coarse-grained biff.graph resolvers (:contract/data, :state, :history)
     graph.clj                  generates one biff.graph resolver PER Concerto property from the live registry
-    playground.clj             links out to Accord's Concerto/Template Playgrounds — read its docstring before
-                                touching anything playground-related; the single-model limit is Template
-                                Playground's, not ours, and is fully explained there
+    playground.clj             links out to Accord's Concerto Playground and Trustblocks' Template Playground
+                                (our fork, carrying clause + lifecycle) — read its docstring before touching
+                                anything playground-related
 
   did/                      DID/VC primitives — no XTDB, no app knowledge, pure crypto/data
     base58.clj                 hand-rolled Base58(btc), tested against real spec vectors
@@ -102,7 +102,7 @@ docs/
                              -> identity, DID/VC and attestation); every form is meant to be pasted and run
   operator-runbook.md         local operations: seed/signin, demo identities, REPL provisioning/revocation
   concerto-xtdb-mapping.md   original research notes on the Concerto<->XTDB mapping problem xtdb/keys.clj solves
-  template-playground-webmcp.md  local exploration of Accord's experimental webmcp-poc branch
+  template-playground-webmcp.md  Trustblocks' Template Playground: the fork, hosting, bin/playground, WebMCP
   examples/
     snow-removal.cto           synthetic, walkthrough-only contract — deliberately zero imports
     late-delivery.cta          Accord's own reference template — used only as a cross-check oracle
@@ -202,14 +202,12 @@ are probably in the wrong repo.
   so inherited fields stay addressable like local ones. Rule: **if a field
   appears in template prose, it must be on the root concept or inherited
   into it; composition is fine for anything the prose never names.**
-- **Template Playground's "only one model" limitation is the external
-  tool's, not a defect in our modeling.** Verified by direct comparison
-  against Accord's own reference template (`docs/examples/late-delivery.cta`),
-  which uses the identical extends-base-Contract-and-imports-a-domain-namespace
-  pattern. Left as documented, known behavior (`model/playground.clj`'s
-  docstring) rather than flattening our own models to fit an external
-  tool's link-size limit — re-check whether Accord's own playground has
-  improved before concluding the only fix is self-hosting one.
+- **Template Playground takes one model per link, beside what it bundles.**
+  Our fork bundles our shared models (and Accord's `usa.state`), so every
+  template of ours opens; a model needing more than one namespace beyond the
+  bundle is explained, not linked (`model/playground.clj`'s docstring).
+  Don't flatten models to fit -- bundle the shared one in the fork
+  (trustblocks-templates' shared models flow in through its sync script).
 - **The model registry (`registry-from-xtdb`) is global and flat** — every
   `.cto` ever `put-model!`'d into a node is visible to every query,
   regardless of which contract or feature it was loaded for. This is why

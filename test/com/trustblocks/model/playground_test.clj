@@ -119,10 +119,10 @@ concept Greeting {
 
 (deftest blank-origin-property-is-treated-as-unset
   ;; Falls through to the environment variable, if this shell exported one,
-  ;; and otherwise to the deployed playground -- never to "".
+  ;; and otherwise to Trustblocks' hosted playground -- never to "".
   (let [env (System/getenv "TRUSTBLOCKS_TEMPLATE_PLAYGROUND_ORIGIN")]
     (is (= (if (str/blank? env)
-             "https://playground.accordproject.org"
+             "https://trustblocks.github.io/template-playground"
              (str/replace (str/trim env) #"/+$" ""))
            (with-origin-property "  " pg/template-playground-origin)))))
 
@@ -135,19 +135,41 @@ concept Greeting {
       (is (nil? url))
       (is (re-find #"No contract template text on file" unavailable)))))
 
+(deftest template-status-opens-a-contract-with-its-logic-and-lifecycle
+  ;; The manager's contract imports our shared agreement base and Accord's
+  ;; usa.state, which Trustblocks' fork bundles: it opens, carrying its
+  ;; Clojure clause and its lifecycle, ready to simulate.
+  (with-open [node (xt.node/start-node)]
+    (archive/ingest-dir! node (library/dir "manager-employment-contract"))
+    (let [reg      (store/registry-from-xtdb node)
+          instance (json/parse-string (library/sample "manager-employment-contract"))
+          {:keys [url unavailable]} (with-origin-property
+                                      "https://trustblocks.github.io/template-playground"
+                                      #(pg/template-status node reg instance))
+          payload  (decode url)]
+      (is (nil? unavailable))
+      (is (.startsWith ^String url "https://trustblocks.github.io/template-playground/#data="))
+      (is (str/includes? (get payload "modelCto") "namespace com.trustblocks.municipal.employment@1.0.0"))
+      (is (str/includes? (get payload "logicTs") "BoardApprovalRequest"))
+      (is (= "ManagerEmploymentState" (get (json/parse-string (get payload "lifecycleJson")) "stateType"))))))
+
 (deftest template-status-explains-too-many-namespaces
-  ;; Reuses the same fixture archive as the walkthrough and dev/seed.clj,
-  ;; rather than a synthetic multi-namespace model, so this fails the day
-  ;; the real template stops needing more than one namespace -- exactly
-  ;; when the explanation would go stale.
+  ;; Against Accord's own bundle alone -- as the upstream playground has it --
+  ;; the manager's contract needs three namespaces more than its share link
+  ;; can hold, and is explained rather than linked.
   (with-open [node (xt.node/start-node)]
     (archive/ingest-dir! node (library/dir "manager-employment-contract"))
     (let [reg      (store/registry-from-xtdb node)
           instance (json/parse-string
                     (library/sample "manager-employment-contract"))
-          {:keys [url unavailable]} (pg/template-status node reg instance)]
+
+          {:keys [url unavailable]}
+          (with-redefs [pg/template-playground-bundled-namespaces
+                        (set (remove #(re-find #"trustblocks|usa\.state" %)
+                                     pg/template-playground-bundled-namespaces))]
+            (pg/template-status node reg instance))]
       (is (nil? url))
-      (is (re-find #"needs \d+ namespaces beyond what Template Playground bundles" unavailable)))))
+      (is (re-find #"needs 3 namespaces beyond what Template Playground bundles" unavailable)))))
 
 (deftest compress-roundtrips
   (doseq [payload ["" "hello" "unicode: \u2603 \u00e9\u00e8" (apply str (repeat 500 "ab"))]]
