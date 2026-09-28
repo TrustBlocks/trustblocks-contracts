@@ -40,8 +40,9 @@ After signing in, the primary navigation is:
 - `/clauses` — stored SCI/TypeScript clause inventory;
 - `/authorizations` — officeholders and signature-verified OfficeGrant VCs.
 
-To route eligible Template Playground actions into Accord's experimental
-`webmcp-poc` branch running locally, follow
+Template Playground actions open Trustblocks' hosted playground
+(trustblocks.github.io/template-playground). To route them to a local
+checkout instead (`bin/playground`), follow
 `docs/template-playground-webmcp.md` and set
 `TRUSTBLOCKS_TEMPLATE_PLAYGROUND_ORIGIN` before starting the JVM.
 

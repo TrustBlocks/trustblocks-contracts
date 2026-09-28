@@ -1,11 +1,17 @@
 (ns com.trustblocks.model.playground
-  "Links out to Accord Project's own playgrounds -- concerto-playground.
-  accordproject.org for the model, playground.accordproject.org for the
-  template -- so a contract's own model and template text can be opened,
-  read and experimented with in the tools Accord already built for exactly
-  that, instead of us building a second Concerto editor or a second
-  TemplateMark renderer. Both are hosted by Accord Project today; see the
-  module docstring below for why that may not stay true.
+  "Links out to the playgrounds -- Accord Project's
+  concerto-playground.accordproject.org for the model, and Trustblocks' own
+  Template Playground for the template, its logic and its lifecycle -- so a
+  contract's model and template can be opened, read and experimented with
+  in tools built for exactly that, instead of us building a second Concerto
+  editor or a second TemplateMark renderer.
+
+  The Template Playground is TrustBlocks' fork of Accord's
+  (github.com/TrustBlocks/template-playground, hosted at
+  trustblocks.github.io/template-playground): it runs a template's Clojure
+  logic with our own clause runtime (trustblocks-templates' runtime/), so a
+  request there gets the answer it gets here, and it bundles our shared
+  models beside Accord's.
 
   Both playgrounds put their state in the URL: a JSON payload, LZ-String
   compressed (com.github.tommyettinger/blazingchain -- confirmed
@@ -26,50 +32,30 @@
     property types touch -- fits in one link. concerto-url below always
     returns one.
 
-  - Template Playground takes exactly one .cto string, no more. Re-checked
-    against the `webmcp-poc` branch at 8206dc1: rebuild() still calls
-    modelManager.addCTOModel(model, undefined, true) exactly once, and its
-    share state still has singular `modelCto`. WebMCP adds six in-page tools
-    (get/set template, model, and data); it does not add multi-model loading.
-    A model text can declare only one namespace -- confirmed by an actual
-    Concerto parse error when every one of our namespaces was concatenated
-    into one string. So a contract whose model needs more than one
-    namespace beyond what the playground bundles (see
-    template-playground-bundled-namespaces) cannot be opened there at all
-    -- not degraded, just wrong: feeding it only the leaf namespace throws
-    'Namespace is not defined for type ...' before anything renders.
-    template-status below returns an :unavailable reason naming exactly
-    how many namespaces are over the limit, rather than a link that is
-    certain to fail.
+  - Template Playground takes exactly one .cto string besides the models
+    it bundles -- its share state has a singular `modelCto`, and a model
+    text can declare only one namespace. Our fork bundles, beside Accord's
+    standard models, the shared ones our templates import
+    (com.trustblocks.municipal.agreement, com.trustblocks.attestation and
+    org.accordproject.usa.state -- see template-playground-bundled-
+    namespaces), so every template of ours fits: each has one namespace of
+    its own. A model that still needs more than one namespace beyond the
+    bundle cannot be opened there at all -- feeding it only the leaf
+    namespace throws 'Namespace is not defined for type ...' -- and
+    template-status says so rather than giving a link certain to fail.
 
-    com.trustblocks.municipal.employment@1.0.0.ManagerEmployment is a real
-    case of this, not a hypothetical: it needs org.accordproject.usa.state
-    (an Accord Project namespace, just not one of the ones the playground
-    happens to bundle) and com.trustblocks.municipal.agreement (our own
-    shared jurisdiction base, reused by other municipal contracts on
-    purpose -- see agreement.cto's own docstring) on top of its own
-    namespace, three past the limit of one. Deliberately not worked
-    around by reshaping either model to fit -- flattening the shared base
-    back into every contract that uses it, or swapping the imported enum
-    for a bare string, would be a real, permanent loss of the reuse and
-    validation those choices exist for, made solely to satisfy an
-    external tool's link-size limit. Left as documented, known behaviour
-    instead: Concerto Playground already gives a complete, correct view
-    of such a model with no such limit, and Accord Project is actively
-    developing Template Playground -- worth checking again periodically
-    for either broader bundling or genuine multi-file support before
-    concluding the only fix is self-hosting one, which remains the real
-    fix if neither materializes.
+  The link also carries the contract's clause (logicTs) and lifecycle
+  (lifecycleJson), which the fork reads from its share state, so the
+  playground opens with the contract ready to simulate.
 
-    The WebMCP branch is source code, not a separately hosted deployment.
-    `TRUSTBLOCKS_TEMPLATE_PLAYGROUND_ORIGIN` can point links at a local
-    checkout running on port 5173 for exploration; see
-    docs/template-playground-webmcp.md. The default remains Accord's official
-    deployed playground."
+  `TRUSTBLOCKS_TEMPLATE_PLAYGROUND_ORIGIN` points links at a local
+  checkout (bin/playground, port 5173) instead; see
+  docs/template-playground-webmcp.md."
   (:require [cheshire.core :as json]
             [clojure.string :as str]
             [com.trustblocks.concerto.metamodel :as mm]
             [com.trustblocks.template.archive :as archive]
+            [com.trustblocks.xtdb.execute :as execute]
             [com.trustblocks.xtdb.store :as store])
   (:import [blazing.chain LZSEncoding]))
 
@@ -125,15 +111,15 @@
   (str origin "/#" (compressed-payload payload)))
 
 (defn template-playground-origin
-  "The deployed Template Playground by default, or an explicitly configured
-  compatible origin (principally a local `webmcp-poc` checkout). A function
+  "Trustblocks' hosted Template Playground by default, or an explicitly
+  configured compatible origin (principally a local checkout, bin/playground). A function
   rather than a def so a REPL can change the system property without
   reloading this namespace. A blank setting counts as unset: an exported but
   empty variable would otherwise yield relative links back into this app."
   []
   (-> (or (not-empty (str/trim (or (System/getProperty "trustblocks.template-playground-origin") "")))
           (not-empty (str/trim (or (System/getenv "TRUSTBLOCKS_TEMPLATE_PLAYGROUND_ORIGIN") "")))
-          "https://playground.accordproject.org")
+          "https://trustblocks.github.io/template-playground")
       (str/replace #"/+$" "")))
 
 (defn- template-share-link [payload]
@@ -149,21 +135,26 @@
               (into [] (keep #(store/model-source node %)) (namespaces reg fqn))))
 
 (def template-playground-bundled-namespaces
-  "Namespaces template-playground preloads into every session (see its
+  "Namespaces the Template Playground preloads into every session (see its
   src/utils/modelCache.ts) so a template importing them resolves without a
-  network round trip. A model needing only these plus one namespace of its
-  own fits in a template-status link; anything more does not, because the
-  playground's own share format holds exactly one model string besides
-  these. Checked against its current main -- not a stale clone -- while
-  writing this."
+  network round trip: Accord's standard models, and -- in our fork, from
+  trustblocks-templates (its scripts/sync-trustblocks.mjs) -- the shared
+  models our templates import. A model needing only these plus one
+  namespace of its own fits in a template-status link; anything more does
+  not, because the playground's share format holds exactly one model string
+  besides these."
   #{"org.accordproject.contract@0.2.0" "org.accordproject.runtime@0.2.0"
     "org.accordproject.time@0.3.0" "org.accordproject.money@0.3.0"
     "org.accordproject.obligation@0.2.0" "org.accordproject.binary@0.2.0"
-    "org.accordproject.signature@0.3.0" "com.docusign.connect@0.4.0"})
+    "org.accordproject.signature@0.3.0" "com.docusign.connect@0.4.0"
+    ;; Trustblocks' fork
+    "com.trustblocks.municipal.agreement@1.0.0" "com.trustblocks.attestation@1.0.0"
+    "org.accordproject.usa.state@0.3.0"})
 
 (defn template-status
-  "Whether instance's model and template can be opened in
-  playground.accordproject.org, and either the link or why not.
+  "Whether instance's model and template can be opened in the Template
+  Playground, and either the link or why not. The link carries the
+  contract's clause and lifecycle too, when its template has them.
 
   Returns {:url \"...\"} or {:unavailable \"a reason to show someone\"}, never
   both and never neither -- one caller (document-page) branches on this once
@@ -192,7 +183,13 @@
 
       :else
       {:url (template-share-link
-             {:templateMarkdown grammar
-              :modelCto         (store/model-source node (first custom))
-              :data             (json/generate-string instance)
-              :agreementHtml    ""})})))
+             (cond-> {:templateMarkdown grammar
+                      :modelCto         (store/model-source node (first custom))
+                      :data             (json/generate-string instance)
+                      :agreementHtml    ""}
+               (= :clojure (:runtime (execute/get-clause node fqn)))
+               (assoc :logicTs (:source (execute/get-clause node fqn)))
+
+               (execute/get-lifecycle node fqn)
+               (assoc :lifecycleJson (json/generate-string (execute/get-lifecycle node fqn)
+                                                           {:pretty true}))))})))
