@@ -1,10 +1,20 @@
 ;; ClojureScript builds of the clause runtime (com.trustblocks.clause,
-;; com.trustblocks.lifecycle). Run through deps.edn's :cljs alias, e.g.
-;; bin/cljs-test.
+;; com.trustblocks.lifecycle, com.trustblocks.runtime). Run through
+;; deps.edn's :cljs alias: bin/cljs-test, bin/logic-bundle.
 {:builds
  {;; The JVM/ClojureScript parity test, run under Node.
   :clause-test
   {:target    :node-test
    :output-to "target/cljs/clause-test.js"
    :ns-regexp "clause-parity-test$"
-   :autorun   true}}}
+   :autorun   true}
+
+  ;; trustblocks-logic.js, the Template Playground's logic runtime: one
+  ;; classic script defining the global TrustblocksLogic (see
+  ;; com.trustblocks.logic-bundle). BigInt (divide) needs ES2020.
+  :logic-bundle
+  {:target           :browser
+   :output-dir       "target/cljs/logic"
+   :asset-path       "."
+   :modules          {:trustblocks-logic {:init-fn com.trustblocks.logic-bundle/init}}
+   :compiler-options {:output-feature-set :es2020}}}}

@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Build trustblocks-logic.js -- the clause runtime compiled for the browser,
+# which the Template Playground's logic worker loads (see
+# src/com/trustblocks/logic_bundle.cljs) -- and test it under Node, loaded
+# as the worker loads it.
+#
+# Usage: bin/logic-bundle     -> target/trustblocks-logic.js
+#   TRUSTBLOCKS_TEMPLATES  the trustblocks-templates checkout the test reads
+#                          templates from (default ../trustblocks-templates)
+set -euo pipefail
+cd "$(dirname "$0")/.."
+bin/clj -M:cljs release logic-bundle
+cp target/cljs/logic/trustblocks-logic.js target/trustblocks-logic.js
+node --test test/js/logic_bundle_test.mjs
+echo "target/trustblocks-logic.js ($(wc -c < target/trustblocks-logic.js | tr -d ' ') bytes, $(gzip -c target/trustblocks-logic.js | wc -c | tr -d ' ') gzipped)"
