@@ -1,0 +1,10 @@
+;; ClojureScript builds of the clause runtime (com.trustblocks.clause,
+;; com.trustblocks.lifecycle). Run through deps.edn's :cljs alias, e.g.
+;; bin/cljs-test.
+{:builds
+ {;; The JVM/ClojureScript parity test, run under Node.
+  :clause-test
+  {:target    :node-test
+   :output-to "target/cljs/clause-test.js"
+   :ns-regexp "clause-parity-test$"
+   :autorun   true}}}

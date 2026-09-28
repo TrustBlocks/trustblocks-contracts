@@ -102,6 +102,16 @@
                  "--enable-native-access=ALL-UNNAMED"
                  "-Dio.netty.tryReflectionSetAccessible=true"]}
 
+;; The clause runtime in ClojureScript (com.trustblocks.clause is .cljc):
+  ;; its Node parity test, and later the browser bundle the Template
+  ;; Playground runs. Its own small classpath -- nothing of the app's but
+  ;; SCI. Usage: bin/cljs-test
+  :cljs
+  {:replace-deps  {thheller/shadow-cljs {:mvn/version "2.28.23"}
+                   org.babashka/sci     {:mvn/version "0.10.47"}}
+   :replace-paths ["src" "test"]
+   :main-opts     ["-m" "shadow.cljs.devtools.cli"]}
+
   :prod
   {:main-opts ["-m" "com.trustblocks"]
    :jvm-opts  ["--add-opens=java.base/java.nio=ALL-UNNAMED"

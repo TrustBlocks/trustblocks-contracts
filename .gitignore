@@ -39,3 +39,4 @@ node_modules/
 .calva/
 .eca/
 .zed/
+/.shadow-cljs/

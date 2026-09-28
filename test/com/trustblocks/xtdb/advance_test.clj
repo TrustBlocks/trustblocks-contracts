@@ -109,7 +109,7 @@
       (testing "figures that do not agree"
         (let [id (another-request! node root "str-27-pay-3b" ["3.1" "5.1" "7.1"]
                                    {"netAmountDue" 70000.0})]
-          (is (re-find #"^The figures do not agree: the net amount due is \$70000.0, not \$69753.75"
+          (is (re-find #"^The figures do not agree: the net amount due is \$70000, not \$69753.75"
                        (refusal-message #(advance! node demo/ketner id "PayRequestCertified" "Attestation"
                                                    "2026-09-26T11:00:00Z"))))
           (is (= "INSPECTED" (status node id))))))))
