@@ -27,8 +27,8 @@ repo=https://github.com/TrustBlocks/template-playground.git
 dir="${TRUSTBLOCKS_PLAYGROUND_DIR:-$HOME/Code/trustblocks-playground}"
 templates="${TRUSTBLOCKS_TEMPLATES_DIR:-$HOME/Code/trustblocks-templates}"
 # The fork's `trustblocks` branch as verified: the Clojure runtime merged
-# (TrustBlocks/template-playground#1, #2). Moving it is a deliberate act.
-ref="${TRUSTBLOCKS_PLAYGROUND_REF:-c69bdad397ea551e609c48a31142f07eacd59971}"
+# (TrustBlocks/template-playground#1-#4). Moving it is a deliberate act.
+ref="${TRUSTBLOCKS_PLAYGROUND_REF:-d0ec8af7a84b1c48902993512eb7dfafea410e4a}"
 port=5173
 
 if ! command -v node >/dev/null 2>&1; then
