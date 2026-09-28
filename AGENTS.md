@@ -34,6 +34,8 @@ code around it.
 deps.edn                  Clojure CLI deps + aliases (see §7)
 bb.edn                    babashka deps for the no-database half of docs/walkthrough.md
 bin/clj                   ALWAYS use this, never bare `clj` — pins JAVA_HOME to JDK 21 (XTDB needs 21-24)
+bin/notebook              renders notebooks/*.clj (Clay) to target/notebook/ -- a guided tour of Clojure, Malli,
+                          XTDB and bitemporality for TypeScript/Rust readers; its own in-memory XTDB node
 bin/playground            runs Trustblocks' Template Playground (the TrustBlocks/template-playground fork, pinned)
                           locally on :5173; see docs/template-playground-webmcp.md; .mcp.json declares its agent relay
 repl.clj                  REPL scratch: (get-node), (refresh)

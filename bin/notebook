@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Render the Clay notebooks in notebooks/ to HTML in target/notebook/ -- a
+# guided tour of Trustblocks' Clojure, Malli, XTDB and bitemporality for
+# readers who know TypeScript or Rust. Each notebook starts its own
+# in-memory XTDB node, so nothing here touches storage/.
+#
+# Usage: bin/notebook [notebooks/accord_overview.clj]
+set -euo pipefail
+cd "$(dirname "$0")/.."
+source="${1:-notebooks/accord_overview.clj}"
+exec bin/clj -M:notebook -e "
+(require '[scicloj.clay.v2.api :as clay] 'clay-reader)
+(clay-reader/install!)
+(clay/make! {:source-path \"$source\" :format [:html] :base-target-path \"target/notebook\"
+             :show false :browse false})
+;; The notebook's XTDB node would keep the JVM alive.
+(shutdown-agents)
+(System/exit 0)"
