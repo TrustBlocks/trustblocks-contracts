@@ -337,8 +337,10 @@ the source, so it catches `slurp` even nested inside an anonymous function.
 Clause logic runs under an explicitly configured vocabulary: no clock, no `/`
 (an exact ratio on the JVM and a float in ClojureScript, so identical source
 would diverge between a server and a browser), no I/O, no interop. See
-[`src/com/trustblocks/clause.clj`](../src/com/trustblocks/clause.clj) — the
-allow-list is meant to be read.
+`com.trustblocks.clause`, in trustblocks-templates'
+[`runtime/`](https://github.com/TrustBlocks/trustblocks-templates/blob/main/docs/runtime.md) — the
+allow-list is meant to be read. The same code runs in the browser as
+`trustblocks-logic.js`, with the same answers.
 
 ```clojure
 (.close node)

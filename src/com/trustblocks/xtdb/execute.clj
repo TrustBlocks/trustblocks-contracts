@@ -25,6 +25,7 @@
             [clojure.walk :as walk]
             [com.trustblocks.clause :as clause]
             [com.trustblocks.lifecycle :as lifecycle]
+            [com.trustblocks.runtime :as runtime]
             [com.trustblocks.concerto.metamodel :as mm]
             [com.trustblocks.xtdb.keys :as k]
             [com.trustblocks.xtdb.store :as store]
@@ -410,41 +411,23 @@
   (let [version (state-version node contract-id)
         state   (current-state node contract-id :reg reg :at at)
         fqn     (get contract "$class")
-        status  (get state "status")
-        ;; The template's lifecycle decides whether the event may happen at
-        ;; all -- before the clause, which decides what follows from it.
-        t       (when lc
-                  (lifecycle/transition lc status request :certification certification))
-        result  (let [clause-result (when src
-                                      (run-clause runtime ctx src {:data contract :request request
-                                                                   :state state :now now}))]
-                  (if-not lc
-                    clause-result
-                    ;; With a lifecycle, the lifecycle owns the status and the
-                    ;; clause what follows from the event: its state is merged
-                    ;; over the state it was given, under the new status, and
-                    ;; it may leave the answer to the transition.
-                    (let [state-fqn (lifecycle/state-type lc fqn)
-                          moved     (lifecycle/state lc fqn contract-id
-                                                     (mm/identity-field reg state-fqn) t)]
-                      {:response (or (:response clause-result) (lifecycle/response status t now))
-                       :state    (merge state moved (:state clause-result))})))
+        ;; The contract's own part of the step -- lifecycle, clause, and
+        ;; the status the lifecycle says it leads to -- shared with the
+        ;; Template Playground (com.trustblocks.runtime).
+        result  (runtime/step
+                 {:lifecycle      lc
+                  :root           fqn
+                  :id             contract-id
+                  :identity-field (when lc (mm/identity-field reg (lifecycle/state-type lc fqn)))
+                  :state          state
+                  :request        request
+                  :certification  certification
+                  :now            now
+                  :run-clause     (when src
+                                    #(run-clause runtime ctx src {:data contract :request request
+                                                                  :state state :now now}))})
         response (:response result)]
 
-    (when (and t (not= (get t "to") (get (:state result) "status")))
-      (throw (ex-info (str "The clause did not leave the document in "
-                           (get t "to") ", where its lifecycle says "
-                           (get t "event") " leads")
-                      {:trustblocks/error :invalid-clause-output
-                       :contract          contract-id
-                       :expected-status   (get t "to")
-                       :status            (get (:state result) "status")})))
-
-    (when-not response
-      (throw (ex-info "Clause returned no :response"
-                      {:trustblocks/error :invalid-clause-output
-                       :contract          contract-id
-                       :returned          (keys result)})))
     (doseq [[what instance] [[:response response] [:state (:state result)]]
             :when instance]
       (when-let [errs (store/validate reg instance)]

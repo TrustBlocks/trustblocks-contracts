@@ -45,7 +45,9 @@ src/com/trustblocks/
   trustblocks.clj          app entrypoint: start/stop/-main, boots `modules` in `start-order`, launches nREPL
   modules.clj              THE list of every subsystem actually wired into the running app — check here first
   routes.clj               every URL path (defpath) + contract-id (reads :uri, not :path-params — see its docstring)
-  clause.clj               the SCI sandbox contract clauses run in — read before touching ANY clause logic
+  (com.trustblocks.clause, .lifecycle, .runtime — the SCI sandbox clauses run in, the lifecycle and the
+   step trigger! takes — live in trustblocks-templates' runtime/, on the classpath through the pinned
+   templates dep; read its docs/runtime.md before touching ANY clause logic)
   contract.clj             cross-contract party querying/projection — NOT in modules.clj, exploratory only
 
   app/                     HTTP handlers + Biff modules
@@ -147,7 +149,7 @@ are probably in the wrong repo.
   keyword-and-kebab-case world at the storage boundary — never invent a
   second translation path.
 - **A contract's clause is a pure, sandboxed function of `(data request state
-  now)`** (`clause.clj`), interpreted via SCI with an explicit whitelist —
+  now)`** (`com.trustblocks.clause`, in trustblocks-templates' `runtime/`), interpreted via SCI with an explicit whitelist —
   no clock, no `/` (JVM exact-ratio vs. ClojureScript float divergence), no
   network, no XTDB access, no identity. This is deliberate and load-bearing:
   it is what makes an execution replayable and what makes it safe to store
@@ -249,7 +251,7 @@ not a starting point to improve on.**
   for any new refusal a caller needs to distinguish.
 - **Dates are ISO-8601 strings on the wire, `java.time.Instant` in Clojure
   code, and never a raw JVM date inside a sandboxed clause** — clauses
-  receive/return DateTime fields as strings (`clause.clj`'s whole design
+  receive/return DateTime fields as strings (`com.trustblocks.clause`'s whole design
   point is a clause never holds a platform date object). `execute/->instant`
   is the one sanctioned string->Instant conversion; don't invent another.
 - **Bitemporal by construction, not by convention**: use XTDB's own
