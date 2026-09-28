@@ -36,6 +36,7 @@
             [com.trustblocks.xtdb.matter :as matter]
             [com.trustblocks.xtdb.note :as note]
             [com.trustblocks.xtdb.receipt :as receipt]
+            [com.trustblocks.runtime :as runtime]
             [com.trustblocks.xtdb.store :as store]))
 
 (defn- instant [x]
@@ -150,11 +151,7 @@
   (let [instance (store/get-instance node id)
         lc       (some->> (get instance "$class") (execute/get-lifecycle node))
         status   (get (execute/current-state node id :at at) "status")]
-    (for [t (get lc "transitions")
-          :when (if status (some #{status} (get t "from")) (empty? (get t "from")))]
-      {:event    (get t "event")
-       :to       (get t "to")
-       :requires (get t "requires")})))
+    (runtime/next-steps lc status)))
 
 (defn accepting?
   "Whether `status` is final in `id`'s lifecycle."
