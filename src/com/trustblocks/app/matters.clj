@@ -27,13 +27,11 @@
             [com.trustblocks.routes :as routes]
             [com.trustblocks.xtdb.certification :as cert]
             [com.trustblocks.xtdb.document :as document]
-            [com.trustblocks.xtdb.execute :as execute]
-            [com.trustblocks.xtdb.identity :as identity]
             [com.trustblocks.model.manifest :as manifest]
+            [com.trustblocks.model.reads :as reads]
             [com.trustblocks.model.timeline :as timeline]
             [com.trustblocks.xtdb.matter :as matter]
-            [com.trustblocks.xtdb.receipt :as receipt]
-            [com.trustblocks.xtdb.store :as store]))
+            [com.trustblocks.xtdb.receipt :as receipt]))
 
 (def ^:private section
   ["rounded-xl border border-slate-200 bg-white p-6 shadow-sm"])
@@ -41,19 +39,21 @@
 (defn- date [instant]
   (when instant (subs (str instant) 0 10)))
 
+;; `v` below is what the page's graph query resolved for display: :labels
+;; {did 'Teresa Barringer, Zoning Administrator'} for everyone the matter's
+;; record names, and :files {hash filename} for the stored files it shows.
+
 (defn- who
   "'Teresa Barringer, Zoning Administrator', or the bare did."
-  [node did]
-  (if-let [o (identity/by-did node did)]
-    (str (:identity/name o) ", " (:identity/office o))
-    did))
+  [v did]
+  (get-in v [:labels did] did))
 
 (defn- label [s]
   (-> s str/lower-case (str/replace "_" " ") str/capitalize))
 
-(defn- file-link [node id]
+(defn- file-link [v id]
   (when id
-    (let [{:document/keys [filename]} (document/get-document node id)]
+    (let [filename (get-in v [:files id])]
       [:a {:href (routes/stored-document id)
            :class ["font-mono text-xs text-blue-700 hover:underline"]
            :title id}
@@ -112,7 +112,7 @@
   [:span {:class ["inline-flex shrink-0 justify-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset" classes]}
    text])
 
-(defn- entry-line [node {:keys [kind id at file status terms from document]}]
+(defn- entry-line [v {:keys [kind id at file status terms from document]}]
   [:li {:class ["flex flex-wrap items-baseline gap-x-2 text-xs text-slate-600"]}
    (when at [:span {:class ["font-mono text-slate-500"]} (date at)])
    (case kind
@@ -120,16 +120,16 @@
      (list [:a {:href (routes/contract id) :class ["font-mono text-blue-700 hover:underline"]} id]
            (when terms [:span "(the matter's terms)"])
            (when status (status-badge status))
-           (file-link node file))
+           (file-link v file))
      :receipt
      (list [:span (str "received from " from)]
-           (file-link node file)
+           (file-link v file)
            (when document
              (list [:span "with"]
                    [:a {:href (routes/contract document) :class ["font-mono text-blue-700 hover:underline"]} document]))))])
 
-(defn- checklist-row [node refs {:keys [title exhibit treatment supplied-by received-under note
-                                        references on-record standing fields] :as d}]
+(defn- checklist-row [v refs {:keys [title exhibit treatment supplied-by received-under note
+                                     references on-record standing fields] :as d}]
   (let [n (get d :count)]
     [:tr {:class ["align-top"]}
      [:td {:class ["py-3 pr-4"]}
@@ -150,12 +150,15 @@
         [:span {:class ["block text-slate-500"]} (str/lower-case (label received-under))])]
      [:td {:class ["py-3 pr-4"]}
       (if (seq on-record)
-        [:ul {:class ["space-y-1"]} (map #(entry-line node %) on-record)]
+        [:ul {:class ["space-y-1"]} (map #(entry-line v %) on-record)]
         [:span {:class ["text-xs text-slate-400"]} "—"])]
      [:td {:class ["py-3 text-right"]} (pill (standing-styles standing))]]))
 
-(defn- checklist-section [node m matter-record as-of today]
-  (let [{:keys [documents unlisted]} (manifest/checklist node m matter-record :at as-of)
+(defn- checklist-section
+  "The manifest's checklist, as of `as-of` -- `checklist`, as the page's
+  query read it (:matter/checklist)."
+  [v m checklist as-of today]
+  (let [{:keys [documents unlisted]} checklist
         refs    (into {} (map (juxt :id identity) (:references m)))
         missing (count (filter #(= :not-on-record (:standing %)) documents))]
     [:section {:id "checklist" :class section}
@@ -178,14 +181,14 @@
          [:thead {:class ["text-xs uppercase tracking-wide text-slate-500"]}
           [:tr [:th {:class ["w-[44%] py-2"]} "Document"] [:th {:class ["w-[17%]"]} "Treatment"]
            [:th {:class ["w-[27%]"]} "On record"] [:th {:class ["w-[12%]"]} ""]]]
-         [:tbody {:class ["divide-y divide-slate-100"]} (map #(checklist-row node refs %) rows)]]])
+         [:tbody {:class ["divide-y divide-slate-100"]} (map #(checklist-row v refs %) rows)]]])
      (when (seq unlisted)
        [:div {:class ["mt-6"]}
         [:h3 {:class ["text-sm font-semibold uppercase tracking-widest text-slate-500"]} "On record, not in the manifest"]
         [:ul {:class ["mt-2 space-y-1"]}
          (for [[role entries] unlisted, e entries]
            [:li {:class ["flex gap-2 text-sm"]} [:span {:class ["text-slate-500"]} (or role "no role")]
-            [:ul (entry-line node e)]])]])]))
+            [:ul (entry-line v e)]])]])]))
 
 (defn- milestones-section [m]
   [:section {:class section}
@@ -255,7 +258,7 @@
 
 ;; ------------------------------------------------------------------ one matter
 
-(defn- designations [node record]
+(defn- designations [v record]
   (let [ds (filter #(= cert/designation-class (get % "$class")) record)]
     [:section {:class section}
      [:h2 {:class ["mb-3 text-lg font-semibold text-slate-950"]} "Designations"]
@@ -263,10 +266,10 @@
        [:p {:class ["text-slate-500"]} "No one acts on this matter by designation."]
        (for [d ds]
          [:div {:class ["rounded-lg border border-slate-200 p-4"]}
-          [:p {:class ["font-medium text-slate-950"]} (who node (get d "subject"))]
+          [:p {:class ["font-medium text-slate-950"]} (who v (get d "subject"))]
           [:p {:class ["text-sm text-slate-600"]} (get d "capacity")]
           [:p {:class ["mt-1 text-sm text-slate-600"]}
-           (str "Designated by " (who node (get d "issuer")) ", "
+           (str "Designated by " (who v (get d "issuer")) ", "
                 (date (get d "valid-from")) " to " (date (get d "valid-until")) ", to "
                 (str/join ", " (map (comp str/lower-case label) (get d "authority"))) ".")]
           [:p {:class ["mt-1 text-xs text-slate-400"]}
@@ -281,35 +284,37 @@
        (map (fn [[k v]] (str k ": " (if (sequential? v) (str/join ", " v) v))))
        (str/join "; ")))
 
-(defn- documents [node matter-id]
-  (let [docs (matter/documents node matter-id)]
-    [:section {:class section}
-     [:h2 {:class ["mb-3 text-lg font-semibold text-slate-950"]} (str "Documents (" (count docs) ")")]
-     [:table {:class ["w-full text-left text-sm"]}
-      [:thead {:class ["text-xs uppercase tracking-wide text-slate-500"]}
-       [:tr [:th {:class ["py-2"]} "Document"] [:th "Role"] [:th "Joined"] [:th "Status"]
-        [:th "State"] [:th "File"]]]
-      [:tbody {:class ["divide-y divide-slate-100"]}
-       (for [{:keys [xt/id role joined stored-document]} docs
-             :let [state (execute/current-state node id)]]
-         [:tr
-          [:td {:class ["py-2"]}
-           [:a {:href (routes/contract id) :class ["font-mono text-blue-700 hover:underline"]} id]]
-          [:td role]
-          [:td (date joined)]
-          [:td (status-badge (get state "status"))]
-          [:td {:class ["text-xs text-slate-600"]} (state-details state)]
-          [:td (file-link node stored-document)]])]]]))
+(defn- documents
+  "The matter's documents as of the page's day, each with its state then:
+  :matter/documents-as-of, as the page's query read it."
+  [v docs]
+  [:section {:class section}
+   [:h2 {:class ["mb-3 text-lg font-semibold text-slate-950"]} (str "Documents (" (count docs) ")")]
+   [:table {:class ["w-full text-left text-sm"]}
+    [:thead {:class ["text-xs uppercase tracking-wide text-slate-500"]}
+     [:tr [:th {:class ["py-2"]} "Document"] [:th "Role"] [:th "Joined"] [:th "Status"]
+      [:th "State"] [:th "File"]]]
+    [:tbody {:class ["divide-y divide-slate-100"]}
+     (for [{id :contract/id role :membership/role joined :membership/joined
+            stored-document :membership/file state :contract/state} docs]
+       [:tr
+        [:td {:class ["py-2"]}
+         [:a {:href (routes/contract id) :class ["font-mono text-blue-700 hover:underline"]} id]]
+        [:td role]
+        [:td (date joined)]
+        [:td (status-badge (get state "status"))]
+        [:td {:class ["text-xs text-slate-600"]} (state-details state)]
+        [:td (file-link v stored-document)]])]]])
 
-(defn- evidence-line [node {:strs [type issuer credentialSubject]}]
+(defn- evidence-line [v {:strs [type issuer credentialSubject]}]
   (when type
     (str "Under " (if (= "Designation" type)
-                    (str "designation by " (who node issuer))
-                    (str "office grant from " (if (str/starts-with? issuer "did:web") "the Town" (who node issuer))))
+                    (str "designation by " (who v issuer))
+                    (str "office grant from " (if (str/starts-with? issuer "did:web") "the Town" (who v issuer))))
          (when-let [a (seq (get credentialSubject "authority"))]
            (str " (" (str/join ", " (map (comp str/lower-case label) a)) ")")))))
 
-(defn- record-entry [node entry]
+(defn- record-entry [v entry]
   (let [cls (get entry "$class")
 
         [kind text]
@@ -320,35 +325,55 @@
           cert/attestation-class
           ["Attestation" (str (get entry "statement") " — " (get entry "contractId"))]
           cert/designation-class
-          ["Designation" (str "Designated " (who node (get entry "subject")) " as "
+          ["Designation" (str "Designated " (who v (get entry "subject")) " as "
                               (get entry "capacity") ".")]
           [cls ""])]
     [:li {:class ["py-3"]}
      [:div {:class ["flex flex-wrap items-baseline gap-x-3"]}
       [:span {:class ["w-24 font-mono text-xs text-slate-500"]} (date (get entry "valid-from"))]
       [:span {:class ["text-xs font-semibold uppercase tracking-wide text-blue-700"]} kind]
-      [:span {:class ["text-sm text-slate-900"]} (who node (get entry "issuer"))]]
+      [:span {:class ["text-sm text-slate-900"]} (who v (get entry "issuer"))]]
      [:p {:class ["ml-[6.75rem] text-sm text-slate-700"]} text]
      [:p {:class ["ml-[6.75rem] flex flex-wrap gap-x-3 text-xs text-slate-500"]}
-      (when-let [e (evidence-line node (get entry "evidence"))] [:span e])
-      (file-link node (get entry "documentHash"))
+      (when-let [e (evidence-line v (get entry "evidence"))] [:span e])
+      (file-link v (get entry "documentHash"))
       [:span {:class ["text-emerald-700"]} "✓ signature verified"]]]))
 
 (defn show-page
   "The matter: held up against its package's manifest, as of a day (the
   slider, ?as-of=), with its deadlines, timeline, law and guides; then its
-  documents and signed record. ?manifest=json shows the manifest as JSON."
-  [{:keys [biff.xtdb/node] :as ctx}]
-  (let [id (routes/matter-id ctx)]
-    (if-let [{:matter/keys [name package terms] :as matter-record} (matter/get-matter node id)]
-      (let [record (sort-by #(get % "valid-from") (cert/matter-record node id))
-            reg    (store/registry-from-xtdb node)
-            m      (manifest/for-package package)
-            today  (java.time.Instant/now)
-            as-of  (or (some-> (contracts/query-param ctx "as-of") not-empty
-                               (#(try (contracts/end-of-day %) (catch Exception _ nil))))
-                       today)
-            as-of  (if (.isAfter ^java.time.Instant as-of today) today as-of)]
+  documents and signed record. ?manifest=json shows the manifest as JSON.
+
+  Everything it shows is read in one graph query (com.trustblocks.model.
+  reads): the matter's record is verified once, and each person, document
+  and stored file it names is read once, however many sections show it."
+  [ctx]
+  (let [id    (routes/matter-id ctx)
+        today (java.time.Instant/now)
+        as-of (or (some-> (contracts/query-param ctx "as-of") not-empty
+                          (#(try (contracts/end-of-day %) (catch Exception _ nil))))
+                  today)
+        as-of (if (.isAfter ^java.time.Instant as-of today) today as-of)
+        d     (reads/query ctx {:matter/id id}
+                           [[:? :matter/name] [:? :matter/package]
+                            {[:? :matter/terms]
+                             [:contract/id {[:? :contract/instance] [:*]}
+                              {[:? :contract/all-deadlines] [:*]}
+                              {[:? :contract/timeline] reads/timeline-item}]}
+                            {:matter/documents-as-of [:contract/id :membership/role :membership/joined
+                                                      [:? :membership/file] {[:? :contract/state] [:*]}]}
+                            {:matter/record [:*]}
+                            {:matter/people [:identity/did :identity/label]}
+                            {:matter/files [:*]}
+                            {[:? :matter/checklist] [:*]}]
+                           :now today :as-of as-of)]
+    (if-let [terms-d (:matter/terms d)]
+      (let [{:matter/keys [name package record]} d
+            terms  (:contract/id terms-d)
+            v      {:labels (into {} (map (juxt :identity/did :identity/label)) (:matter/people d))
+                    :files  (:matter/files d)}
+            items  (mapv timeline/finish (:contract/timeline terms-d))
+            m      (manifest/for-package package)]
         (ui/page
          {:ui/title (str (or name id) " — Trustblocks")}
          (ui/workspace-header :matters)
@@ -362,32 +387,32 @@
            [:p {:class ["mt-2 text-sm text-slate-500"]}
             [:span {:class ["font-mono"]} id] (when package (str " · package " package)) " · terms "
             [:a {:href (routes/contract terms) :class ["font-mono text-blue-700 hover:underline"]} terms]
-            (when-let [c (get (store/get-instance node terms) "contractorName")]
+            (when-let [c (get (:contract/instance terms-d) "contractorName")]
               (str " · " c))]
            (when m
              [:div {:class ["mt-3 max-w-3xl"]}
               [:p {:class ["text-sm font-medium text-slate-800"]} (:title m)]
               [:p {:class ["mt-1 text-sm leading-6 text-slate-600"]} (:summary m)]])]
-          (contracts/as-of-slider (routes/matter id) (timeline/items node reg terms today) as-of today)
+          (contracts/as-of-slider (routes/matter id) items as-of today)
           (if m
-            (checklist-section node m matter-record as-of today)
+            (checklist-section v m (:matter/checklist d) as-of today)
             [:section {:class section}
              [:p {:class ["text-sm text-slate-500"]}
               (if package
                 (str "The package " package " has no manifest, so there is nothing to hold this matter up against.")
                 "This matter names no package, so it has no manifest.")]])
-          (contracts/deadlines-section node reg terms today)
-          (contracts/timeline-section node reg terms as-of today)
+          (contracts/deadlines-section (:contract/all-deadlines terms-d) terms)
+          (contracts/timeline-section items terms as-of today)
           [:p {:class ["-mt-5 text-sm text-slate-500"]}
            "Notes on the matter are made on its terms' "
            [:a {:href (str (routes/contract terms) "#timeline") :class ["text-blue-700 hover:underline"]} "dashboard"] "."]
-          (documents node id)
-          (designations node record)
+          (documents v (:matter/documents-as-of d))
+          (designations v record)
           [:section {:class section}
            [:h2 {:class ["mb-1 text-lg font-semibold text-slate-950"]} (str "Signed Record (" (count record) ")")]
            [:p {:class ["mb-3 text-sm text-slate-500"]}
             "Every credential naming this matter, by the date of the act, each verified against its signer's key."]
-           [:ol {:class ["divide-y divide-slate-100"]} (map #(record-entry node %) record)]]
+           [:ol {:class ["divide-y divide-slate-100"]} (map #(record-entry v %) record)]]
           (when m
             (list (milestones-section m)
                   (references-section m)

@@ -7,9 +7,9 @@
             [com.trustblocks.app.matters :as matters]
             [com.trustblocks.lib.code :as code]
             [com.trustblocks.model.manifest :as manifest]
-            [com.trustblocks.model.timeline :as timeline]
-            [com.trustblocks.xtdb.matter :as matter]
-            [com.trustblocks.xtdb.store :as store]
+            [com.trustblocks.model.reads :as reads]
+            [com.trustblocks.xtdb.certification :as cert]
+            [com.trustblocks.xtdb.identity :as identity]
             [street-resurfacing-matter-demo :as demo]
             [xtdb.node :as xt.node])
   (:import [java.nio.file Files]
@@ -39,10 +39,9 @@
 (deftest the-matter-held-up-against-its-manifest
   (with-open [node (xt.node/start-node)]
     (loaded! node)
-    (let [m        (manifest/for-package "street-resurfacing")
-          record   (matter/get-matter node demo/matter-id)
+    (let [ctx      {:biff.xtdb/node node}
           by-role  (fn [cl] (into {} (map (juxt :role identity) (:documents cl))))
-          now      (by-role (manifest/checklist node m record))]
+          now      (by-role (reads/checklist ctx demo/matter-id))]
       (testing "the terms, the notices and the vendor form, as instances"
         (is (= :on-record (:standing (now "contract"))))
         (is (true? (:terms (first (:on-record (now "contract"))))))
@@ -62,9 +61,9 @@
         (is (= :optional (:standing (now "bid-bond"))))
         (is (= :not-yet (:standing (now "certificate-of-final-acceptance")))))
       (testing "nothing on record goes unlisted"
-        (is (empty? (:unlisted (manifest/checklist node m record)))))
+        (is (empty? (:unlisted (reads/checklist ctx demo/matter-id)))))
       (testing "as of June 20: the Notice of Award, not yet the forms or the Notice to Proceed"
-        (let [then (by-role (manifest/checklist node m record :at (Instant/parse "2026-06-20T23:59:59Z")))]
+        (let [then (by-role (reads/checklist ctx demo/matter-id :at (Instant/parse "2026-06-20T23:59:59Z")))]
           (is (= :on-record (:standing (then "notice-of-award"))))
           (is (= :not-on-record (:standing (then "certificate-of-insurance"))))
           (is (= :not-yet (:standing (then "notice-to-proceed"))))
@@ -73,7 +72,7 @@
 (deftest receipts-that-move-no-lifecycle-are-on-the-timeline
   (with-open [node (xt.node/start-node)]
     (loaded! node)
-    (let [items (timeline/items node (store/registry-from-xtdb node) demo/contract-id (Instant/now))]
+    (let [items (reads/timeline-items {:biff.xtdb/node node} demo/contract-id)]
       (is (= 3 (count (filter #(= :receipt (:kind %)) items))))
       (is (some #(= "Received: IRS Form W-9" (:title %)) items))
       (testing "a receipt that moved a lifecycle is its event, not a receipt too"
@@ -115,3 +114,19 @@
       (is (= "text-sky-300" (get (spans "{:role \"x\"}") ":role")))
       (is (= "text-sky-300" (get (spans "[:$class :string]") ":$class")))
       (is (= "text-emerald-300" (get (spans ";; note") ";; note"))))))
+
+(deftest the-matter-page-reads-each-thing-once
+  ;; Every section of the page is drawn from one graph query
+  ;; (com.trustblocks.model.reads): the matter's record is verified once, and
+  ;; each person on it looked up once -- not once per section, as the page
+  ;; did before (107 verifications and 165 lookups for this matter).
+  (with-open [node (xt.node/start-node)]
+    (loaded! node)
+    (let [calls   (atom {})
+          counted (fn [k f] (fn [& args] (swap! calls update k (fnil inc 0)) (apply f args)))]
+      (with-redefs [cert/matter-record (counted :matter-record cert/matter-record)
+                    identity/by-did    (counted :by-did identity/by-did)]
+        (is (str/includes? (page node) "What the package calls for")))
+      (is (= 1 (:matter-record @calls)))
+      (testing "one lookup per person the page names, not per mention"
+        (is (<= (:by-did @calls) 10))))))

@@ -342,13 +342,16 @@
   one). A record that fails to verify is left out, as
   attestations-for-contract leaves it."
   [node matter-id]
-  (let [decode (fn [jwt]
+  (let [;; A matter's record is signed by a handful of people, many times
+        ;; over: look each one up once.
+        signer (memoize #(identity/by-did node %))
+        decode (fn [jwt]
                  (try (let [{:keys [vc iss]} (interop/jws-claims jwt)]
                         {"issuer" iss "credentialSubject" (into {} (get vc "credentialSubject"))
                          "type" (last (get vc "type"))})
                       (catch Exception _ nil)))]
     (keep (fn [{:keys [issuer subject jwt valid-from valid-until] cls :concerto/class}]
-            (when-let [signer (identity/by-did node issuer)]
+            (when-let [signer (signer issuer)]
               ;; At its own signed validFrom, for the reason
               ;; office-grant-authorization gives.
               (let [signed (try (java.time.Instant/parse

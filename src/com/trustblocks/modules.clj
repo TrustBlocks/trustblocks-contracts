@@ -14,7 +14,7 @@
             [com.trustblocks.app.templates :as app.templates]
             [com.trustblocks.app.trigger :as app.trigger]
             [com.trustblocks.lib.ui :as ui]
-            [com.trustblocks.model.contract :as model.contract]))
+            [com.trustblocks.model.reads :as model.reads]))
 
 (def modules
   [{:biff.core/init {:biff.ring/on-error #'ui/on-error}}
@@ -23,7 +23,7 @@
    (biff.ring/module)
    (biff.datastar/module)
    (biff.graph/module)
-   model.contract/module
+   model.reads/module
    app.auth/module
    app.landing/module
    app.contracts/module

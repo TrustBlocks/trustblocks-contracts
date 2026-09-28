@@ -69,8 +69,7 @@
   org.accordproject.runtime@0.2.0.cto declares relationships to
   Participant, a type nothing in this codebase defines, and the model
   still validates -- and concerto-clj treats a relationship's value as the
-  bare referenced id rather than the referenced document (see
-  com.trustblocks.model.graph). A class's own fields is the same boundary
+  bare referenced id rather than the referenced document. A class's own fields is the same boundary
   this library already draws elsewhere for what a relationship's target
   owes the class holding it."
   [prop]
