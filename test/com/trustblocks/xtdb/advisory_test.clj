@@ -4,13 +4,12 @@
   nothing. Over the STR-27 demo matter."
   (:require [clojure.test :refer [deftest is testing]]
             [com.trustblocks.did.interop :as interop]
-            [com.trustblocks.model.timeline :as timeline]
+            [com.trustblocks.model.reads :as reads]
             [com.trustblocks.xtdb.advance :as advance]
             [com.trustblocks.xtdb.advisory :as advisory]
             [com.trustblocks.xtdb.certification :as cert]
             [com.trustblocks.xtdb.execute :as execute]
             [com.trustblocks.xtdb.identity :as identity]
-            [com.trustblocks.xtdb.store :as store]
             [street-resurfacing-matter-demo :as demo]
             [xtdb.node :as xt.node])
   (:import [java.nio.file Files]
@@ -88,7 +87,7 @@
       (testing "on the document's timeline, and its matter's terms', marked as AI advice"
         (doseq [id ["str-27-pay-3" demo/contract-id]]
           (let [item (first (filter #(= :advisory (:kind %))
-                                    (timeline/items node (store/registry-from-xtdb node) id (Instant/now))))]
+                                    (reads/timeline-items {:biff.xtdb/node node} id)))]
             (is (= text (:title item)))
             (is (= "Pay request assistant (AI agent)" (:who item)))
             (is (re-find #"designated to advise by Teresa Barringer" (:detail item))))))

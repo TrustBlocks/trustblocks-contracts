@@ -18,7 +18,7 @@
   else is affected."
   (:require [clojure.java.io :as io]
             [clojure.java.shell :as shell]
-            [com.trustblocks.model.graph :as model.graph]
+            [com.trustblocks.model.properties :as model.properties]
             [com.trustblocks.template.render :as render])
   (:import [java.nio.file Files]
            [java.nio.file.attribute FileAttribute]))
@@ -68,7 +68,7 @@
   (cond
     (and (map? instance) (get instance "$class"))
     (let [optional (set (keep #(when (:isOptional %) (:name %))
-                              (model.graph/own-properties reg (get instance "$class"))))]
+                              (model.properties/own-properties reg (get instance "$class"))))]
       (into {} (keep (fn [[k v]] (when-not (optional k) [k (blank reg v)]))) instance))
 
     (sequential? instance) (mapv #(blank reg %) instance)

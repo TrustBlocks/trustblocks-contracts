@@ -27,17 +27,14 @@
   documents' events and deadlines are on its timeline too -- STR-27's pay
   requests on STR-27 -- each marked with the document it belongs to."
   (:require [clojure.string :as str]
-            [com.trustblocks.xtdb.advisory :as advisory]
-            [com.trustblocks.model.deadlines :as deadlines]
-            [com.trustblocks.model.graph :as model.graph]
-            [com.trustblocks.xtdb.certification :as cert]
-            [com.trustblocks.xtdb.execute :as execute]
-            [com.trustblocks.xtdb.identity :as identity]
-            [com.trustblocks.xtdb.matter :as matter]
-            [com.trustblocks.xtdb.note :as note]
-            [com.trustblocks.xtdb.receipt :as receipt]
-            [com.trustblocks.runtime :as runtime]
-            [com.trustblocks.xtdb.store :as store]))
+            [com.trustblocks.model.properties :as model.properties]
+            [com.trustblocks.xtdb.execute :as execute]))
+
+;; Pure: everything here is built from what com.trustblocks.model.reads
+;; resolves (:contract/timeline). People are refs -- {:identity/did ...} or
+;; {:identity/email ...} under :who, :subject and :by -- so a page's one
+;; graph query resolves each person once, however many items name them;
+;; `finish` then writes the names in.
 
 (defn- instant [x]
   (try (execute/->instant x) (catch Exception _ nil)))
@@ -51,55 +48,54 @@
   (let [spaced (str/lower-case (str/replace s #"([a-z0-9])([A-Z])" "$1 $2"))]
     (str (str/upper-case (subs spaced 0 1)) (subs spaced 1))))
 
-(defn- who
-  "'Teresa Barringer, Zoning Administrator' for a DID or an email on file."
-  [node {:keys [did email]}]
-  (if-let [o (or (some->> did (identity/by-did node)) (some->> email (identity/by-email node)))]
-    (str (:identity/name o) ", " (:identity/office o))
-    (or email did)))
-
-(defn- events [node document]
-  (for [{:keys [at by request certification]} (execute/history node document)
+(defn- events
+  "Each execution of `document`: `history` as com.trustblocks.model.reads
+  gives it, each execution with :who, the person who took the step."
+  [document history]
+  (for [{:keys [at request certification who]} history
         :let [t (instant at)] :when t]
     {:at       t
      :kind     :event
      :document document
      :title    (words (short-name (:concerto/class request)))
-     :who      (who node (if certification {:did (:did certification)} {:email by}))
+     :who      who
      :detail   (when certification
                  (str "Certified by " (str/lower-case (:credential certification))
                       " under " (:authority certification)))}))
 
-(defn- designations [node matter-id]
-  (for [d (cert/matter-record node matter-id)
-        :when (= cert/designation-class (get d "$class"))]
-    {:at     (get d "valid-from")
-     :kind   :designation
-     :title  (str "Designated: " (who node {:did (get d "subject")}))
-     :who    (who node {:did (get d "issuer")})
-     :detail (str (get d "capacity") " -- "
-                  (str/join ", " (map #(str/lower-case (words (str/replace % "_" " ")))
-                                      (get d "authority"))))}))
+(defn- designations [record]
+  (for [d record
+        ;; certification/designation-class, not required here: this
+        ;; namespace reads nothing.
+        :when (= "com.trustblocks.identity@1.0.0.Designation" (get d "$class"))]
+    {:at      (get d "valid-from")
+     :kind    :designation
+     :title   "Designated: "
+     :subject {:identity/did (get d "subject")}
+     :who     {:identity/did (get d "issuer")}
+     :detail  (str (get d "capacity") " -- "
+                   (str/join ", " (map #(str/lower-case (words (str/replace % "_" " ")))
+                                       (get d "authority"))))}))
 
-(defn- receipts [node matter-id]
-  (for [r (receipt/receipts-for-matter node matter-id)
+(defn- receipt-items [receipts]
+  (for [r receipts
         :when (not (get r "contractId"))]
     {:at     (get r "received-at")
      :kind   :receipt
      :title  (str "Received: " (or (get r "description") (get r "documentRole") "a document"))
-     :who    (who node {:did (get r "issuer")})
+     :who    {:identity/did (get r "issuer")}
      :detail (str "From " (get r "receivedFrom")
                   (when-let [role (get r "documentRole")] (str " -- " role)))}))
 
 (defn- contract-dates [reg instance]
-  (for [prop (model.graph/own-properties reg (get instance "$class"))
+  (for [prop (model.properties/own-properties reg (get instance "$class"))
         :when (= "DateTimeProperty" (last (str/split (str (:$class prop)) #"\.")))
         :let [v (get instance (:name prop)) t (instant v)]
         :when t]
     {:at t :kind :date :title (words (:name prop)) :detail "A date the contract names"}))
 
-(defn- deadline-items [node reg id now]
-  (for [{:keys [name description document due status]} (deadlines/for-contract node reg id now)
+(defn- deadline-items [deadlines]
+  (for [{:keys [name description document due status]} deadlines
         :when due]
     {:at       due
      :kind     :deadline
@@ -108,53 +104,56 @@
      :title    (str name (case status :met " -- met" :passed " -- passed" ""))
      :detail   description}))
 
-(defn- notes [node contract]
-  (for [{:keys [author text about recorded]} (note/for-contract node contract)]
-    {:at about :kind :note :title text :who (who node {:email author}) :recorded recorded}))
+(defn- note-items [notes]
+  (for [{:keys [author text about recorded]} notes]
+    {:at about :kind :note :title text :who {:identity/email author} :recorded recorded}))
 
-(defn- advisories [node id]
-  (for [a (advisory/for-document node id)]
+(defn- advisory-items [advisories]
+  (for [a advisories]
     {:at       (get a "valid-from")
      :kind     :advisory
      :document (get a "contractId")
      :title    (get a "text")
-     :who      (str (:identity/name (identity/by-did node (get a "issuer"))) " (AI agent)")
-     :detail   (str "Advice, not a determination -- designated to advise by "
-                    (who node {:did (get-in a ["evidence" "issuer"])}))}))
+     :who      {:identity/did (get a "issuer")}
+     :by       {:identity/did (get-in a ["evidence" "issuer"])}
+     :detail   "Advice, not a determination -- designated to advise by "}))
 
-(defn matter-of-terms
-  "The matter `id` anchors, or nil."
-  [node id]
-  (first (filter #(= id (:matter/terms %)) (matter/all node))))
+(defn assemble
+  "Contract `id`'s timeline, oldest first, people as refs.
 
-(defn items
-  "Contract `id`'s timeline, oldest first. `now` places the due dates."
-  [node reg id now]
-  (let [instance  (store/get-instance node id :reg reg)
-        matter-id (:xt/id (matter-of-terms node id))
-        documents (when matter-id (map :xt/id (matter/documents node matter-id)))]
-    (->> (concat (events node id)
-                 (mapcat #(events node %) documents)
-                 (when matter-id (designations node matter-id))
-                 (when matter-id (receipts node matter-id))
-                 (contract-dates reg instance)
-                 (deadline-items node reg id now)
-                 (notes node id)
-                 (advisories node id))
-         (sort-by :at)
-         vec)))
+    instance    the contract (Concerto JSON), reg its registry
+    history     its executions
+    documents   when it anchors a matter: [[document-id history] ...]
+    record      its matter's verified record; receipts its receipts
+    deadlines   its deadlines and its documents' (model.deadlines/compute)
+    notes, advisories"
+  [{:keys [id reg instance history documents record receipts deadlines notes advisories]}]
+  (->> (concat (events id history)
+               (mapcat (fn [[doc h]] (events doc h)) documents)
+               (designations record)
+               (receipt-items receipts)
+               (contract-dates reg instance)
+               (deadline-items deadlines)
+               (note-items notes)
+               (advisory-items advisories))
+       (sort-by :at)
+       vec))
 
-(defn next-steps
-  "What can happen to `id` next, from its lifecycle and its status as of
-  `at`: each transition with the certification it needs."
-  [node id at]
-  (let [instance (store/get-instance node id)
-        lc       (some->> (get instance "$class") (execute/get-lifecycle node))
-        status   (get (execute/current-state node id :at at) "status")]
-    (runtime/next-steps lc status)))
+(defn finish
+  "An item whose people the graph has resolved (each ref now carrying
+  :identity/label, and :identity/name for an agent), with the names written
+  into it: :who as 'Teresa Barringer, Zoning Administrator' -- or, for an AI
+  agent's advice, its name and '(AI agent)' -- a designation's title, and
+  whom an agent's advice is designated by."
+  [{:keys [kind who subject by] :as item}]
+  (cond-> (dissoc item :who :subject :by)
+    who     (assoc :who (if (= :advisory kind)
+                          (str (:identity/name who) " (AI agent)")
+                          (:identity/label who)))
+    subject (update :title str (:identity/label subject))
+    by      (update :detail str (:identity/label by))))
 
 (defn accepting?
-  "Whether `status` is final in `id`'s lifecycle."
-  [node id status]
-  (let [lc (some->> (store/get-instance node id) (#(get % "$class")) (execute/get-lifecycle node))]
-    (boolean (some #(and (= status (get % "name")) (get % "accepting")) (get lc "states")))))
+  "Whether `status` is final in `lifecycle`."
+  [lifecycle status]
+  (boolean (some #(and (= status (get % "name")) (get % "accepting")) (get lifecycle "states"))))

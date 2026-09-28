@@ -64,8 +64,9 @@ src/com/trustblocks/
     middleware.clj            wrap-signed-in
 
   model/                    (NOTE: src/com/trustblocks/model/, distinct from the repo-root model/ below)
-    contract.clj               coarse-grained biff.graph resolvers (:contract/data, :state, :history)
-    graph.clj                  generates one biff.graph resolver PER Concerto property from the live registry
+    reads.clj                  the biff.graph resolvers the matter page and contract dashboard read through --
+                                one query per page, each thing fetched once (see its docstring for the entities)
+    properties.clj             a Concerto class's properties in reader order (own-properties)
     playground.clj             links out to Accord's Concerto Playground and Trustblocks' Template Playground
                                 (our fork, carrying clause + lifecycle) — read its docstring before touching
                                 anything playground-related
@@ -280,8 +281,8 @@ not a starting point to improve on.**
   tests. `app/trigger.clj` has a handler test for its 409 refusals only.
   `template/render.clj` has its own tests (formats, scoping, lists, tables,
   escaping, and both real templates rendering with no unresolved token).
-  `model/graph.clj` and `app/contracts.clj` have
-  none — they're exercised by the `dev/*_demo.clj` scripts and manual curl
+  `app/contracts.clj` has
+  none of its own — they're exercised by the `dev/*_demo.clj` scripts and manual curl
   instead. Don't assume test presence maps to code
   age or importance.
 - **One PR per coherent increment**, each independently mergeable, each with
@@ -326,10 +327,12 @@ not a starting point to improve on.**
   `logic/*.ts` as a citable artifact) but `execute.clj`'s `run-clause`
   refuses to execute them (`:runtime-unavailable`) — no TypeScript backend
   exists.
-- **Field-level GraphQL-ish querying** (`model/graph.clj`, `model/contract.clj`):
-  resolvers are generated correctly from any ingested model, but there is no
-  UI or route that actually calls `biff.graph/query` with them today — reachable
-  only from a REPL or a new caller you'd have to write.
+- **Page reads go through biff.graph** (`model/reads.clj`): the matter page
+  and the contract dashboard each make one graph query; the timeline,
+  deadlines and manifest checklist are pure functions over what it resolves.
+  New read-heavy pages should add resolvers there rather than fetch per
+  section. (The earlier per-Concerto-property resolvers, which nothing
+  called, were removed.)
 - **Cross-contract party querying** (`src/com/trustblocks/contract.clj`,
   `signed-by`/`as-of`): implemented, but not registered in `modules.clj` and
   not reachable from the running app — only exercised by
@@ -496,10 +499,10 @@ there, run with `-M:templates-local` (e.g. `bin/clj -M:templates-local:run test`
 
 ## 8. Recommended next steps
 
-1. **Decide whether `com.trustblocks.contract` (party querying) and
-   `model/graph.clj`'s field-level resolvers get a real caller, or get
-   removed.** Both are complete, working code with zero production callers;
-   left alone indefinitely they'll bit-rot against model/schema changes
+1. **Decide whether `com.trustblocks.contract` (party querying) gets a real
+   caller, or gets removed.** (`model/graph.clj`'s field-level resolvers were
+   removed.) It is complete, working code with zero production callers;
+   left alone indefinitely it'll bit-rot against model/schema changes
    nothing exercises them against.
 2. **Decide whether provisioning warrants a guarded admin UI.** A concrete
    REPL path now exists in `docs/operator-runbook.md`; onboarding no longer

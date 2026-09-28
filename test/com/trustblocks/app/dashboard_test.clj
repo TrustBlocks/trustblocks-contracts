@@ -6,9 +6,8 @@
             [clojure.test :refer [deftest is testing]]
             [com.trustblocks.app.auth :as auth]
             [com.trustblocks.app.contracts :as contracts]
-            [com.trustblocks.model.timeline :as timeline]
+            [com.trustblocks.model.reads :as reads]
             [com.trustblocks.xtdb.note :as note]
-            [com.trustblocks.xtdb.store :as store]
             [street-resurfacing-matter-demo :as demo]
             [xtdb.node :as xt.node])
   (:import [java.nio.file Files]
@@ -25,7 +24,7 @@
 (deftest a-contracts-timeline-includes-its-matters-documents
   (with-open [node (xt.node/start-node)]
     (loaded! node)
-    (let [items (timeline/items node (store/registry-from-xtdb node) demo/contract-id (Instant/now))
+    (let [items (reads/timeline-items {:biff.xtdb/node node} demo/contract-id)
           kinds (frequencies (map :kind items))]
       (testing "the pay requests' and the vendor form's certified steps, each with its document"
         (is (= 12 (:event kinds)))

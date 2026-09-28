@@ -10,7 +10,7 @@
   templates commit deps.edn pins.
 
   The checklist puts what is on record beside what the manifest lists, by
-  role:
+  role -- a pure function of what com.trustblocks.model.reads reads:
 
     TERMS     the matter's terms instance
     TEMPLATE  the matter's documents that joined with the role
@@ -24,10 +24,7 @@
   document not on record is something to see, not a refusal or a notice."
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
-            [clojure.string :as str]
-            [com.trustblocks.xtdb.execute :as execute]
-            [com.trustblocks.xtdb.matter :as matter]
-            [com.trustblocks.xtdb.receipt :as receipt]))
+            [clojure.string :as str]))
 
 (defn source
   "The text of `package`'s manifest.edn, or nil when it has none."
@@ -70,18 +67,18 @@
 ;; ------------------------------------------------------------------ checklist
 
 (defn- on-record
-  "What matter `matter-id` has on record for each role, as of `at`:
-  {role [{:kind :instance|:receipt :id :at :file :status}]}."
-  [node {:keys [xt/id] :matter/keys [terms]} terms-role at]
-  (let [docs     (matter/documents node id :at at)
-        members  (for [{:keys [xt/id role joined stored-document]} docs]
-                   [role {:kind :instance :id id :at joined :file stored-document
-                          :status (get (execute/current-state node id :at at) "status")}])
+  "What the matter has on record for each role, as of `at`:
+  {role [{:kind :instance|:receipt :id :at :file :status}]}. `documents` are
+  its memberships as of `at`, each with the document's :status; `receipts`
+  its verified receipts."
+  [{:keys [terms documents receipts]} terms-role at]
+  (let [members  (for [{:keys [xt/id role joined stored-document status]} documents]
+                   [role {:kind :instance :id id :at joined :file stored-document :status status}])
         ;; A receipt of a document's own file is that document, already
         ;; listed; any other names a stored document of its own -- an
         ;; engineer's certificate received with a pay request.
-        own-files (set (keep :stored-document docs))
-        receipts (for [r (receipt/receipts-for-matter node id)
+        own-files (set (keep :stored-document documents))
+        receipts (for [r receipts
                        :when (and (get r "documentRole")
                                   (not (own-files (get r "documentHash")))
                                   (not (.isAfter ^java.time.Instant (get r "received-at") at)))]
@@ -106,12 +103,17 @@
 
   A phase has begun when it, or a later phase, has anything on record.
   Also returns, under :unlisted, what is on record under a role the
-  manifest does not list, so nothing on file goes unshown."
-  [node manifest matter & {:keys [at]}]
+  manifest does not list, so nothing on file goes unshown.
+
+  `matter` is what com.trustblocks.model.reads resolves for it
+  (:matter/checklist): {:terms <terms instance id>, :documents <its
+  memberships as of `at`, each with :status>, :receipts <its verified
+  receipts>}."
+  [manifest matter & {:keys [at]}]
   (let [at       (or at (java.time.Instant/now))
         docs     (:documents manifest)
         terms    (:role (first (filter #(= "TERMS" (:treatment %)) docs)))
-        record   (on-record node matter terms at)
+        record   (on-record matter terms at)
         order    (zipmap (map :name (:phases manifest)) (range))
         begun    (reduce max -1 (keep #(when (seq (record (:role %))) (order (:phase %))) docs))]
     {:documents

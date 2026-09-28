@@ -20,17 +20,16 @@
             [com.trustblocks.lib.code :as code]
             [com.trustblocks.lib.middleware :as mid]
             [com.trustblocks.lib.ui :as ui]
-            [com.trustblocks.model.deadlines :as deadlines]
-            [com.trustblocks.model.graph :as model.graph]
+            [com.trustblocks.model.properties :as model.properties]
             [com.trustblocks.model.malli :as model.malli]
             [com.trustblocks.model.playground :as pg]
+            [com.trustblocks.model.reads :as reads]
             [com.trustblocks.model.timeline :as timeline]
             [com.trustblocks.routes :as routes]
+            [com.trustblocks.runtime :as runtime]
             [com.trustblocks.template.archive :as archive]
             [com.trustblocks.template.render :as render]
             [com.trustblocks.template.word :as word]
-            [com.trustblocks.xtdb.certification :as cert]
-            [com.trustblocks.xtdb.execute :as execute]
             [com.trustblocks.xtdb.identity :as identity]
             [com.trustblocks.xtdb.note :as note]
             [com.trustblocks.xtdb.store :as store]
@@ -64,14 +63,14 @@
 
 (defn render-instance
   "A Concerto instance as a read-only field list, in the $class's own
-  declared property order (com.trustblocks.model.graph/own-properties) --
+  declared property order (com.trustblocks.model.properties/own-properties) --
   the order a human reading the source contract would expect, not JSON key
   order (unspecified) or alphabetical (meaningless). $class/$identifier
   aren't shown; they're the type and the id, not a term of the contract."
   [reg instance]
   (let [fqn (get instance "$class")]
     [:dl {:class ["divide-y divide-gray-100"]}
-     (for [prop (model.graph/own-properties reg fqn)
+     (for [prop (model.properties/own-properties reg fqn)
            :let [pname (:name prop)
                  v     (get instance pname)]
            :when (some? v)]
@@ -190,23 +189,18 @@
      [:p {:class ["text-gray-500"]} "response"]
      [:pre {:class ["whitespace-pre-wrap break-words"]} (pr-str response)]]]])
 
-(defn- officeholder-label
-  "'Pamela Mills, Town Clerk', or the bare did if no identity is on file
-  for it -- a signature always verifies against a did (see
-  com.trustblocks.xtdb.certification/attestations-for-contract), so
-  this only falls back if that identity has since been removed."
-  [node did]
-  (if-let [officeholder (identity/by-did node did)]
-    (str (:identity/name officeholder) ", " (:identity/office officeholder))
-    did))
-
-(defn- attestation-row [node attestation]
+(defn- attestation-row
+  "One attestation; `labels` names its signer -- 'Pamela Mills, Town
+  Clerk', or the bare did if no identity is on file for it (a signature
+  always verifies against a did, so this only falls back if that identity
+  has since been removed)."
+  [labels attestation]
   (let [{:strs [statement documentHash evidence]} attestation
         issuer     (get attestation "issuer")
         valid-from (get attestation "valid-from")]
     [:div {:class ["border rounded p-3"]}
      [:p {:class ["text-xs text-gray-500 mb-1"]}
-      (str valid-from " -- " (officeholder-label node issuer))]
+      (str valid-from " -- " (get labels issuer issuer))]
      [:p {:class ["text-sm"]} statement]
      [:p {:class ["text-xs text-gray-500 mt-1"]} (str "Document: " documentHash)]
      (when evidence
@@ -252,10 +246,10 @@
   page itself is already behind wrap-signed-in -- but only an email
   registered as an officeholder (com.trustblocks.xtdb.identity/by-email)
   sees the form; certify! re-checks their actual authority regardless,
-  this is only about whether to offer the form at all."
-  [{:keys [biff.xtdb/node session] :as ctx} id]
-  (let [attestations (cert/attestations-for-contract node id)
-        officeholder (some->> (:uid session) (auth/user-email ctx) (identity/by-email node))
+  this is only about whether to offer the form at all. `attestations` and
+  `labels` (did -> label) are what the page's query read."
+  [{:keys [biff.xtdb/node session] :as ctx} id attestations labels]
+  (let [officeholder (some->> (:uid session) (auth/user-email ctx) (identity/by-email node))
         authority    (certify/required-authority node id)
         error        (query-param ctx "certify-error")]
     [:section {:class ["rounded-xl border border-slate-200 bg-white p-6 shadow-sm"]}
@@ -264,7 +258,7 @@
        [:p {:class ["mb-3 rounded-md bg-red-50 px-3 py-2 text-sm font-medium text-red-700"]} error])
      (if (empty? attestations)
        [:p {:class ["mb-4 text-slate-500"]} "No certifications recorded."]
-       [:div {:class ["mb-5 space-y-3"]} (map #(attestation-row node %) attestations)])
+       [:div {:class ["mb-5 space-y-3"]} (map #(attestation-row labels %) attestations)])
      (cond
        (not authority)
        [:p {:class ["text-sm text-slate-400"]}
@@ -352,9 +346,10 @@
   "The watch list: each deadline the contract sets, and its documents set,
   with where it stands -- on the dashboard, and on the matter page for the
   matter's terms. Shown, never acted on -- what follows a passed
-  deadline is the Town's decision."
-  [node reg id today]
-  (let [ds (->> (deadlines/for-contract node reg id today)
+  deadline is the Town's decision. `deadlines` is the contract's
+  :contract/all-deadlines (com.trustblocks.model.reads)."
+  [deadlines id]
+  (let [ds (->> deadlines
                 (filter :due)
                 (sort-by (juxt #(case (:status %) :passed 0 :upcoming 1 :met 2) :due)))]
     (when (seq ds)
@@ -375,11 +370,13 @@
             [:p {:class ["text-xs text-slate-500"]}
              (str/join " -- " (remove nil? [description (when met-at (str "Met " (day met-at)))]))]]])]])))
 
-(defn- where-it-stands [node reg id as-of today]
-  (let [state  (execute/current-state node id :reg reg :at as-of)
-        status (get state "status")
-        steps  (timeline/next-steps node id as-of)
-        matter (timeline/matter-of-terms node id)]
+(defn- where-it-stands
+  "Its state as of `as-of`, and what can happen next: from what the page's
+  query read (`d`)."
+  [reg {:contract/keys [state lifecycle terms-of]} as-of today]
+  (let [status (get state "status")
+        steps  (runtime/next-steps lifecycle status)
+        matter (when terms-of {:xt/id (:matter/id terms-of) :matter/name (:matter/name terms-of)})]
     [:section {:class ["rounded-xl border border-slate-200 bg-white p-6 shadow-sm"]}
      [:div {:class ["mb-4 flex flex-wrap items-center justify-between gap-3"]}
       [:h2 {:class ["text-lg font-semibold text-slate-950"]}
@@ -399,7 +396,7 @@
          (for [{:keys [event to] :as step} steps]
            [:li [:span {:class ["font-mono"]} event] (str " → " to ", " (requirement-text step))])]]
 
-       (and status (timeline/accepting? node id status))
+       (and status (timeline/accepting? lifecycle status))
        [:p {:class ["text-sm text-slate-600"]} "Its lifecycle is complete."]
 
        (not status)
@@ -433,11 +430,11 @@
               (when (< (epoch-day recorded) (epoch-day at)) " -- before the day it is about"))])]]))
 
 (defn timeline-section
-  "Contract `id`'s timeline (com.trustblocks.model.timeline), divided at
-  `as-of` -- on the dashboard, and on the matter page for its terms."
-  [node reg id as-of today]
-  (let [items  (timeline/items node reg id today)
-        [past future] (split-with #(not (.isAfter ^java.time.Instant (:at %) ^java.time.Instant as-of)) items)]
+  "Contract `id`'s timeline -- `items`, finished (com.trustblocks.model.
+  timeline/finish) -- divided at `as-of`: on the dashboard, and on the
+  matter page for its terms."
+  [items id as-of today]
+  (let [[past future] (split-with #(not (.isAfter ^java.time.Instant (:at %) ^java.time.Instant as-of)) items)]
     [:section {:class ["rounded-xl border border-slate-200 bg-white p-6 shadow-sm"]}
      [:h2 {:class ["mb-1 text-lg font-semibold text-slate-950"]} "Timeline"]
      [:p {:class ["mb-3 text-sm text-slate-500"]}
@@ -480,22 +477,41 @@
       (note/add! node {:contract id :author (auth/user-email ctx (:uid session)) :text text :about about}))
     {:status 303 :headers {"location" (str (routes/contract id) "#timeline")}}))
 
+(defn- people-labels
+  "{did label} for the people a query resolved."
+  [people]
+  (into {} (map (juxt :identity/did :identity/label)) people))
+
 (defn show-page
   "The contract dashboard: where it stands as of a day (the slider, ?as-of=),
-  its timeline, notes, its data, and its certifications."
+  its timeline, notes, its data, and its certifications -- everything read
+  in one graph query (com.trustblocks.model.reads), so each thing it shows
+  in several places is read once."
   [{:keys [biff.xtdb/node] :as ctx}]
-  (let [id       (routes/contract-id ctx)
-        reg      (store/registry-from-xtdb node)
-        instance (store/get-instance node id :reg reg)]
+  (let [id      (routes/contract-id ctx)
+        today   (java.time.Instant/now)
+        as-of   (or (some-> (query-param ctx "as-of") not-empty
+                            (#(try (end-of-day %) (catch Exception _ nil))))
+                    today)
+        as-of   (if (.isAfter ^java.time.Instant as-of today) today as-of)
+        reg     (store/registry-from-xtdb node)
+        d       (reads/query ctx {:contract/id id}
+                             [{[:? :contract/instance] [:*]}
+                              {[:? :contract/state] [:*]}
+                              {[:? :contract/lifecycle] [:*]}
+                              {[:? :contract/terms-of] [:matter/id [:? :matter/name]]}
+                              {[:? :contract/all-deadlines] [:*]}
+                              {[:? :contract/timeline] reads/timeline-item}
+                              {:contract/history [:*]}
+                              {:contract/attestations [:*]}
+                              {:contract/attestation-people [:identity/did :identity/label]}]
+                             :now today :as-of as-of :registry reg)
+        instance (:contract/instance d)]
     (if-not instance
       (ui/on-error {:status 404})
       (let [fqn     (get instance "$class")
-            today   (java.time.Instant/now)
-            as-of   (or (some-> (query-param ctx "as-of") not-empty
-                                (#(try (end-of-day %) (catch Exception _ nil))))
-                        today)
-            as-of   (if (.isAfter ^java.time.Instant as-of today) today as-of)
-            history (execute/history node id)]
+            history (:contract/history d)
+            items   (mapv timeline/finish (:contract/timeline d))]
         (ui/page
          {:ui/title (str id " — Trustblocks")}
          (ui/workspace-header :contracts)
@@ -512,17 +528,18 @@
              "Inspect stored model"]]
            (contract-actions node reg instance id)]
 
-          (as-of-slider (routes/contract id) (timeline/items node reg id today) as-of today)
-          (where-it-stands node reg id as-of today)
-          (deadlines-section node reg id today)
-          [:div {:id "timeline"} (timeline-section node reg id as-of today)]
+          (as-of-slider (routes/contract id) items as-of today)
+          (where-it-stands reg d as-of today)
+          (deadlines-section (:contract/all-deadlines d) id)
+          [:div {:id "timeline"} (timeline-section items id as-of today)]
           (note-form id today)
 
           [:section {:class ["rounded-xl border border-slate-200 bg-white p-6 shadow-sm"]}
            [:h2 {:class ["mb-2 text-lg font-semibold text-slate-950"]} "Contract Data"]
            (render-instance reg instance)]
 
-          (certifications-section ctx id)
+          (certifications-section ctx id (:contract/attestations d)
+                                  (people-labels (:contract/attestation-people d)))
 
           [:details {:class ["rounded-xl border border-slate-200 bg-white p-6 shadow-sm"]}
            [:summary {:class ["cursor-pointer text-lg font-semibold text-slate-950"]}
@@ -594,7 +611,7 @@
            [:thead
             [:tr {:class ["text-left text-gray-500"]}
              [:th {:class ["pb-2"]} "Property"] [:th {:class ["pb-2"]} "Type"] [:th {:class ["pb-2"]} ""]]]
-           [:tbody (map render-property (model.graph/own-properties reg fqn))]]])))))
+           [:tbody (map render-property (model.properties/own-properties reg fqn))]]])))))
 
 (defn- concerto-source-block [node ns]
   [:div {:class ["mb-6"]}
