@@ -28,6 +28,8 @@
   (:require [clojure.java.io :as io]
             [xtdb.api :as xt])
   (:import [java.io File InputStream]
+           [org.apache.pdfbox Loader]
+           [org.apache.pdfbox.text PDFTextStripper]
            [java.nio.file FileAlreadyExistsException Files Path StandardCopyOption]
            [java.nio.file.attribute FileAttribute]
            [java.security DigestInputStream MessageDigest]))
@@ -134,3 +136,21 @@
         (throw (ex-info "Stored document does not match its hash"
                         {:trustblocks/error :document-corrupt :id id})))
       bs)))
+
+(defn text
+  "Document `id`'s text -- a PDF's extracted text, or a text file's
+  contents -- or nil for a file with none to give (an image, a scan). Read
+  through `content`, so a file that no longer matches its hash is refused
+  here too."
+  ^String [node root id]
+  (let [bytes      (content root id)
+        media-type (:document/media-type (get-document node id))]
+    (cond
+      (= "application/pdf" media-type)
+      (with-open [pdf (Loader/loadPDF ^bytes bytes)]
+        (.getText (PDFTextStripper.) pdf))
+
+      (and media-type (re-find #"^text/|json$|xml$" media-type))
+      (String. ^bytes bytes "UTF-8")
+
+      :else nil)))

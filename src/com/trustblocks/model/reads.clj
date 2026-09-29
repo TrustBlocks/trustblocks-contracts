@@ -96,7 +96,7 @@
          (cond-> {:contract/id id :membership/role role :membership/joined joined}
            stored-document (assoc :membership/file stored-document)))))
 
-(def ^:private membership [:contract/id :membership/role :membership/joined [:? :membership/file]])
+(def membership [:contract/id :membership/role :membership/joined [:? :membership/file]])
 
 (defresolver matter-documents
   {:input  [:matter/id]
@@ -270,7 +270,7 @@
      :contract/attestation-people (mapv #(hash-map :identity/did %)
                                         (distinct (keep #(get % "issuer") as)))}))
 
-(def ^:private person-ref [[:? :identity/did] [:? :identity/email]])
+(def person-ref [[:? :identity/did] [:? :identity/email]])
 
 (defresolver contract-timeline
   {:input  [:contract/id {:contract/instance [:*]} {:contract/history [:*]}

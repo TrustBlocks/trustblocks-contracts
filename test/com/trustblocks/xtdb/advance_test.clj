@@ -67,11 +67,13 @@
              (map #(status node (:xt/id %)) (matter/documents node demo/matter-id :role "pay-application")))))
     (testing "the engineer's approvals are the pay request's state"
       (is (= ["3.1" "5.1"] (get (execute/current-state node "str-27-pay-1") "approvedPayItems"))))
-    (testing "the matter's record: the designation, a receipt for each file, an attestation for each act"
-      (is (= {cert/designation-class 1 receipt/receipt-class 9 cert/attestation-class 6}
+    (testing "the matter's record: the designations, a receipt for each file, an attestation for each act"
+      (is (= {cert/designation-class 2 receipt/receipt-class 9 cert/attestation-class 6}
              (frequencies (map :concerto/class (credential/for-matter node demo/matter-id))))))
     (testing "the Zoning Administrator's receipts rest on the Director's designation"
-      (let [designation (:jwt (first (filter #(= cert/designation-class (:concerto/class %))
+      (let [za          (:xt/id (identity/by-email node demo/barringer))
+            designation (:jwt (first (filter #(and (= cert/designation-class (:concerto/class %))
+                                                   (= za (:subject %)))
                                              (credential/for-matter node demo/matter-id))))]
         (is (every? #(= designation (get-in (interop/jws-claims (get % "jwt")) [:vc "evidence"]))
                     (filter #(= (:xt/id (identity/by-email node demo/barringer)) (get % "issuer"))

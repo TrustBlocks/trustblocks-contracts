@@ -44,7 +44,8 @@
   so visit http://localhost:8080/signin, enter any email, and read the
   six-digit code off this console -- there is no mail provider configured
   (com.trustblocks.app.auth/send-email prints it instead)."
-  (:require [certification-demo :as cert-demo]
+  (:require [clojure.string :as str]
+            [certification-demo :as cert-demo]
             [com.biffweb.tasks :as tasks]
             [com.trustblocks :as main]
             [com.trustblocks.xtdb.certification :as cert]
@@ -53,7 +54,8 @@
             [snow-removal-demo :as snow]
             [street-resurfacing-demo :as street]
             [street-resurfacing-matter-demo :as str-27]
-            [com.trustblocks.xtdb.document :as document]))
+            [com.trustblocks.xtdb.document :as document]
+            [com.trustblocks.xtdb.identity :as identity]))
 
 (println "\nBuilding CSS...")
 (tasks/css)
@@ -77,6 +79,21 @@
 
 (println "Seeding the STR-27 matter: an illustrative award and three pay requests...")
 (str-27/load! node document/default-root)
+
+(println "Muny, the Town's AI agent: designated to advise on STR-27, reachable over MCP...")
+(let [muny  (str-27/ensure-muny! node)
+      file  (java.io.File. "storage/muny.token")
+      token (when (.exists file) (str/trim (slurp file)))]
+  ;; The token is Muny's credential: kept in a file only you can read,
+  ;; never printed. Only its hash is in the database.
+  (when-not (and token (= (:xt/id muny) (:xt/id (identity/by-agent-token node token))))
+    (spit file (identity/issue-agent-token! node (:xt/id muny)))
+    (.setReadable file false false)
+    (.setReadable file true true)
+    (println "  issued Muny a new token, in storage/muny.token"))
+  (println "  connect Claude Code as Muny:")
+  (println "    claude mcp add --transport http trustblocks-muny http://localhost:8080/mcp \\")
+  (println "      --header \"Authorization: Bearer $(cat storage/muny.token)\""))
 
 (println "Seeding the China Grove Clerk: the Council's approval, then the minutes...")
 (cert-demo/load! node)

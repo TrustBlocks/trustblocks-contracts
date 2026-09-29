@@ -11,6 +11,7 @@
             [com.trustblocks.app.contracts :as app.contracts]
             [com.trustblocks.app.landing :as app.landing]
             [com.trustblocks.app.matters :as app.matters]
+            [com.trustblocks.app.mcp :as app.mcp]
             [com.trustblocks.app.templates :as app.templates]
             [com.trustblocks.app.trigger :as app.trigger]
             [com.trustblocks.lib.ui :as ui]
@@ -28,6 +29,7 @@
    app.landing/module
    app.contracts/module
    app.matters/module
+   app.mcp/module
    app.templates/module
    app.clauses/module
    app.authorizations/module

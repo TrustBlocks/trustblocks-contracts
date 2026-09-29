@@ -78,7 +78,9 @@
    {:email gover :name "Franklin Gover" :office "Town Manager"
     :authority ["APPROVE_PAYMENTS"]}
    {:email newsome :name "Rebekah Newsome" :office "Finance Director"
-    :authority ["CERTIFY_PAYMENTS" "RECEIVE_FINANCE_FORMS"]}])
+    ;; ADVISE, to designate the Town's AI agent (Muny) to advise on her
+    ;; forms -- see ensure-muny!.
+    :authority ["CERTIFY_PAYMENTS" "RECEIVE_FINANCE_FORMS" "ADVISE"]}])
 
 ;; ------------------------------------------------------------------ people
 
@@ -102,6 +104,29 @@
                           {:officeholder-did did :name name :office office :authority authority
                            :valid-from awarded-at :valid-until grants-until}))
     officeholder))
+
+(def muny-name "Muny")
+
+(defn ensure-muny!
+  "Muny, the Town's AI agent (com.trustblocks.xtdb.identity/
+  provision-agent!), provisioned once, with the Finance Director
+  accountable for it, and designated by her to ADVISE on STR-27 -- which is
+  all an agent can be designated to do. Returns its identity record. It
+  reaches Trustblocks through the MCP endpoint (com.trustblocks.app.mcp)
+  with a token issued to it (identity/issue-agent-token!; dev/seed.clj)."
+  [node]
+  (let [operator (:xt/id (identity/by-email node newsome))
+        agent    (or (first (filter #(= muny-name (:identity/name %)) (identity/agents node)))
+                     (identity/provision-agent!
+                      node {:name muny-name :operator operator
+                            :purpose "Reads received forms and proposes their values, and advises on the record; never certifies"}))
+        did      (:xt/id agent)]
+    (when-not (cert/authority-for node did "ADVISE" (Instant/now) :matter matter-id)
+      (cert/designate! node {:designator-email newsome :designee-did did :name muny-name
+                             :capacity "AI assistant to the Finance Director"
+                             :matter matter-id :authority ["ADVISE"]
+                             :valid-from awarded-at :valid-until grants-until}))
+    agent))
 
 ;; ------------------------------------------------------------------ figures
 
@@ -275,13 +300,32 @@
           "commencementDate" "2026-07-01T04:00:00.000Z"
           "dated" "2026-06-24T04:00:00.000Z"))
 
+;; The vendor form as received: on record, only its id -- nobody has typed
+;; it in -- while the stored PDF is filled in (vendor-form-filled). Reading
+;; one into the other is the AI agent's to propose and the Finance
+;; Director's to confirm (com.trustblocks.app.mcp, propose_vendor_form).
 (def ^:private vendor-form
-  (sample "vendor-form"
-          "vendorFormId" "str-27-vendor-form-example-paving"
-          "legalName" "Example Paving, LLC"
-          "northCarolinaCorporation" "YES"
-          "federalTaxId" "00-0000000 (illustrative)"
-          "invoicePaymentTerms" "Net 30"))
+  (sample "vendor-form" "vendorFormId" "str-27-vendor-form-example-paving"))
+
+(def vendor-form-filled
+  "What the Contractor wrote on the vendor form: [label value] as the form
+  lays it out (its template's own wording). Invented -- 555 numbers, .test
+  addresses -- and the PDF says so."
+  [["LEGAL NAME OF COMPANY / CORPORATION (as shown on IRS tax form)" "Example Paving, LLC"]
+   ["SOLE PROPRIETOR NAME" ""]
+   ["DBA / DOING BUSINESS AS (if different from legal name)" "Example Paving"]
+   ["ARE YOU A NORTH CAROLINA CORPORATION?" "YES"]
+   ["ARE YOU REGISTERED TO DO BUSINESS IN NORTH CAROLINA?" "YES"]
+   ["NORTH CAROLINA GENERAL CONTRACTOR LICENSE NUMBER" "12345-L    EXPIRATION: December 31, 2026"]
+   ["FEDERAL TAX ID #" "00-0000000"]
+   ["QUOTATION ADDRESS" "100 Asphalt Way, Salisbury, NC 28144    COUNTY: Rowan"]
+   ["MAILING ADDRESS (PURCHASE ORDERS)" "100 Asphalt Way, Salisbury, NC 28144"]
+   ["REMITTANCE ADDRESS" "PO Box 100, Salisbury, NC 28145"]
+   ["INVOICE PAYMENT TERMS" "Net 30    TERM DISCOUNT? IF YES, EXPLAIN: No"]
+   ["MANAGER" "Jordan Reyes    PHONE: (704) 555-0142    EMAIL: jreyes@example-paving.test"]
+   ["CONTACT PERSON" "Casey Morgan    PHONE: (704) 555-0143    EMAIL: cmorgan@example-paving.test"]
+   ["ACCOUNTS RECEIVABLE CONTACT" "Dana Price    PHONE: (704) 555-0144"]
+   ["TYPE OF PRODUCT OR SERVICES PROVIDED" "Street resurfacing: milling, asphalt surface course, pavement marking"]])
 
 (def ^:private received-forms
   "Received and nothing more: [role title filename]."
@@ -310,7 +354,17 @@
   `numbered`, and the rest received and nothing more."
   [node root when numbered]
   (let [id     (get vendor-form "vendorFormId")
-        stored (document/store! node root (illustrative-pdf "Vendor Information Form")
+        stored (document/store! node root
+                                (pdf (concat ["VENDOR INFORMATION FORM -- Town of China Grove, Finance Department"
+                                              "ILLUSTRATIVE -- a Trustblocks demonstration document, not a real form."
+                                              ""]
+                                             (for [[label value] vendor-form-filled]
+                                               (str label ": " value))
+                                             [""
+                                              "FOR TOWN USE ONLY"
+                                              "TOWN DEPARTMENT CONTACT: ____________    DATE: ________"
+                                              "RECEIVED IN FINANCE BY: ____________    DATE: ________"
+                                              "VENDOR NUMBER ASSIGNED: ____________"]))
                                 :filename "vendor-form.pdf" :media-type "application/pdf")]
     (store/put-instance! node nil vendor-form)
     (when-not (matter/matter-of node id)
@@ -357,6 +411,7 @@
                              :matter matter-id
                              :authority ["RECEIVE_PAY_APPLICATIONS" "RECEIVE_INSPECTION_REPORTS"]
                              :valid-from awarded-at :valid-until grants-until}))
+    (ensure-muny! node)
     (println "Award: the notices and the finance forms ...")
     (issue-notice! node notice-of-award "noticeId" "notice-of-award")
     (receive-forms! node root "2026-06-26T15:00:00Z" "2026-06-29T15:00:00Z")

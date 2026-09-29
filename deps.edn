@@ -23,6 +23,10 @@
         ;; provides -- see com.trustblocks.app.auth.
         com.biffweb/authenticate {:mvn/version "2.0.0"}
 
+        ;; A stored PDF's text, for an AI agent reading a received form --
+        ;; com.trustblocks.xtdb.document/text.
+        org.apache.pdfbox/pdfbox {:mvn/version "3.0.3"}
+
         ;; LZ-String compression, for links out to Accord Project's own
         ;; playgrounds -- see com.trustblocks.model.playground. Their share
         ;; links encode a model/template as JSON, then LZ-String-compress it
