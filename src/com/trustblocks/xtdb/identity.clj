@@ -135,3 +135,35 @@
        (map #(dissoc % :identity/private-key))
        (sort-by :identity/name)
        vec))
+
+;; ---------------------------------------------------------------- agent tokens
+
+(defn- sha256-hex [^String s]
+  (let [md (java.security.MessageDigest/getInstance "SHA-256")]
+    (apply str (map #(format "%02x" (bit-and % 0xff)) (.digest md (.getBytes s "UTF-8"))))))
+
+(defn issue-agent-token!
+  "A new bearer token for AI agent `did` -- how it reaches Trustblocks' MCP
+  endpoint (com.trustblocks.app.mcp), and so the credential that makes a
+  caller *that* agent. Returns the token; only its SHA-256 is kept, on the
+  agent's identity record, so a stored record never holds a usable token.
+  Issuing a new one revokes the last. Refused for anyone but an agent: an
+  officeholder signs in, and certifies, as themselves."
+  [node did]
+  (let [record (by-did node did)]
+    (when-not (agent? record)
+      (throw (ex-info "Only an AI agent is issued a token"
+                      {:trustblocks/error :not-an-agent :did did})))
+    (let [bytes (byte-array 32)
+          _     (.nextBytes (java.security.SecureRandom.) bytes)
+          token (.encodeToString (.withoutPadding (java.util.Base64/getUrlEncoder)) bytes)]
+      (put! node (assoc record :identity/token-hash (sha256-hex token)))
+      token)))
+
+(defn by-agent-token
+  "The AI agent `token` was issued to, or nil -- never an officeholder."
+  [node token]
+  (when (seq token)
+    (let [record (first (xt/q node (list 'from identity-table
+                                         [{:identity/token-hash (sha256-hex token)} (symbol "*")])))]
+      (when (agent? record) record))))

@@ -14,6 +14,9 @@
 ;; picks. Take it from the library rather than repeating the literal, which
 ;; is how the first attempt at this ended up pointing at nothing.
 (def signout (constantly biff.auth/signout-path))
+;; The MCP endpoint an AI agent reaches with its bearer token -- an API
+;; route, outside sign-in (com.trustblocks.app.mcp).
+(defpath mcp "/mcp")
 (defpath contracts "/contracts")
 (defpath clauses "/clauses")
 (defpath authorizations "/authorizations")

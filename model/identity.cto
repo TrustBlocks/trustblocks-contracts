@@ -122,6 +122,8 @@ concept Advisory {
   @description("The stored file it read, when it read one")
   o String documentHash optional
   o String text
+  @description("A proposal: the document's data as the agent read it from the stored file -- a Concerto instance of the document's own type, as JSON, valid against its model -- for a person to confirm. Never applied by the agent.")
+  o String proposedData optional
   o DateTime certifiedAt
 }
 

@@ -29,8 +29,8 @@
       (testing "the pay requests' and the vendor form's certified steps, each with its document"
         (is (= 12 (:event kinds)))
         (is (some #(and (= "Payment certified" (:title %)) (= "str-27-pay-1" (:document %))) items)))
-      (testing "the designation, and the dates the contract names"
-        (is (= 1 (:designation kinds)))
+      (testing "the designations -- the Zoning Administrator's, and Muny's to advise -- and the dates the contract names"
+        (is (= 2 (:designation kinds)))
         (is (some #(= "Notice to proceed date" (:title %)) items)))
       (testing "the deadlines: pay request 2's payment due 30 days after its Sept 3 approval"
         (is (some #(and (= :deadline (:kind %)) (= "str-27-pay-2" (:document %))

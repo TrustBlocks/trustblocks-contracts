@@ -477,6 +477,38 @@
       (note/add! node {:contract id :author (auth/user-email ctx (:uid session)) :text text :about about}))
     {:status 303 :headers {"location" (str (routes/contract id) "#timeline")}}))
 
+(defn- proposals-section
+  "What an AI agent proposed this document says, as read from its received
+  file -- each proposal field by field, in the model's order, beside what is
+  on record, differences marked. Advice: nothing here changes the record;
+  a person confirms."
+  [reg instance advisories]
+  (let [proposals (filter #(get % "proposedData") advisories)
+        fields    (map :name (model.properties/own-properties reg (get instance "$class")))]
+    (when (seq proposals)
+      [:section {:class ["rounded-xl border border-fuchsia-200 bg-white p-6 shadow-sm"]}
+       [:h2 {:class ["mb-1 text-lg font-semibold text-slate-950"]} "Proposed by an AI agent"]
+       [:p {:class ["mb-4 text-sm text-slate-500"]}
+        "Values an AI agent read from the received file, checked against the model. Advice, not the record: nothing changes until a person confirms."]
+       (for [p proposals
+             :let [proposed (json/parse-string (get p "proposedData"))]]
+         [:div {:class ["mb-6 last:mb-0"]}
+          [:p {:class ["mb-2 text-sm text-slate-700"]}
+           [:span {:class ["font-mono text-xs text-slate-500"]} (subs (str (get p "valid-from")) 0 10)]
+           " " (get p "text")]
+          [:table {:class ["w-full text-left text-sm"]}
+           [:thead {:class ["text-xs uppercase tracking-wide text-slate-500"]}
+            [:tr [:th {:class ["py-1"]} "Field"] [:th "On record"] [:th "Proposed"]]]
+           [:tbody {:class ["divide-y divide-slate-100"]}
+            (for [f fields
+                  :let [on-record (get instance f) value (get proposed f)]
+                  :when (or (some? on-record) (some? value))
+                  :let [differs (not= on-record value)]]
+              [:tr {:class (when differs ["bg-fuchsia-50"])}
+               [:td {:class ["py-1 pr-4 font-mono text-xs text-slate-600"]} f]
+               [:td {:class ["py-1 pr-4"]} (if (some? on-record) (str on-record) [:span {:class ["text-slate-400"]} "—"])]
+               [:td {:class ["py-1"]} (if (some? value) (str value) [:span {:class ["text-slate-400"]} "—"])]])]]])])))
+
 (defn- people-labels
   "{did label} for the people a query resolved."
   [people]
@@ -503,6 +535,7 @@
                               {[:? :contract/all-deadlines] [:*]}
                               {[:? :contract/timeline] reads/timeline-item}
                               {:contract/history [:*]}
+                              {:contract/advisories [:*]}
                               {:contract/attestations [:*]}
                               {:contract/attestation-people [:identity/did :identity/label]}]
                              :now today :as-of as-of :registry reg)
@@ -533,6 +566,8 @@
           (deadlines-section (:contract/all-deadlines d) id)
           [:div {:id "timeline"} (timeline-section items id as-of today)]
           (note-form id today)
+
+          (proposals-section reg instance (:contract/advisories d))
 
           [:section {:class ["rounded-xl border border-slate-200 bg-white p-6 shadow-sm"]}
            [:h2 {:class ["mb-2 text-lg font-semibold text-slate-950"]} "Contract Data"]

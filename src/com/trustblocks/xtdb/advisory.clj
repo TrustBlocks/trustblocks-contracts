@@ -15,7 +15,8 @@
   agent's part is to read, notice and say so -- \"this request arrived
   late, and the last one was returned\" -- on the record, under its own
   name, for the person who decides."
-  (:require [clojure.string :as str]
+  (:require [cheshire.core :as json]
+            [clojure.string :as str]
             [com.trustblocks.xtdb.certification :as cert]
             [com.trustblocks.xtdb.credential :as credential]
             [com.trustblocks.xtdb.identity :as identity]
@@ -37,8 +38,15 @@
   Refusals, tagged :trustblocks/error: :not-an-agent, :no-such-instance,
   :no-such-matter, :missing-authority (no Designation for this matter
   carrying ADVISE in force at `at`, or its designator no longer holds
-  ADVISE), :invalid-advisory (no text)."
-  [node {:keys [agent document text document-hash at]}]
+  ADVISE), :invalid-advisory (no text), :invalid-proposal (a `proposal`
+  that is not a valid instance of the document's own type).
+
+  `proposal`, optionally, is the document's data as the agent read it from
+  the stored file -- a Concerto instance of the document's type (JSON
+  data), for a person to compare and confirm. It is checked against the
+  document's model before anything is signed, and it is advice like the
+  rest: nothing applies it."
+  [node {:keys [agent document text document-hash proposal at]}]
   (let [identity (identity/by-did node agent)]
     (when-not (and identity (identity/agent? identity))
       (refuse! "Only an AI agent's identity signs an Advisory"
@@ -47,6 +55,14 @@
       (refuse! "An Advisory needs some text" {:trustblocks/error :invalid-advisory}))
     (when-not (store/get-instance node document)
       (refuse! "No such document" {:trustblocks/error :no-such-instance :instance document}))
+    (when proposal
+      (let [fqn (get (store/get-instance node document) "$class")]
+        (when (not= fqn (get proposal "$class"))
+          (refuse! "A proposal is an instance of the document's own type"
+                   {:trustblocks/error :invalid-proposal :expected fqn :given (get proposal "$class")}))
+        (when-let [errs (store/validate (store/registry-from-xtdb node) proposal)]
+          (refuse! "The proposed values do not fit the document's model"
+                   {:trustblocks/error :invalid-proposal :errors errs}))))
     (let [matter-id (or (matter/matter-of node document :at at)
                         (refuse! "An Advisory concerns a document of a matter, and this is in none"
                                  {:trustblocks/error :no-such-matter :document document}))
@@ -63,7 +79,8 @@
                                      "contractId"  document
                                      "text"        text
                                      "certifiedAt" (str (java.time.Instant/now))}
-                              document-hash (assoc "documentHash" document-hash))
+                              document-hash (assoc "documentHash" document-hash)
+                              proposal      (assoc "proposedData" (json/generate-string proposal)))
         :valid-from at :valid-until open-ended
         :evidence jwt}))))
 
