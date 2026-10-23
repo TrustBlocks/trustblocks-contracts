@@ -58,6 +58,10 @@
         ;; alias below for editing them alongside the app.
         io.github.TrustBlocks/trustblocks-templates {:git/sha "25663c7abf586ffabb97bd7f3782fa6a1f2f12e4"}
 
+        ;; Templates as trees, text clauses and their tracking, release
+        ;; pinning -- see com.trustblocks.xtdb.template-tree, .clause-library
+        ;; and .release. A sibling checkout until it has a remote to pin.
+        templatemark-clj/templatemark-clj {:local/root "../templatemark-clj"}
 
         dev.onionpancakes/chassis     {:mvn/version "1.0.365"}
         ;; CommonMark + pipe tables -- exactly the markdown TemplateMark is

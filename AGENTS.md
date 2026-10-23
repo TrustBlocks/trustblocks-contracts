@@ -82,6 +82,9 @@ src/com/trustblocks/
     execute.clj                trigger! — runs a stored SCI clause, records Request/Response + State bitemporally
     identity.clj                the identity ledger: provision-town!/provision-officeholder!, by-did, by-email
     credential.clj              Verifiable Credential storage: issue!, for-subject, for-contract, revoke!
+    clause_library.clj          text clauses as immutable, hash-chained versions + their state (see docs/design/clause-tracking.md)
+    template_tree.clj           templates as immutable revisions with a moving head, and the clause-use rows
+    release.clj                 pinning a template for deployment: release! (SHA), deploy!, verify, check-active
     certification.clj           grant-office!, certify! (runs execute/trigger! then signs the response as a VC),
                                  attestations-for-contract — the newest and most involved file, read it fully
 
