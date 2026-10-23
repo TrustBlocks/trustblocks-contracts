@@ -83,6 +83,7 @@ src/com/trustblocks/
     identity.clj                the identity ledger: provision-town!/provision-officeholder!, by-did, by-email
     credential.clj              Verifiable Credential storage: issue!, for-subject, for-contract, revoke!
     clause_library.clj          text clauses as immutable, hash-chained versions + their state (see docs/design/clause-tracking.md)
+    signoff.clj                 a login's thumbs-up / objection on a clause version, template revision or release
     template_tree.clj           templates as immutable revisions with a moving head, and the clause-use rows
     release.clj                 pinning a template for deployment: release! (SHA), deploy!, verify, check-active
     certification.clj           grant-office!, certify! (runs execute/trigger! then signs the response as a VC),

@@ -32,6 +32,7 @@
             [com.trustblocks.concerto.parser :as parser]
             [com.trustblocks.templatemark.clauses :as clauses]
             [com.trustblocks.templatemark.tree :as tree]
+            [com.trustblocks.xtdb.signoff :as signoff]
             [xtdb.api :as xt]))
 
 (def version-table :clause-version)
@@ -329,3 +330,27 @@
      :model {:changed? (not= (:clause/model a) (:clause/model b))
              :before   (:clause/model a)
              :after    (:clause/model b)}}))
+
+;; ----------------------------------------------------------------- sign-offs
+
+(defn sign!
+  "The signed-in `:by` says `:verdict` (:agree by default, :object, or
+  :withdrawn) about version `version` of clause `id`. See
+  com.trustblocks.xtdb.signoff: a thumbs-up with an optional `:role` and
+  `:note`, recorded against the version's hash. The version's own author is
+  recorded as such, and their sign-off does not count toward a requirement."
+  [node id version & {:as opts}]
+  (let [c (or (get-version node id version)
+              (refuse :no-such-clause (str "No clause " (version-id id version)) {:clause id :version version}))]
+    (apply signoff/sign! node {:kind :clause :id (version-id id version) :hash (:clause/hash c)}
+           (mapcat identity (assoc opts :author (:clause/author c))))))
+
+(defn signoffs
+  "The standing sign-offs on version `version` of clause `id` (see signoff/signoffs)."
+  [node id version & {:as opts}]
+  (signoff/signoffs node {:kind :clause :id (version-id id version)} opts))
+
+(defn sign-off-summary
+  "Who has agreed and objected on a clause version: {:agree :object :others-agree}."
+  [node id version & {:as opts}]
+  (signoff/summary node {:kind :clause :id (version-id id version)} opts))

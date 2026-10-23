@@ -30,6 +30,7 @@
             [com.trustblocks.templatemark.compose :as compose]
             [com.trustblocks.templatemark.release :as release]
             [com.trustblocks.xtdb.clause-library :as library]
+            [com.trustblocks.xtdb.signoff :as signoff]
             [com.trustblocks.xtdb.template-tree :as templates]
             [xtdb.api :as xt]))
 
@@ -80,6 +81,7 @@
                :tree          (edn/read-string (:tree r))
                :manifest      (edn/read-string (:manifest r))
                :template-hash (:template-hash r)}
+        (:signoffs r)   (assoc :signoffs (edn/read-string (:signoffs r)))
         (:model-hash r) (assoc :model-hash (:model-hash r))
         (:model r)      (assoc :model (edn/read-string (:model r)))))))
 
@@ -122,13 +124,16 @@
 
   Refuses, with :trustblocks/error :release-refused and the :problems, if
   a clause reference cannot be resolved, a clause is not :approved (unless
-  `:allow-draft?`), a library clause floats a dependency, or -- when `:compose`
+  `:allow-draft?`), a clause lacks the sign-offs `:require-signoffs` asks of it
+  (a number of agreements from people other than the clause's author, or
+  {:agree n :roles #{...}}; see signoff/satisfied?), a library clause floats a
+  dependency, or -- when `:compose`
   is given -- the composed model has errors.
 
   `:compose` is {:base :root :deps}, as com.trustblocks.templatemark.compose
   takes them; its model is stored with the release and its hash is part of
   the SHA. Options: `:by`, `:note`, `:valid-from`."
-  [node template-id & {:keys [rev compose allow-draft? by note valid-from]}]
+  [node template-id & {:keys [rev compose allow-draft? require-signoffs by note valid-from]}]
   (let [t (or (templates/revision node template-id rev)
               (refuse :no-such-template (str "No template " template-id (when rev (str " at revision " rev))) {:template template-id}))
         lookup   (library/lookup node)
@@ -142,8 +147,24 @@
                      {:rule :clause-not-approved :clause clause :version version :status s
                       :message (str "Clause " clause " version " version " is " (if s (name s) "unknown")
                                     ", not approved")}))
+        clause-signoffs (into {} (for [{:keys [clause version]} (:manifest pinned)]
+                                   [(str clause "@" version)
+                                    (mapv #(select-keys % [:by :role :verdict :own?])
+                                          (library/signoffs node clause version))]))
+        unsigned (when require-signoffs
+                   (for [{:keys [clause version]} (:manifest pinned)
+                         :let [{:keys [ok? missing objections]}
+                               (signoff/satisfied? node {:kind :clause :id (str clause "@" version)} require-signoffs)]
+                         :when (not ok?)]
+                     {:rule (if (seq objections) :clause-objected :clause-needs-signoff)
+                      :clause clause :version version :objections objections
+                      :message (str "Clause " clause " version " version
+                                    (if (seq objections)
+                                      (str " has an objection from " (clojure.string/join ", " objections))
+                                      (str " " (clojure.string/join "; " missing))))}))
         problems (vec (concat (:problems pinned)
                               drafts
+                              unsigned
                               (when composed
                                 (->> (:problems composed) (filter #(= :error (:severity %)))))))]
     (when (seq problems)
@@ -162,6 +183,7 @@
                             :template-hash (:template-hash pinned) :sha sha}
                      (:model composed)   (assoc :model (pr-str (:model composed))
                                                  :model-hash (:model-hash pinned))
+                     (seq clause-signoffs) (assoc :signoffs (pr-str clause-signoffs))
                      by   (assoc :author by)
                      note (assoc :note note))]]
                  (for [{:keys [clause version hash]} (:manifest pinned)]
@@ -239,3 +261,18 @@
                               :when (not ok?)]
                           {:release sha :contracts (mapv :contract cs) :problems problems}))]
     {:ok? (empty? failures) :checked (count by-release) :failures failures}))
+
+(defn sign!
+  "The signed-in `:by` says `:verdict` about release `sha`: the Manager
+  approves deploying it, the Attorney agrees. Recorded against the release's
+  own hash (see com.trustblocks.xtdb.signoff)."
+  [node sha & {:as opts}]
+  (let [sha (if (.startsWith ^String sha "sha256:") (subs sha 7) sha)]
+    (when-not (get-release node sha)
+      (refuse :no-such-release (str "No release " sha) {:release sha}))
+    (apply signoff/sign! node {:kind :release :id sha :hash sha} (mapcat identity opts))))
+
+(defn signoffs
+  "The standing sign-offs on release `sha`."
+  [node sha & {:as opts}]
+  (signoff/signoffs node {:kind :release :id (if (.startsWith ^String sha "sha256:") (subs sha 7) sha)} opts))

@@ -7,6 +7,7 @@ true, with XTDB's bitemporality answering "as of when":
 |---|---|---|
 | `xtdb.clause-library` | `:clause-version` (the words), `:clause-state` (draft / approved / retired) | version: never. state: yes, with full history |
 | `xtdb.template-tree` | `:template-revision` (every save), `:template` (the head), `:clause-use` (what the head uses) | revisions: never. head and uses: move together, in one transaction |
+| `xtdb.signoff` | `:signoff` -- a login's thumbs-up or objection on a clause version, template revision or release | yes: one standing sign-off per person per item, every earlier one kept |
 | `xtdb.release` | `:release` (a pinned bundle, keyed by its SHA), `:contract-release` (which release a contract is deployed against) | release: never. deployment: yes, with history |
 
 The tree, clause and release logic itself (parsing, hashing, diffing, pinning,
@@ -39,6 +40,30 @@ stays in the history.
 runs it over every release a contract is deployed against and says which
 contracts rest on a release that no longer holds.
 
+## Sign-offs
+
+Approval is deliberately light: no authority check, no credential. The signed-in
+login says *agreed* or *object* about one exact thing, with an optional role
+label and note -- the Manager approves, the Attorney agrees.
+
+- A clause version's author (or anyone with a login) sets it `:approved`; others
+  then `sign!` it. A release has its own sign-offs (`release/sign!`).
+- A sign-off records the subject's hash, so it is evidence of what was agreed to.
+- Signing again replaces your standing sign-off (agree, then object, then agree),
+  and `signoff/history` keeps every one with when it was recorded. `:withdrawn`
+  takes one back.
+- The author's own sign-off is recorded and marked `:own?` but does not count:
+  the point of a second look is that it is a second person. An outstanding
+  objection always counts, and stops a requirement being met.
+- `release!` takes `:require-signoffs` -- a number, or `{:agree n :roles #{"Town
+  Attorney"}}` -- and refuses a release whose clauses lack them, saying who is
+  missing or who objects. The release records who had signed off on each clause
+  at the time (informational: not part of the SHA, which is about content).
+
+If approval ever needs to be formal -- a council vote that must stand up as
+evidence -- the same sign-off can later be issued as a credential through the
+certification machinery; nothing here prevents it.
+
 ## What it answers
 
 | Question | Function |
@@ -51,6 +76,8 @@ contracts rest on a release that no longer holds.
 | What changed between clause versions / template revisions? | `diff-versions`, `diff-revisions` |
 | Which contract was on which release on a date? | `release/release-of` (`:at`) |
 | Have the clauses behind every contract in force stayed unchanged? | `release/check-active` |
+| Who has agreed or objected, and did anyone change their mind? | `clause-library/signoffs`, `signoff/history`, `signoff/summary` |
+| Does this clause or release have the sign-offs it needs? | `signoff/satisfied?`, `release!` `:require-signoffs` |
 | Which pinned uses are behind the library's latest? | `templatemark.clauses/audit` over `clause-users` |
 
 ## Tamper evidence
@@ -81,9 +108,8 @@ fails the model hash.
 ## Not done
 
 - No UI, no HTTP routes.
-- Approval is a status change recorded with `:by` and `:note`. Tying it to a
-  signed credential (as officeholder certification does) is the natural next
-  step: the council's approval of a clause version as a VC naming its hash.
+- Which logins may sign off, and what a role label means, is not enforced: a
+  sign-off is a record, not an authorization. Roles are free text.
 - `templatemark-clj` is a sibling checkout (`:local/root`) until it has a
   remote to pin by SHA.
 - Importing existing markdown re-parses with fresh node ids, so a diff against
