@@ -63,14 +63,29 @@ States: `{:event "PaymentCertified" :authority "CERTIFY_PAYMENTS"}`
 
 > When payment has been made, the {{financeOfficerTitle}}, or the officer authorized to certify payments, certifies the amount paid, the date, and the check or electronic funds transfer number. This certification closes the Pay Request.
 
-### 6. `governing-body-approval`
+### 6. `governing-body-approval` (optional: only contracts the Board approves)
 States: `{:event "BoardApprovalRequest" :authority "CERTIFY_MINUTES"}`, `{:event "AttestationRequest" :authority "CERTIFY_MINUTES"}`
 
 > This Agreement takes effect only on action of the {{governingBodyName}} recorded in its minutes. The {{clerkTitle}}, or the officer authorized to certify minutes, certifies that the {{governingBodyName}} took that action, and later attests this Agreement. The {{municipalityType}} of {{municipalityName}} is bound only after that certification.
 
-## Every clause states how the act is recorded
+### 7. `finance-officer-certification` (new, to be drafted)
+Most contracts do not go to the Board; the Manager executes them. They still need the Finance Officer's certification, so this clause belongs in the standard set and `governing-body-approval` becomes **optional**, used only by contracts the Board approves. The authority name is not yet known (the pay application has `CERTIFY_PAYMENTS`, which is a different act). I believe NC's pre-audit certificate on obligations is the legal basis; the Town Attorney should confirm before the wording is written.
 
-I considered adding one sentence to each: *"The certification is recorded as a signed credential issued by the officeholder under the authority named, and is valid only for the period the officeholder held that authority."* It describes what the system does, but it is also a statement of the Town's record-keeping, so it is a question for the Town Attorney whether it belongs in the contract text. I left it out of the drafts.
+## Decisions (2026-10-24)
+
+- The wording is acceptable as a starting point. The contract does **not** say how the certification is recorded (the sentence I had considered is dropped).
+- `governing-body-approval` is optional. A contract executed by the Manager has a lifecycle with no Board events, and the release check only asks for what its own lifecycle requires. The Finance Officer certification is required for all.
+- **Attestation dialog, like an Acrobat signature.** The officer chooses to attest; the officer's handwritten signature image is placed on the signature line, followed in small print by `CG_Atest` and the short hash (or `CG_Atest` alone, with the hash beside it). The image is presentation. The authority is the signed credential; the mark points at it.
+- **Documents we do not author.** An inspector's report arrives as a PDF. The received file is hashed as received and that hash is the Attestation's `documentHash`. The original bytes are never altered; the mark goes on a receipt stamp or cover sheet.
+- **Automated minimum review.** A model (Jev or similar) reads the submitted PDF and returns yes or no against a short checklist. It is a **flag for the officer**, stored as its own record, never as the attestation. The officer decides, and attests that the document was received and is satisfactory.
+
+### What this needs
+
+1. **Subject of the attestation.** For our contracts, the release SHA (`attestation-subject`). For received documents, the SHA-256 of the file. The mark must be computed from the document *before* any mark is placed, or the hash changes itself.
+2. **Signature image** stored per identity, as an asset the officer uploads or draws once. Personal data: access limited to that officer and the renderer.
+3. **A `received-document` record:** file bytes (or reference), hash, who submitted it, when, the checklist used, the flag result and model identity. Immutable, like a release.
+4. **Rendering** the mark onto Word/PDF output.
+5. **A decision for you:** sending contractor PDFs to an external model sends their content to a third party. The town may have rules about that, and the contractor's report may include personal information. Options are a local model, or an external one for non-sensitive document classes only.
 
 ## Questions for you and the Town Attorney
 
