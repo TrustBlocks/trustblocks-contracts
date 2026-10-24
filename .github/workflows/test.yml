@@ -53,4 +53,4 @@ jobs:
           JAVA_TOOL_OPTIONS: -Xss512m
           CONCERTO_CLI: ${{ github.workspace }}/node_modules/.bin/concerto
         run: |
-          clojure -Sdeps '{:paths ["src" "resources" "dev" "test"]}' -M -m clojure.main -e "(try (require 'street-resurfacing-matter-demo) (catch Throwable t (let [r (loop [c t] (if (.getCause c) (recur (.getCause c)) c)) st (.getStackTrace r)] (println \"DEPTH\" (count st)) (doseq [f (take 40 (remove #(re-find #\"java.util.regex\" (str %)) st))] (println \"FRAME\" (str f))))))" || true
+          clojure -Sdeps '{:paths ["src" "resources" "dev" "test"]}' -M -e "(try (require 'street-resurfacing-matter-demo) (catch Throwable t (let [r (loop [c t] (if (.getCause c) (recur (.getCause c)) c)) st (.getStackTrace r)] (println \"DEPTH\" (count st)) (doseq [f (take 40 (remove #(re-find #\"java.util.regex\" (str %)) st))] (println \"FRAME\" (str f))))))" || true
