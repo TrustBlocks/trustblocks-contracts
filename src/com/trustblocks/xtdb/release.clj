@@ -30,6 +30,7 @@
             [com.trustblocks.templatemark.compose :as compose]
             [com.trustblocks.templatemark.release :as release]
             [com.trustblocks.xtdb.clause-library :as library]
+            [com.trustblocks.xtdb.defaults :as defaults]
             [com.trustblocks.xtdb.signoff :as signoff]
             [com.trustblocks.xtdb.template-tree :as templates]
             [xtdb.api :as xt]))
@@ -83,6 +84,8 @@
                :template-hash (:template-hash r)}
         (:signoffs r)   (assoc :signoffs (edn/read-string (:signoffs r)))
         (:model-hash r) (assoc :model-hash (:model-hash r))
+        (:defaults r)   (assoc :defaults (edn/read-string (:defaults r))
+                               :defaults-hash (:defaults-hash r))
         (:model r)      (assoc :model (edn/read-string (:model r)))))))
 
 (defn verify
@@ -91,7 +94,8 @@
   stored tree and model against the hashes the release recorded. Problems:
   :sha-mismatch, :clause-changed, :clause-missing, :clause-corrupt (a stored
   clause no longer matches its own hash), :template-changed, :model-changed,
-  :no-such-release."
+  :defaults-altered, :defaults-changed, :defaults-missing, :defaults-corrupt
+  (see defaults/verify-snapshot), :no-such-release."
   [node sha]
   (if-let [r (get-release node sha)]
     (let [lookup   (exact-lookup node)
@@ -111,7 +115,12 @@
                                        (some (fn [c] (and (= (:clause c) (:clause %)) (= (:version c) (:version %)))) corrupt))
                                  (release/verify r lookup' :doc {:node :document :body (:body (:tree r))}))
                          (when (and (:model r) (not= (:model-hash r) (model-hash (:model r))))
-                           [{:rule :model-changed :message "The stored model no longer matches the release's model hash"}])))]
+                           [{:rule :model-changed :message "The stored model no longer matches the release's model hash"}])
+                         (when (:defaults r)
+                           (concat
+                            (when (not= (:defaults-hash r) (defaults/snapshot-hash (:defaults r)))
+                              [{:rule :defaults-altered :message "The stored defaults no longer match the release's defaults hash"}])
+                            (defaults/verify-snapshot node (:defaults r))))))]
       {:ok? (empty? problems) :problems problems})
     {:ok? false :problems [{:rule :no-such-release :message (str "No release " sha)}]}))
 
@@ -132,14 +141,23 @@
 
   `:compose` is {:base :root :deps}, as com.trustblocks.templatemark.compose
   takes them; its model is stored with the release and its hash is part of
-  the SHA. Options: `:by`, `:note`, `:valid-from`."
-  [node template-id & {:keys [rev compose allow-draft? require-signoffs by note valid-from]}]
+  the SHA.
+
+  `:defaults` is a vector of [id pin] (see xtdb.defaults/prefill) naming the
+  default data the contract was drafted from. Each is resolved to an exact
+  version once; the release stores the versions and their values, and their
+  hash is part of the SHA, so a later change to the Town's defaults cannot
+  alter this contract and verify says if the stored values were touched.
+  Options: `:by`, `:note`, `:valid-from`."
+  [node template-id & {:keys [rev compose allow-draft? require-signoffs by note valid-from] refs :defaults}]
   (let [t (or (templates/revision node template-id rev)
               (refuse :no-such-template (str "No template " template-id (when rev (str " at revision " rev))) {:template template-id}))
         lookup   (library/lookup node)
         composed (when compose
                    (compose/compose (assoc compose :doc (:tree t) :library lookup)))
-        pinned   (release/release (:tree t) lookup :model-hash (model-hash (:model composed)))
+        snap     (when (seq refs) (defaults/snapshot node refs :at (->instant valid-from)))
+        pinned   (release/release (:tree t) lookup :model-hash (model-hash (:model composed))
+                                  :defaults-hash (defaults/snapshot-hash snap))
         drafts   (when-not allow-draft?
                    (for [{:keys [clause version]} (:manifest pinned)
                          :let [s (library/status node clause version)]
@@ -183,6 +201,7 @@
                             :template-hash (:template-hash pinned) :sha sha}
                      (:model composed)   (assoc :model (pr-str (:model composed))
                                                  :model-hash (:model-hash pinned))
+                     (seq snap)  (assoc :defaults (pr-str snap) :defaults-hash (:defaults-hash pinned))
                      (seq clause-signoffs) (assoc :signoffs (pr-str clause-signoffs))
                      by   (assoc :author by)
                      note (assoc :note note))]]

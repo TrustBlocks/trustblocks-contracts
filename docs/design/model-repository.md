@@ -1,6 +1,6 @@
 # Model repository, default data, and attestation clauses
 
-Design note, 2026-10-23. Status: **step 1 built** (`xtdb/model_repository.clj`); step 2 built (clause `:requires`, `model-use`, `impact`); steps 3-5 are proposals. Companion to `clause-tracking.md` (clause versions, template revisions, release) and `matters.md`.
+Design note, 2026-10-23. Status: **step 1 built** (`xtdb/model_repository.clj`); steps 2 (clause `:requires`, `model-use`, `impact`) and 3 (`defaults`) built; steps 4-5 are proposals. Companion to `clause-tracking.md` (clause versions, template revisions, release) and `matters.md`.
 
 ## What exists (checked, not assumed)
 
@@ -83,7 +83,7 @@ Contracts are not always explicit about who attests or approves. So:
 
 1. **Done.** `xtdb/model_repository`: immutable model versions keyed by `namespace@version`, `import-dir!` from `shared/model/` or a template's vendored `model/`, `closure`, `registry`, `pins`, `verify-pins`. Same content laid out differently is not a change; different content under an existing version is refused. Reads re-hash.
 2. **Done.** `:clause/requires {:model "ns@1.0.0" :root "Type" :fields [...]}`: a clause is held to the pinned model when saved (`:clause-does-not-fit-model`, `:undeclared-read`), and the properties it reads are recorded. A template saved with `:model`/`:root` records what it reads; a draft that does not fit is saved and reports `:problems`, a release will refuse it (release check not yet wired). Queries: `model-use/readers` (who reads a property, by versioned FQN or unversioned field, as of any date), `impact/impact` (clauses and templates a change reaches), `impact/unused-properties`, `repo/importers`. Pins are exact versions for now (`1.0.0`, not `1.x`); per-clause fragments (`:clause/model`) still work alongside.
-3. `xtdb/defaults`: versioned defaults, prefill, snapshot in a release.
+3. **Done.** `xtdb/defaults`: a defaults record is values for one type of one pinned model (`:applies {:model :type}`), checked against it (unknown property, wrong kind, flat values only), versioned like a clause with a hash chain and an effective date (`in-force`). `prefill` layers defaults under a contract's data and reports which fields came from defaults. `release!` takes `:defaults [["town" :latest]]`, resolves to exact versions, stores the values in the release, and their hash is part of the SHA (a release without defaults keeps the sha it always had). `verify` reports `:defaults-altered / -changed / -missing / -corrupt`. Not done: the dialog to author defaults, layers beyond a list of refs, nested (concept) values.
 4. Release checks: attestation-unstated; `documentHash` = release SHA.
 5. Standard attestation clause in the library.
 
