@@ -85,7 +85,17 @@ Most contracts do not go to the Board; the Manager executes them. They still nee
 2. **Signature image** stored per identity, as an asset the officer uploads or draws once. Personal data: access limited to that officer and the renderer.
 3. **A `received-document` record:** file bytes (or reference), hash, who submitted it, when, the checklist used, the flag result and model identity. Immutable, like a release.
 4. **Rendering** the mark onto Word/PDF output.
-5. **A decision for you:** sending contractor PDFs to an external model sends their content to a third party. The town may have rules about that, and the contractor's report may include personal information. Options are a local model, or an external one for non-sensitive document classes only.
+5. **Settled (2026-10-24):** contractual documents are public records, so sending them to an external model is acceptable by default. The exception is anything marked confidential or attorney work product (below), which is never sent out.
+
+### Classification flag
+
+A document or draft carries a **classification**: `public` (the default), `confidential`, or `attorney-work-product`.
+
+- It shows as a stamp or short line on the output, and as a chip in the console.
+- It gates behaviour: a classified document is not sent to an external model, and is not shown on any public listing or export.
+- It is versioned like other drafting state, so the record shows when a draft was marked and when the mark was lifted. Lifting it (for example when a draft is released) is an explicit act by a named person.
+- It matters most during drafting, so new drafts may start as work product and become public at release. **Open:** is that the default you want?
+- The NC Public Records Act has limits and timing rules for attorney communications and trial-preparation material. I believe those exceptions are narrow and time-limited, so the Town Attorney should say which classes the flag offers and what the stamp wording is. The flag is a handling marker, not a legal determination.
 
 ## Questions for you and the Town Attorney
 
