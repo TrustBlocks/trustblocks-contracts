@@ -25,7 +25,10 @@
   would mangle the keys of a nested map."
   (:require [clojure.edn :as edn]
             [com.trustblocks.templatemark.clauses :as clauses]
+            [com.trustblocks.templatemark.model :as model]
             [com.trustblocks.templatemark.tree :as tree]
+            [com.trustblocks.xtdb.model-repository :as repo]
+            [com.trustblocks.xtdb.model-use :as model-use]
             [xtdb.api :as xt]))
 
 (def revision-table :template-revision)
@@ -99,10 +102,13 @@
 ;; --------------------------------------------------------------------- reads
 
 (defn head
-  "The head of `template-id` -- {:rev :hash} -- or nil, as of `:at` / `:as-of`."
+  "The head of `template-id` -- {:rev :hash}, with :model and :root when the
+  template says which model it is written against -- or nil, as of `:at` /
+  `:as-of`."
   [node template-id & {:as opts}]
   (when-let [r (first (with-reads #(xt/q node (from-q head-table [{:xt/id template-id} star] opts))))]
-    {:rev (:rev r) :hash (:hash r)}))
+    (cond-> {:rev (:rev r) :hash (:hash r)}
+      (:model r) (assoc :model (:model r) :root (:root r)))))
 
 (defn- verified-tree [row]
   (let [doc (edn/read-string (:tree row))]
@@ -157,15 +163,39 @@
   and changed ones put, vanished ones deleted), and asserts that the head is
   still where `:based-on` said, so racing saves cannot both land.
 
+  A template may say which model it is written against, `:model` (\"ns@1.0.0\")
+  and `:root` (a type in it); a later save keeps what the head had unless it
+  says otherwise. Then the template is checked against it and the properties
+  it reads are recorded (com.trustblocks.xtdb.model-use) with the revision.
+  Saving does not refuse a template that does not fit: a draft is allowed to be
+  wrong. The result says so, in :problems, and a release will not.
+  `:library` is a `(fn [id pin])` that supplies clauses to follow (see
+  clause-library/lookup).
+
   Options: `:based-on`, `:valid-from` (when this revision takes effect;
-  default now), `:by`, `:note`."
-  [node template-id doc & {:keys [based-on valid-from by note]}]
+  default now), `:by`, `:note`, `:model`, `:root`, `:library`."
+  [node template-id doc & {:keys [based-on valid-from by note library] :as opts}]
   (when-let [problems (tree/explain doc)]
     (refuse :invalid-template (str "Not a valid template: " (pr-str problems)) {:template template-id :problems problems}))
   (let [doc  (tree/with-ids doc)
         h    (clauses/body-hash (:body doc))
         vf   (or (->instant valid-from) (java.time.Instant/now))
-        cur  (head node template-id)]
+        cur  (head node template-id)
+        model (or (:model opts) (:model cur))
+        root  (if (:model opts) (:root opts) (:root cur))
+        _     (when (and model (not root))
+                (refuse :invalid-template "A template that names a model names its :root type too" {:template template-id}))
+        reg   (when model
+                (try (repo/registry node model)
+                     (catch clojure.lang.ExceptionInfo e
+                       (refuse (or (:trustblocks/error (ex-data e)) :model-missing)
+                               (str "Template " template-id " is written against " model ": " (ex-message e))
+                               {:template template-id :model model}))))
+        root-fqn (when model (str model "." root))
+        _     (when (and model (not (get reg root-fqn)))
+                (refuse :invalid-template (str "Model " model " has no type " root) {:template template-id :model model :root root}))
+        problems (when model (model/typecheck doc reg root-fqn :library library))
+        reads    (when model (model/reads doc reg root-fqn :library library))]
     (cond
       (not= based-on (:rev cur))
       (refuse :stale-template
@@ -173,12 +203,15 @@
                    "; load the current revision and merge")
               {:template template-id :head (:rev cur) :based-on based-on})
 
-      (and cur (= h (:hash cur)))
-      {:rev (:rev cur) :hash h :changed? false}
+      (and cur (= h (:hash cur)) (= model (:model cur)) (= root (:root cur)))
+      (cond-> {:rev (:rev cur) :hash h :changed? false} model (assoc :problems problems))
 
       :else
       (let [rev      (inc (or (:rev cur) 0))
             old-uses (when cur (uses node template-id))
+            old-reads (when cur (map :fqn (model-use/reads-of node :template template-id)))
+            new-rows  (model-use/rows :template template-id rev reads)
+            gone-reads (remove (set (map :xt/id new-rows)) (map #(model-use/row-id :template template-id %) old-reads))
             new-uses (clauses/uses doc)
             gone     (remove (set (map :node-id new-uses)) (map :node-id old-uses))
             guard    (if cur
@@ -191,14 +224,17 @@
                 [:put-docs {:into revision-table :valid-from vf}
                  (cond-> {:xt/id (revision-id template-id rev) :template-id template-id :rev rev
                           :tree (pr-str doc) :hash h}
+                   model (assoc :model model :root root)
                    cur  (assoc :parent-hash (:hash cur))
                    note (assoc :note note)
                    by   (assoc :author by))]
                 [:put-docs {:into head-table :valid-from vf}
-                 {:xt/id template-id :rev rev :hash h}]]
+                 (cond-> {:xt/id template-id :rev rev :hash h} model (assoc :model model :root root))]]
                (into (map (fn [u] [:put-docs {:into use-table :valid-from vf} (use-row template-id rev u)]) new-uses))
-               (into (map (fn [id] [:delete-docs {:from use-table :valid-from vf} (use-id template-id id)]) gone))))
-          {:rev rev :hash h :changed? true}
+               (into (map (fn [id] [:delete-docs {:from use-table :valid-from vf} (use-id template-id id)]) gone))
+               (into (map (fn [row] [:put-docs {:into model-use/table :valid-from vf} row]) new-rows))
+               (into (map (fn [id] [:delete-docs {:from model-use/table :valid-from vf} id]) gone-reads))))
+          (cond-> {:rev rev :hash h :changed? true} model (assoc :problems problems))
           (catch Exception e
             (if (assert-failed? e)
               (refuse :stale-template

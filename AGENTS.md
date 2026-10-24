@@ -86,7 +86,9 @@ src/com/trustblocks/
     signoff.clj                 a login's thumbs-up / objection on a clause version, template revision or release
     template_tree.clj           templates as immutable revisions with a moving head, and the clause-use rows
     release.clj                 pinning a template for deployment: release! (SHA), deploy!, verify, check-active
-    model_repository.clj        Concerto models as immutable namespace@version rows: import-dir!, closure, registry, pins, verify-pins
+    model_repository.clj        Concerto models as immutable namespace@version rows: import-dir!, closure, registry, pins, verify-pins, importers
+    model_use.clj               which clauses/templates read which model property (declaring type): readers, reads-of
+    impact.clj                  impact of changing a property; unused-properties of a model
     certification.clj           grant-office!, certify! (runs execute/trigger! then signs the response as a VC),
                                  attestations-for-contract — the newest and most involved file, read it fully
 

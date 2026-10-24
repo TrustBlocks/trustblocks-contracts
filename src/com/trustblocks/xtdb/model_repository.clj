@@ -219,6 +219,11 @@
   (when-let [v (last (versions node name))]
     (get-model node (str name "@" v))))
 
+(defn importers
+  "The stored models that import `ns` directly, by id."
+  [node ns]
+  (->> (models node) (filter #(some #{ns} (:imports %))) (mapv :id)))
+
 ;; ----------------------------------------------------------------- closure
 
 (defn closure

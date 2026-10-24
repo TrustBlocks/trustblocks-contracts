@@ -1,6 +1,6 @@
 # Model repository, default data, and attestation clauses
 
-Design note, 2026-10-23. Status: **step 1 built** (`xtdb/model_repository.clj`); steps 2-5 are proposals. Companion to `clause-tracking.md` (clause versions, template revisions, release) and `matters.md`.
+Design note, 2026-10-23. Status: **step 1 built** (`xtdb/model_repository.clj`); step 2 built (clause `:requires`, `model-use`, `impact`); steps 3-5 are proposals. Companion to `clause-tracking.md` (clause versions, template revisions, release) and `matters.md`.
 
 ## What exists (checked, not assumed)
 
@@ -82,7 +82,7 @@ Contracts are not always explicit about who attests or approves. So:
 ## Sequence (each step small, tested)
 
 1. **Done.** `xtdb/model_repository`: immutable model versions keyed by `namespace@version`, `import-dir!` from `shared/model/` or a template's vendored `model/`, `closure`, `registry`, `pins`, `verify-pins`. Same content laid out differently is not a change; different content under an existing version is refused. Reads re-hash.
-2. `:clause/requires` + build-time resolution against the pinned base, replacing per-clause fragments where a shared base covers them.
+2. **Done.** `:clause/requires {:model "ns@1.0.0" :root "Type" :fields [...]}`: a clause is held to the pinned model when saved (`:clause-does-not-fit-model`, `:undeclared-read`), and the properties it reads are recorded. A template saved with `:model`/`:root` records what it reads; a draft that does not fit is saved and reports `:problems`, a release will refuse it (release check not yet wired). Queries: `model-use/readers` (who reads a property, by versioned FQN or unversioned field, as of any date), `impact/impact` (clauses and templates a change reaches), `impact/unused-properties`, `repo/importers`. Pins are exact versions for now (`1.0.0`, not `1.x`); per-clause fragments (`:clause/model`) still work alongside.
 3. `xtdb/defaults`: versioned defaults, prefill, snapshot in a release.
 4. Release checks: attestation-unstated; `documentHash` = release SHA.
 5. Standard attestation clause in the library.

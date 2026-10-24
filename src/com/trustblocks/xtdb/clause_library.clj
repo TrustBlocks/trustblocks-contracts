@@ -30,8 +30,12 @@
   (:require [clojure.edn :as edn]
             [clojure.string :as str]
             [com.trustblocks.concerto.parser :as parser]
+            [com.trustblocks.concerto.metamodel :as mm]
             [com.trustblocks.templatemark.clauses :as clauses]
+            [com.trustblocks.templatemark.model :as model]
             [com.trustblocks.templatemark.tree :as tree]
+            [com.trustblocks.xtdb.model-repository :as repo]
+            [com.trustblocks.xtdb.model-use :as model-use]
             [com.trustblocks.xtdb.signoff :as signoff]
             [xtdb.api :as xt]))
 
@@ -82,7 +86,7 @@
 
 ;; -------------------------------------------------------------------- rows
 
-(defn- clause->row [{:clause/keys [id version title body model root hash parent-hash note author]}]
+(defn- clause->row [{:clause/keys [id version title body model root requires hash parent-hash note author]}]
   (cond-> {:xt/id     (version-id id version)
            :clause-id id
            :version   version
@@ -91,6 +95,7 @@
     title       (assoc :title title)
     model       (assoc :model model)
     root        (assoc :root root)
+    requires    (assoc :requires (pr-str requires))
     parent-hash (assoc :parent-hash parent-hash)
     note        (assoc :note note)
     author      (assoc :author author)))
@@ -103,6 +108,7 @@
     (:title row)       (assoc :clause/title (:title row))
     (:model row)       (assoc :clause/model (:model row))
     (:root row)        (assoc :clause/root (:root row))
+    (:requires row)    (assoc :clause/requires (edn/read-string (:requires row)))
     (:parent-hash row) (assoc :clause/parent-hash (:parent-hash row))
     (:note row)        (assoc :clause/note (:note row))
     (:author row)      (assoc :clause/author (:author row))))
@@ -258,9 +264,53 @@
                    {:clause id}))))
   clause)
 
+(declare lookup)
+
+(defn- check-requires
+  "For a clause that says which model it reads -- :clause/requires
+  {:model \"ns@1.0.0\" :root \"Type\" :fields [\"name\" ...]} -- holds its body to
+  that model and returns the properties it reads (templatemark model/reads).
+
+  Every placeholder must resolve against `:root` in the pinned model, or the
+  clause is refused (:clause-does-not-fit-model). If `:fields` is given it is
+  the clause's declaration of what it reads from the root and its supertypes;
+  reading anything else is refused (:undeclared-read), so a clause cannot
+  quietly depend on more of the contract than it says."
+  [node {:clause/keys [id body requires]}]
+  (let [{:keys [model root fields]} requires
+        _        (when-not (and (string? model) (string? root))
+                   (refuse :invalid-clause (str "Clause " id ": :requires needs a :model (ns@version) and a :root type")
+                           {:clause id}))
+        reg      (try (repo/registry node model)
+                      (catch clojure.lang.ExceptionInfo e
+                        (refuse (or (:trustblocks/error (ex-data e)) :model-missing)
+                                (str "Clause " id " requires model " model ": " (ex-message e))
+                                {:clause id :model model})))
+        root-fqn (str model "." root)
+        _        (when-not (get reg root-fqn)
+                   (refuse :clause-does-not-fit-model (str "Model " model " has no type " root) {:clause id :model model :root root}))
+        doc      {:node :document :id "check" :body (:body (tree/with-ids {:node :document :id "x" :body body}))}
+        library  (lookup node)
+        errors   (model/errors (model/typecheck doc reg root-fqn :library library))]
+    (when (seq errors)
+      (refuse :clause-does-not-fit-model
+              (str "Clause " id " does not fit " model "." root ": " (str/join "; " (map :message errors)))
+              {:clause id :model model :root root :problems errors}))
+    (let [reads (model/reads doc reg root-fqn :library library)]
+      (when (seq fields)
+        (let [scope (set (map #(str % ".") (mm/super-chain reg root-fqn)))
+              ours  (fn [fqn] (some #(and (str/starts-with? fqn %) (not (str/includes? (subs fqn (count %)) "."))) scope))
+              extra (->> reads (map :fqn) distinct (filter ours)
+                         (remove (fn [fqn] (some #(str/ends-with? fqn (str "." %)) fields))))]
+          (when (seq extra)
+            (refuse :undeclared-read
+                    (str "Clause " id " reads " (str/join ", " extra) " but does not declare it in :fields")
+                    {:clause id :undeclared (vec extra)}))))
+      reads)))
+
 (defn put-version!
   "Save `clause` -- {:clause/id :clause/title :clause/body :clause/model
-  :clause/root} -- as the next version of its id, and return it with its
+  :clause/root :clause/requires} -- as the next version of its id, and return it with its
   :clause/version, :clause/hash and :clause/parent-hash. The new version starts
   as :draft.
 
@@ -271,12 +321,17 @@
   then tries again with the new latest).
 
   Options: `:valid-from` when the wording takes effect (default now), `:by`,
-  `:note` (why it changed)."
+  `:note` (why it changed).
+
+  A clause with :clause/requires is held to that model first (see
+  `check-requires`), and the properties it reads are recorded with the
+  version (com.trustblocks.xtdb.model-use)."
   [node clause & {:keys [valid-from by note]}]
   (validate! clause)
   (let [id   (:clause/id clause)
         body (:body (tree/with-ids {:node :document :id "x" :body (:clause/body clause)}))
-        base (-> clause (assoc :clause/body body) (select-keys [:clause/id :clause/title :clause/body :clause/model :clause/root]))
+        base (-> clause (assoc :clause/body body) (select-keys [:clause/id :clause/title :clause/body :clause/model :clause/root :clause/requires]))
+        reads (when (:clause/requires clause) (check-requires node base))
         h    (clauses/clause-hash base)
         vf   (or (->instant valid-from) (java.time.Instant/now))]
     (loop [attempt 0]
@@ -292,10 +347,13 @@
                 vid (version-id id (:clause/version c))
                 r   (try
                       (xt/execute-tx node
-                                     [[:sql "ASSERT NOT EXISTS (SELECT 1 FROM clause_version WHERE _id = ?)" [vid]]
+                                     (into
+                                      [[:sql "ASSERT NOT EXISTS (SELECT 1 FROM clause_version WHERE _id = ?)" [vid]]
                                       [:put-docs {:into version-table :valid-from vf} (clause->row c)]
                                       [:put-docs {:into state-table :valid-from vf}
-                                       (cond-> {:xt/id vid :status "draft"} by (assoc :by by))]])
+                                       (cond-> {:xt/id vid :status "draft"} by (assoc :by by))]]
+                                     (map (fn [row] [:put-docs {:into model-use/table :valid-from vf} row])
+                                          (model-use/rows :clause vid (:clause/version c) reads))))
                       c
                       (catch Exception e
                         (if (and (assert-failed? e) (< attempt 5)) ::taken (throw e))))]
