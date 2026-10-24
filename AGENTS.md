@@ -89,6 +89,7 @@ src/com/trustblocks/
     model_repository.clj        Concerto models as immutable namespace@version rows: import-dir!, closure, registry, pins, verify-pins, importers
     model_use.clj               which clauses/templates read which model property (declaring type): readers, reads-of
     defaults.clj                versioned default data (the Town): put-version!, in-force, prefill, snapshot, verify-snapshot
+    lifecycle_check.clj         pure: which certifications a lifecycle.json requires that a release's text does not state
     impact.clj                  impact of changing a property; unused-properties of a model
     certification.clj           grant-office!, certify! (runs execute/trigger! then signs the response as a VC),
                                  attestations-for-contract — the newest and most involved file, read it fully

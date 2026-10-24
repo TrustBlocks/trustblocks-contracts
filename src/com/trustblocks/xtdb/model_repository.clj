@@ -256,6 +256,11 @@
 
 ;; -------------------------------------------------------------------- pins
 
+(defn pins-hash
+  "The fingerprint of a pins map ({ns hash})."
+  [pins-map]
+  (clauses/sha-256 (pr-str (clauses/canonical (into (sorted-map) pins-map)))))
+
 (defn pins
   "A fingerprint of `ns` and everything it imports: {:pins {ns hash ...}
   :hash sha}. The :hash covers every model in the closure, so it changes if
@@ -266,7 +271,7 @@
       (refuse :model-missing (str "Model " ns " needs " (str/join ", " missing) ", which is not in the repository")
               {:model ns :missing missing}))
     (let [pm (into (sorted-map) (map (fn [n] [n (:model/hash (get-model node n))])) order)]
-      {:root ns :pins pm :hash (clauses/sha-256 (pr-str (clauses/canonical pm)))})))
+      {:root ns :pins pm :hash (pins-hash pm)})))
 
 (defn verify-pins
   "Hold the repository up against `pins` (the :pins map of `pins`): what

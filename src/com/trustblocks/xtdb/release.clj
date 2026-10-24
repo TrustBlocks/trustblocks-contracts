@@ -30,7 +30,10 @@
             [com.trustblocks.templatemark.compose :as compose]
             [com.trustblocks.templatemark.release :as release]
             [com.trustblocks.xtdb.clause-library :as library]
+            [com.trustblocks.templatemark.model :as model]
             [com.trustblocks.xtdb.defaults :as defaults]
+            [com.trustblocks.xtdb.lifecycle-check :as lifecycle-check]
+            [com.trustblocks.xtdb.model-repository :as repo]
             [com.trustblocks.xtdb.signoff :as signoff]
             [com.trustblocks.xtdb.template-tree :as templates]
             [xtdb.api :as xt]))
@@ -59,6 +62,9 @@
 
 (defn release-id [sha] (str "sha256:" sha))
 
+(defn- states-hash [states]
+  (when (seq states) (clauses/sha-256 (pr-str (clauses/canonical (vec states))))))
+
 (defn- model-hash [model] (when model (clauses/sha-256 (pr-str (clauses/canonical model)))))
 
 (defn- exact-lookup
@@ -86,6 +92,11 @@
         (:model-hash r) (assoc :model-hash (:model-hash r))
         (:defaults r)   (assoc :defaults (edn/read-string (:defaults r))
                                :defaults-hash (:defaults-hash r))
+        (:pinned-model r) (assoc :pinned {:model (:pinned-model r) :root (:pinned-root r)
+                                          :pins (edn/read-string (:pins r))}
+                                 :pins-hash (:pins-hash r))
+        (:states r)     (assoc :states (edn/read-string (:states r))
+                               :states-hash (:states-hash r))
         (:model r)      (assoc :model (edn/read-string (:model r)))))))
 
 (defn verify
@@ -95,7 +106,9 @@
   :sha-mismatch, :clause-changed, :clause-missing, :clause-corrupt (a stored
   clause no longer matches its own hash), :template-changed, :model-changed,
   :defaults-altered, :defaults-changed, :defaults-missing, :defaults-corrupt
-  (see defaults/verify-snapshot), :no-such-release."
+  (see defaults/verify-snapshot), :pins-altered, :model-missing,
+  :model-changed (a pinned model; see model-repository/verify-pins),
+  :model-corrupt, :no-such-release."
   [node sha]
   (if-let [r (get-release node sha)]
     (let [lookup   (exact-lookup node)
@@ -116,11 +129,20 @@
                                  (release/verify r lookup' :doc {:node :document :body (:body (:tree r))}))
                          (when (and (:model r) (not= (:model-hash r) (model-hash (:model r))))
                            [{:rule :model-changed :message "The stored model no longer matches the release's model hash"}])
+                         (when (and (:states r) (not= (:states-hash r) (states-hash (:states r))))
+                           [{:rule :states-altered :message "The stored statements no longer match the release's states hash"}])
                          (when (:defaults r)
                            (concat
                             (when (not= (:defaults-hash r) (defaults/snapshot-hash (:defaults r)))
                               [{:rule :defaults-altered :message "The stored defaults no longer match the release's defaults hash"}])
-                            (defaults/verify-snapshot node (:defaults r))))))]
+                            (defaults/verify-snapshot node (:defaults r))))
+                         (when-let [{:keys [pins]} (:pinned r)]
+                           (concat
+                            (when (not= (:pins-hash r) (repo/pins-hash pins))
+                              [{:rule :pins-altered :message "The stored model pins no longer match the release's pins hash"}])
+                            (for [{:keys [problem model]} (repo/verify-pins node pins)]
+                              {:rule problem :model model
+                               :message (str "Model " model ": " (name problem))})))))]
       {:ok? (empty? problems) :problems problems})
     {:ok? false :problems [{:rule :no-such-release :message (str "No release " sha)}]}))
 
@@ -148,16 +170,58 @@
   version once; the release stores the versions and their values, and their
   hash is part of the SHA, so a later change to the Town's defaults cannot
   alter this contract and verify says if the stored values were touched.
+  A template saved against a model (template-tree/save! `:model`) is held
+  to it: a placeholder that does not resolve refuses the release
+  (:template-does-not-fit-model), as does a clause that requires a model the
+  template is not written against (:clause-model-not-pinned). The model and
+  everything it imports are pinned -- exact versions and hashes -- stored with
+  the release, and their hash is part of the SHA; `verify` says if a pinned
+  model has since changed.
+
+  `:lifecycle` (a lifecycle.json map) asks whether the text states every
+  certification the lifecycle requires (see xtdb.lifecycle-check). What the
+  text states is each clause's `:clause/states` plus `:states`, the template's
+  own, a list of {:event :authority}; `:states` is part of the SHA, so the same
+  template released with a different statement is a different release. The
+  gaps come back as `:findings` on the release; with `:require-stated?` they
+  refuse it.
+
   Options: `:by`, `:note`, `:valid-from`."
-  [node template-id & {:keys [rev compose allow-draft? require-signoffs by note valid-from] refs :defaults}]
+  [node template-id & {:keys [rev compose allow-draft? require-signoffs by note valid-from lifecycle states require-stated?]
+                       refs :defaults}]
   (let [t (or (templates/revision node template-id rev)
               (refuse :no-such-template (str "No template " template-id (when rev (str " at revision " rev))) {:template template-id}))
         lookup   (library/lookup node)
         composed (when compose
                    (compose/compose (assoc compose :doc (:tree t) :library lookup)))
         snap     (when (seq refs) (defaults/snapshot node refs :at (->instant valid-from)))
+        model-ref (:model t)
+        pins-result (when model-ref
+                      (try {:pins (repo/pins node model-ref)}
+                           (catch clojure.lang.ExceptionInfo e
+                             {:problem {:rule (or (:trustblocks/error (ex-data e)) :model-missing)
+                                        :message (str "Template " template-id " is written against " model-ref ": " (ex-message e))}})))
+        pins     (:pins pins-result)
+        fit      (when pins
+                   (let [reg (repo/registry node model-ref)
+                         root-fqn (str model-ref "." (:root t))]
+                     (for [{:keys [node-id message]} (model/errors (model/typecheck (:tree t) reg root-fqn :library lookup))]
+                       {:rule :template-does-not-fit-model :node-id node-id
+                        :message (str "Template " template-id " does not fit " model-ref ": " message)})))
         pinned   (release/release (:tree t) lookup :model-hash (model-hash (:model composed))
-                                  :defaults-hash (defaults/snapshot-hash snap))
+                                  :defaults-hash (defaults/snapshot-hash snap)
+                                  :pins-hash (:hash pins)
+                                  :states-hash (states-hash states))
+        manifest-clauses (for [{:keys [clause version]} (:manifest pinned)] (library/get-version node clause version))
+        model-mismatch (when pins
+                         (for [c manifest-clauses
+                               :let [req (:model (:clause/requires c))]
+                               :when (and req (not (contains? (:pins pins) req)))]
+                           {:rule :clause-model-not-pinned :clause (:clause/id c) :version (:clause/version c)
+                            :message (str "Clause " (:clause/id c) " version " (:clause/version c) " requires " req
+                                          ", which " model-ref " does not import")}))
+        stated   (concat (mapcat :clause/states manifest-clauses) states)
+        findings (when lifecycle (lifecycle-check/unstated lifecycle stated))
         drafts   (when-not allow-draft?
                    (for [{:keys [clause version]} (:manifest pinned)
                          :let [s (library/status node clause version)]
@@ -181,6 +245,10 @@
                                       (str " has an objection from " (clojure.string/join ", " objections))
                                       (str " " (clojure.string/join "; " missing))))}))
         problems (vec (concat (:problems pinned)
+                              (some-> pins-result :problem vector)
+                              fit
+                              model-mismatch
+                              (when require-stated? findings)
                               drafts
                               unsigned
                               (when composed
@@ -191,7 +259,7 @@
               {:template template-id :problems problems}))
     (let [sha (:sha pinned), id (release-id sha)]
       (if-let [existing (get-release node sha)]
-        (assoc existing :new? false)
+        (assoc existing :new? false :findings findings)
         (let [vf (or (->instant valid-from) (java.time.Instant/now))]
           (xt/execute-tx
            node
@@ -202,6 +270,9 @@
                      (:model composed)   (assoc :model (pr-str (:model composed))
                                                  :model-hash (:model-hash pinned))
                      (seq snap)  (assoc :defaults (pr-str snap) :defaults-hash (:defaults-hash pinned))
+                     pins        (assoc :pinned-model model-ref :pinned-root (:root t)
+                                        :pins (pr-str (:pins pins)) :pins-hash (:hash pins))
+                     (seq states) (assoc :states (pr-str (vec states)) :states-hash (:states-hash pinned))
                      (seq clause-signoffs) (assoc :signoffs (pr-str clause-signoffs))
                      by   (assoc :author by)
                      note (assoc :note note))]]
@@ -209,7 +280,20 @@
                    [:put-docs {:into templates/use-table :valid-from vf}
                     {:xt/id (str "release:" sha "#" clause "@" version)
                      :owner-kind "release" :owner id :clause clause :pin version :hash hash :inline false}])))
-          (assoc (get-release node sha) :new? true))))))
+          (assoc (get-release node sha) :new? true :findings findings))))))
+
+;; ------------------------------------------------------------------ findings
+
+(defn findings
+  "The certifications `lifecycle` requires that release `sha`'s text does not
+  state: see lifecycle-check/unstated. What the release states is each pinned
+  clause's `:clause/states` and the `:states` it was released with."
+  [node sha lifecycle]
+  (when-let [r (get-release node sha)]
+    (lifecycle-check/unstated
+     lifecycle
+     (concat (mapcat #(:clause/states (library/get-version node (:clause %) (:version %))) (:manifest r))
+             (:states r)))))
 
 ;; ------------------------------------------------------------------ deploy
 
@@ -295,3 +379,24 @@
   "The standing sign-offs on release `sha`."
   [node sha & {:as opts}]
   (signoff/signoffs node {:kind :release :id (if (.startsWith ^String sha "sha256:") (subs sha 7) sha)} opts))
+
+;; ------------------------------------------------------------- attestations
+
+(defn attestation-subject
+  "What an officeholder should attest to for `contract-id`: the release it is
+  deployed against, as `sha256:<hex>` -- the value for an Attestation's
+  documentHash -- or nil if it is not deployed. Attesting to the release
+  rather than to a typed reference makes the attestation about exactly the
+  words, clauses, model and defaults that were released."
+  [node contract-id & {:as opts}]
+  (some-> (apply release-of node contract-id (mapcat identity opts)) release-id))
+
+(defn verify-attested
+  "Does what an Attestation attested to still hold? `document-hash` is its
+  documentHash. If it names a release (`sha256:<hex>`), the release is
+  verified: {:release sha :ok? :problems}. Otherwise it is a reference to
+  something else (a stored file, say) and this says so: {:ok? nil}."
+  [node document-hash]
+  (if (and (string? document-hash) (re-matches #"sha256:[0-9a-f]{64}" document-hash))
+    (assoc (verify node document-hash) :release (subs document-hash 7))
+    {:ok? nil :note "not a release; nothing to verify here"}))

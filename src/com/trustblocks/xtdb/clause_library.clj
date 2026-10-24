@@ -86,7 +86,7 @@
 
 ;; -------------------------------------------------------------------- rows
 
-(defn- clause->row [{:clause/keys [id version title body model root requires hash parent-hash note author]}]
+(defn- clause->row [{:clause/keys [id version title body model root requires states hash parent-hash note author]}]
   (cond-> {:xt/id     (version-id id version)
            :clause-id id
            :version   version
@@ -96,6 +96,7 @@
     model       (assoc :model model)
     root        (assoc :root root)
     requires    (assoc :requires (pr-str requires))
+    states      (assoc :states (pr-str states))
     parent-hash (assoc :parent-hash parent-hash)
     note        (assoc :note note)
     author      (assoc :author author)))
@@ -109,6 +110,7 @@
     (:model row)       (assoc :clause/model (:model row))
     (:root row)        (assoc :clause/root (:root row))
     (:requires row)    (assoc :clause/requires (edn/read-string (:requires row)))
+    (:states row)      (assoc :clause/states (edn/read-string (:states row)))
     (:parent-hash row) (assoc :clause/parent-hash (:parent-hash row))
     (:note row)        (assoc :clause/note (:note row))
     (:author row)      (assoc :clause/author (:author row))))
@@ -248,6 +250,11 @@
             {:clause id}))
   (when-not (vector? body)
     (refuse :invalid-clause "A clause body is a vector of template nodes" {:clause id}))
+  (when-let [states (:clause/states clause)]
+    (when-not (and (sequential? states) (every? #(and (map? %) (string? (:event %))) states))
+      (refuse :invalid-clause
+              (str "Clause " id ": :clause/states is a list of {:event \"EventName\" :authority \"AUTHORITY\"}, the lifecycle events its text states")
+              {:clause id})))
   (let [doc {:node :document :id "check" :body body}]
     (when-let [problems (tree/explain doc)]
       (refuse :invalid-clause-body (str "Clause " id "'s body is not a valid template: " (pr-str problems))
@@ -310,7 +317,7 @@
 
 (defn put-version!
   "Save `clause` -- {:clause/id :clause/title :clause/body :clause/model
-  :clause/root :clause/requires} -- as the next version of its id, and return it with its
+  :clause/root :clause/requires :clause/states} -- as the next version of its id, and return it with its
   :clause/version, :clause/hash and :clause/parent-hash. The new version starts
   as :draft.
 
@@ -330,7 +337,7 @@
   (validate! clause)
   (let [id   (:clause/id clause)
         body (:body (tree/with-ids {:node :document :id "x" :body (:clause/body clause)}))
-        base (-> clause (assoc :clause/body body) (select-keys [:clause/id :clause/title :clause/body :clause/model :clause/root :clause/requires]))
+        base (-> clause (assoc :clause/body body) (select-keys [:clause/id :clause/title :clause/body :clause/model :clause/root :clause/requires :clause/states]))
         reads (when (:clause/requires clause) (check-requires node base))
         h    (clauses/clause-hash base)
         vf   (or (->instant valid-from) (java.time.Instant/now))]

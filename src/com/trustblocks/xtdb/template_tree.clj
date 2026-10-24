@@ -128,6 +128,7 @@
                                                       [{:xt/id (revision-id template-id rev)} star]))))]
       (cond-> {:rev rev :hash (:hash r) :tree (verified-tree r)}
         (:parent-hash r) (assoc :parent-hash (:parent-hash r))
+        (:model r)       (assoc :model (:model r) :root (:root r))
         (:note r)        (assoc :note (:note r))
         (:author r)      (assoc :author (:author r))))))
 
