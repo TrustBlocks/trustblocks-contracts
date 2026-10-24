@@ -42,15 +42,5 @@ jobs:
       # so it needs no services.
       - name: test
         env:
-          # Macroexpanding the street-resurfacing demo overflows the default stack.
-          JAVA_TOOL_OPTIONS: -Xss512m
           CONCERTO_CLI: ${{ github.workspace }}/node_modules/.bin/concerto
         run: clojure -M:dev:run test
-
-      - name: debug stack
-        if: failure()
-        env:
-          JAVA_TOOL_OPTIONS: -Xss512m
-          CONCERTO_CLI: ${{ github.workspace }}/node_modules/.bin/concerto
-        run: |
-          clojure -Sdeps '{:aliases {:probe {:extra-paths ["test" "dev"] :extra-deps {com.biffweb/tasks {:mvn/version "2.0.0"}} :jvm-opts ["--add-opens=java.base/java.nio=ALL-UNNAMED" "--enable-native-access=ALL-UNNAMED" "-Dio.netty.tryReflectionSetAccessible=true"]}}}' -M:probe -e "(require '[com.trustblocks.xtdb.store :as store] '[com.trustblocks.template.library :as library] '[xtdb.node :as xn] '[clojure.java.io :as io]) (with-open [node (xn/start-node)] (doseq [t [\"contract\" \"pay-application\" \"notice-of-award\" \"notice-to-proceed\" \"vendor-form\"] f (store/model-dir-files (io/file (library/dir (str \"street-resurfacing/\" t)) \"model\"))] (println \"PROBE\" t (.getName (io/file f)) (.length (io/file f)) (try (do (store/put-model! node f) :ok) (catch Throwable e (str (class e) (some-> (loop [c e] (if (.getCause c) (recur (.getCause c)) c)) class)))))))" || true

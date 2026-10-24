@@ -103,7 +103,12 @@
   {:extra-paths ["test" "dev"]
    :extra-deps  {com.biffweb/tasks {:mvn/version "2.0.0"}}
    :main-opts   ["-m" "com.biffweb.tasks.app"]
-   :jvm-opts    ["--add-opens=java.base/java.nio=ALL-UNNAMED"
+   ;; Parsing a model with a long comment (concerto-clj's block-comment regex)
+   ;; recurses per character; it needs more than Linux's default 1 MB stack.
+   ;; On the command line, since the launcher ignores -Xss in JAVA_TOOL_OPTIONS
+   ;; for the main thread.
+   :jvm-opts    ["-Xss16m"
+                 "--add-opens=java.base/java.nio=ALL-UNNAMED"
                  "--enable-native-access=ALL-UNNAMED"
                  "-Dio.netty.tryReflectionSetAccessible=true"]}
 
