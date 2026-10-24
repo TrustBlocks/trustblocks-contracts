@@ -60,8 +60,8 @@
 
         ;; Templates as trees, text clauses and their tracking, release
         ;; pinning -- see com.trustblocks.xtdb.template-tree, .clause-library
-        ;; and .release. A sibling checkout until it has a remote to pin.
-        templatemark-clj/templatemark-clj {:local/root "../templatemark-clj"}
+        ;; and .release. A git dependency, pinned by SHA; not on Clojars.
+        io.github.TrustBlocks/templatemark-clj {:git/sha "b30a0aa96ccfd6cba4a132f291fa94bc3d55f74b"}
 
         dev.onionpancakes/chassis     {:mvn/version "1.0.365"}
         ;; CommonMark + pipe tables -- exactly the markdown TemplateMark is

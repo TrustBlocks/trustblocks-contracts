@@ -110,8 +110,9 @@ fails the model hash.
 - No UI, no HTTP routes.
 - Which logins may sign off, and what a role label means, is not enforced: a
   sign-off is a record, not an authorization. Roles are free text.
-- `templatemark-clj` is a sibling checkout (`:local/root`) until it has a
-  remote to pin by SHA.
+- `templatemark-clj` is a git dependency pinned by SHA
+  (github.com/TrustBlocks/templatemark-clj), not on Clojars. Bump the SHA in
+  `deps.edn` when it changes.
 - Importing existing markdown re-parses with fresh node ids, so a diff against
   an earlier revision shows everything replaced. The builder edits the loaded
   tree, which keeps ids; an `align-ids` step for imports would fix it.
