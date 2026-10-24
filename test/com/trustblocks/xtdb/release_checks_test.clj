@@ -5,6 +5,7 @@
   (:require [clojure.test :refer [deftest is testing]]
             [com.trustblocks.templatemark.parse :as parse]
             [com.trustblocks.xtdb.clause-library :as lib]
+            [com.trustblocks.xtdb.lifecycle-check :as lifecycle-check]
             [com.trustblocks.xtdb.model-repository :as repo]
             [com.trustblocks.xtdb.release :as rel]
             [com.trustblocks.xtdb.template-tree :as tt]
@@ -119,3 +120,30 @@ concept Thing { o String town }
         (is (not (:ok? (rel/verify-attested node (str "sha256:" (:sha r)))))))
       (testing "a reference to anything else is not verified here"
         (is (nil? (:ok? (rel/verify-attested node "STR-27/pay-1.pdf"))))))))
+
+(def waivable-lifecycle
+  {"transitions" [{"event" "E1" "from" [] "to" "S1"
+                   "requires" [{"credential" "Attestation" "authority" "PREAUDIT"}]}
+                  {"event" "E2" "from" ["S1"] "to" "S2"
+                   "requires" [{"credential" "Attestation" "authority" "MANAGER" "waivableBy" "BOARD"}]}]})
+
+(deftest a-certification-is-not-waivable-unless-the-contract-says-so
+  (with-open [node (xt.node/start-node)]
+    (testing "stated, but nothing grants the waiver the lifecycle allows"
+      (approved! node "plain" "Both are required." :clause/states [{:event "E1" :authority "PREAUDIT"} {:event "E2" :authority "MANAGER"}])
+      (tt/save! node "a" (doc "{{#clause plain}}{{/clause}}"))
+      (is (= [[:waiver-unstated "E2" "BOARD"]]
+             (map (juxt :rule :event :waivable-by) (:findings (rel/release! node "a" :lifecycle waivable-lifecycle))))))
+    (testing "the clause grants it, so nothing is left"
+      (approved! node "waiver" "The Board may waive the Manager's certification in writing."
+                 :clause/states [{:event "E1" :authority "PREAUDIT"} {:event "E2" :authority "MANAGER" :waivable-by "BOARD"}])
+      (tt/save! node "b" (doc "{{#clause waiver}}{{/clause}}"))
+      (is (= [] (:findings (rel/release! node "b" :lifecycle waivable-lifecycle)))))
+    (testing "a waiver of something the lifecycle does not allow is flagged, and strict refuses it"
+      (approved! node "too-much" "The Board may waive anything."
+                 :clause/states [{:event "E1" :authority "PREAUDIT" :waivable-by "BOARD"} {:event "E2" :authority "MANAGER" :waivable-by "BOARD"}])
+      (tt/save! node "c" (doc "{{#clause too-much}}{{/clause}}"))
+      (is (= [[:waiver-not-allowed "E1"]] (map (juxt :rule :event) (:findings (rel/release! node "c" :lifecycle waivable-lifecycle)))))
+      (is (= #{:waiver-not-allowed} (rules (refusal #(rel/release! node "c" :lifecycle waivable-lifecycle :require-stated? true))))))
+    (testing "a lifecycle with no waivableBy asks for no waiver wording"
+      (is (= [] (lifecycle-check/waivers lifecycle [{:event "A1"}]))))))

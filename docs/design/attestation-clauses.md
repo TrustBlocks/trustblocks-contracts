@@ -96,3 +96,13 @@ Everything is public. There is no classification by default, and no field to fil
 - Setting or lifting a mark is an explicit act by a named person and is recorded.
 - Truly confidential material belongs outside this system. The mark is for the rare case, not a way to keep such material here.
 - The NC Public Records Act exceptions are narrow and time-limited, so the Town Attorney decides the stamp wording. The mark is a handling marker, not a legal determination.
+
+## Waiver (decided and built 2026-10-24)
+
+A required certification cannot be waived unless the contract says so. The pre-audit certificate (G.S. 159-28) is not waivable and gets no waiver wording.
+
+- **Lifecycle:** a requirement may carry `"waivableBy": "AUTHORITY"`. Absent means not waivable.
+- **Clause:** a `:clause/states` entry may carry `:waivable-by "AUTHORITY"`, meaning its text grants that waiver.
+- **Release check** (`lifecycle-check/waivers`, reported with the other findings): `:waiver-unstated` when the lifecycle allows a waiver no clause grants; `:waiver-not-allowed` when a clause grants one the lifecycle does not. `:require-stated?` refuses either.
+- **Not done:** `waivableBy` is not yet in `trustblocks-templates/shared/model/lifecycle.cto` (`Certification`) or its vendored copies, so `bb check` there does not know the field. The recorded waiver act at runtime is also not built.
+- **Next:** a `conditions` clause that lists the required certifications and any waivers, and a `background` clause for context only.

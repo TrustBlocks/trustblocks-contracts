@@ -251,9 +251,9 @@
   (when-not (vector? body)
     (refuse :invalid-clause "A clause body is a vector of template nodes" {:clause id}))
   (when-let [states (:clause/states clause)]
-    (when-not (and (sequential? states) (every? #(and (map? %) (string? (:event %))) states))
+    (when-not (and (sequential? states) (every? #(and (map? %) (string? (:event %)) (or (nil? (:waivable-by %)) (string? (:waivable-by %)))) states))
       (refuse :invalid-clause
-              (str "Clause " id ": :clause/states is a list of {:event \"EventName\" :authority \"AUTHORITY\"}, the lifecycle events its text states")
+              (str "Clause " id ": :clause/states is a list of {:event \"EventName\" :authority \"AUTHORITY\" :waivable-by \"AUTHORITY\"}, the lifecycle events its text states, and optionally who may waive them")
               {:clause id})))
   (let [doc {:node :document :id "check" :body body}]
     (when-let [problems (tree/explain doc)]

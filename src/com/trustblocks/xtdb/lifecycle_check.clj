@@ -10,7 +10,13 @@
   A requirement is STATED when some clause in the release says it does. A
   library clause says so with `:clause/states`, a list of
   {:event \"InspectionCertified\" :authority \"INSPECT_PAY_APPLICATIONS\"}; the
-  authority may be left out to state the event for any authority. Text a
+  authority may be left out to state the event for any authority.
+
+  A required certification cannot be waived unless the contract says so. The
+  lifecycle marks a requirement waivable with `\"waivableBy\"`, the authority
+  that may waive it; without it the requirement is not waivable. A clause that
+  grants the waiver says `:waivable-by` in its state entry. The text and the
+  lifecycle must agree both ways. Text a
   template writes itself says so through `release!`'s `:states`. Whether the
   words actually say it is for the author and a reader; what this checks is that
   someone has said they do, for every event, so a required certification
@@ -23,7 +29,8 @@
   [lifecycle]
   (vec (for [t (get lifecycle "transitions")
              r (get t "requires")]
-         {:event (get t "event") :credential (get r "credential") :authority (get r "authority")})))
+         (cond-> {:event (get t "event") :credential (get r "credential") :authority (get r "authority")}
+           (get r "waivableBy") (assoc :waivable-by (get r "waivableBy"))))))
 
 (defn stated?
   "Whether `states` ({:event :authority}) state requirement `req`."
@@ -32,17 +39,42 @@
                               (or (nil? (:authority s)) (= authority (:authority s)))))
                  states)))
 
+(defn- matches? [{:keys [event authority]} s]
+  (and (= event (:event s)) (or (nil? (:authority s)) (= authority (:authority s)))))
+
+(defn waivers
+  "Where the text and the lifecycle disagree about waiver. A requirement the
+  lifecycle marks waivable that no state grants is :waiver-unstated; a state
+  that grants a waiver the lifecycle does not allow is :waiver-not-allowed."
+  [lifecycle states]
+  (let [reqs (requirements lifecycle)]
+    (vec (concat
+          (for [{:keys [event authority waivable-by] :as r} reqs
+                :when (and waivable-by
+                           (not-any? #(and (matches? r %) (= waivable-by (:waivable-by %))) states))]
+            {:rule :waiver-unstated :event event :authority authority :waivable-by waivable-by
+             :message (str "The lifecycle lets " waivable-by " waive " authority " for " event
+                           ", but the text does not say so")})
+          (for [s states
+                :when (:waivable-by s)
+                :let [rs (filter #(matches? % s) reqs)]
+                :when (and (seq rs) (not-any? #(= (:waivable-by s) (:waivable-by %)) rs))]
+            {:rule :waiver-not-allowed :event (:event s) :authority (:authority s) :waivable-by (:waivable-by s)
+             :message (str "The text lets " (:waivable-by s) " waive " (or (:authority s) "the certification") " for "
+                           (:event s) ", but the lifecycle does not allow a waiver")})))))
+
 (defn unstated
   "The requirements of `lifecycle` that `states` do not state: findings
   {:rule :event :credential :authority :message}. :rule is :attestation-unstated
-  or :receipt-unstated."
+  or :receipt-unstated, or one of `waivers`'."
   [lifecycle states]
-  (vec (for [{:keys [event credential authority] :as r} (requirements lifecycle)
-             :when (not (stated? states r))]
+  (vec (concat (waivers lifecycle states)
+               (for [{:keys [event credential authority] :as r} (requirements lifecycle)
+                     :when (not (stated? states r))]
          {:rule       (if (= "Receipt" credential) :receipt-unstated :attestation-unstated)
           :event      event
           :credential credential
           :authority  authority
           :message    (str "The text does not state that " event " needs "
                            (if (= "Receipt" credential) "a Receipt" "an Attestation")
-                           " under the authority " authority)})))
+                           " under the authority " authority)}))))
