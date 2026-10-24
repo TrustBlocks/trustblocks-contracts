@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="./image-slot.js"></script>
+<style>body{margin:0;background:#f6f6f4}a{color:#1f3a5f}a:hover{color:#0e2240}button{font-family:inherit}</style>
+</helmet>
+<div style="display:flex;flex-direction:column;height:100vh;min-width:760px;font-family:'Public Sans',Helvetica,Arial,sans-serif;color:#1c1c1a;font-size:14px;background:#f6f6f4">
+  <header style="display:flex;align-items:center;gap:24px;padding:0 24px;height:64px;background:#fff;border-bottom:1px solid #e2e2de;flex:none">
+    <img src="logo.png" alt="China Grove" onClick="{{ goHome }}" style="cursor:pointer;height:38px;width:auto;display:block">
+    <div style="width:1px;height:24px;background:#e2e2de"></div>
+    <div style="font-weight:600;font-size:15px;letter-spacing:.01em;white-space:nowrap">Trustblocks <span style="font-weight:400;color:#6b6b66">· Municipal Contracts</span></div>
+    <div style="flex:1"></div>
+      </header>
+  <div style="display:flex;flex:1;min-height:0">
+    <nav style="width:208px;flex:none;background:#fff;border-right:1px solid #e2e2de;padding:16px 12px;display:flex;flex-direction:column;gap:2px">
+      <sc-for list="{{ navItems }}" as="n" hint-placeholder-count="4">
+        <button onClick="{{ n.go }}" style="text-align:left;border:0;border-radius:6px;padding:9px 12px;font-size:14px;cursor:pointer;background:{{ n.bg }};color:{{ n.fg }};font-weight:{{ n.fw }}">{{ n.label }}</button>
+      </sc-for>
+      <div style="flex:1"></div>
+      <button onClick="{{ toggleSignals }}" style="text-align:left;border:1px solid #e2e2de;border-radius:6px;padding:8px 12px;font-size:12px;cursor:pointer;background:#fff;color:#6b6b66;font-family:'IBM Plex Mono',monospace">{{ signalsLabel }}</button>
+    </nav>
+    <main style="flex:1;overflow:auto;padding:28px 32px 48px">
+
+      <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+        <div style="position:relative;margin:-28px -32px -48px;min-height:calc(100vh - 64px);background:#f6f6f4;overflow:hidden">
+          <image-slot id="home-aerial" shape="rect" placeholder=" " style="position:absolute;inset:0"></image-slot>
+                              <div style="position:relative;pointer-events:none;min-height:calc(100vh - 64px);box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;gap:32px;padding:32px 48px 48px;color:#1c1c1a">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px">
+              <img src="logo.png" alt="Town of China Grove" style="height:96px;width:auto;display:block">
+              <div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#6b6b66;padding-top:6px">Town of China Grove, North Carolina</div>
+            </div>
+            <div>
+              <div style="font-size:26px;font-weight:600;margin-bottom:4px">Welcome to the</div>
+              <h1 style="font-size:64px;line-height:1.02;font-weight:700;margin:0 0 36px;letter-spacing:-.02em;text-wrap:balance;max-width:900px">Contract Management Console</h1>
+              <div style="display:flex;gap:16px;flex-wrap:wrap;pointer-events:auto">
+                <button onClick="{{ goActive }}" style="display:flex;flex-direction:column;gap:6px;text-align:left;border:0;background:#1c1c1a;color:#fff;border-radius:10px;padding:20px 28px;min-width:280px;cursor:pointer" style-hover="background:#2c2c29">
+                  <span style="font-size:22px;font-weight:600">Active Contracts →</span>
+                  <span style="font-size:14px;color:#dcdcd6">Status, next steps and search</span>
+                </button>
+                <button onClick="{{ goDraft }}" style="display:flex;flex-direction:column;gap:6px;text-align:left;border:2px solid #1c1c1a;background:transparent;color:#1c1c1a;border-radius:10px;padding:18px 28px;min-width:280px;cursor:pointer" style-hover="background:#eeeeea">
+                  <span style="font-size:22px;font-weight:600">Draft Contracts →</span>
+                  <span style="font-size:14px;color:#55554f">Editor, clauses, contracts and matters</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isDash }}" hint-placeholder-val="{{ true }}">
+        <div>
+          <h1 style="font-size:24px;font-weight:600;margin:0 0 4px">Active Contracts</h1>
+          <div style="color:#6b6b66;margin-bottom:24px">{{ roleBlurb }}</div>
+          <div style="background:#fff;border:1px solid #e2e2de;border-radius:8px;margin-bottom:24px;overflow:hidden">
+            <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #e2e2de;background:#fafaf8"><b style="font-weight:600;flex:1">Current Status</b><span style="font-size:12px;color:#6b6b66">{{ statusSummary }}</span></div>
+            <sc-for list="{{ top5 }}" as="c" hint-placeholder-count="5">
+              <button onClick="{{ c.open }}" style="display:grid;grid-template-columns:2.4fr 1.4fr 2fr 24px;gap:12px;align-items:center;width:100%;text-align:left;padding:12px 16px;border:0;border-bottom:1px solid #eeeeea;background:#fff;cursor:pointer;font-size:14px" style-hover="background:#fafaf8">
+                <span style="font-weight:500">{{ c.name }}</span>
+                <span><span style="display:inline-block;padding:3px 9px;border-radius:99px;font-size:12px;font-weight:500;background:{{ c.chipBg }};color:{{ c.chipFg }}">{{ c.statusLabel }}</span></span>
+                <span style="color:#55554f;font-size:13px">{{ c.next }}</span><span style="color:#6b6b66">→</span>
+              </button>
+            </sc-for>
+          </div>
+          <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+            <h2 style="font-size:15px;font-weight:600;margin:0">Active Contracts</h2>
+            <div style="flex:1"></div>
+            <input value="{{ query }}" onInput="{{ setQuery }}" placeholder="Search contracts, counterparties, types…" style="width:360px;box-sizing:border-box;border:1px solid #d4d4cf;border-radius:6px;padding:9px 12px;font-size:14px;font-family:inherit;background:#fff;outline:none">
+          </div>
+          <div style="background:#fff;border:1px solid #e2e2de;border-radius:8px;overflow:hidden">
+            <div style="display:grid;grid-template-columns:2.4fr 1.4fr 1fr 1.2fr;padding:10px 16px;font-size:12px;color:#6b6b66;border-bottom:1px solid #e2e2de;text-transform:uppercase;letter-spacing:.04em"><span>Contract</span><span>Counterparty</span><span>Amount</span><span>Status</span></div>
+            <sc-for list="{{ rows }}" as="c" hint-placeholder-count="5">
+              <button onClick="{{ c.open }}" style="display:grid;grid-template-columns:2.4fr 1.4fr 1fr 1.2fr;align-items:center;width:100%;text-align:left;padding:13px 16px;border:0;border-bottom:1px solid #eeeeea;background:#fff;cursor:pointer;font-size:14px" style-hover="background:#fafaf8">
+                <span><b style="font-weight:500">{{ c.name }}</b><br><span style="font-size:12px;color:#6b6b66">{{ c.type }}</span></span>
+                <span>{{ c.party }}</span><span style="font-variant-numeric:tabular-nums">{{ c.amount }}</span>
+                <span><span style="display:inline-block;padding:3px 9px;border-radius:99px;font-size:12px;font-weight:500;background:{{ c.chipBg }};color:{{ c.chipFg }}">{{ c.statusLabel }}</span></span>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isContract }}" hint-placeholder-val="{{ false }}">
+        <div style="max-width:1040px">
+          <button onClick="{{ goDash }}" style="border:0;background:none;color:#6b6b66;cursor:pointer;padding:0;margin-bottom:10px;font-size:13px">← All contracts</button>
+          <div style="display:flex;align-items:flex-start;gap:16px;margin-bottom:6px">
+            <h1 style="font-size:24px;font-weight:600;margin:0;flex:1">{{ cur.name }}</h1>
+            <span style="padding:4px 11px;border-radius:99px;font-size:12px;font-weight:500;background:{{ cur.chipBg }};color:{{ cur.chipFg }}">{{ cur.statusLabel }}</span>
+          </div>
+          <div style="color:#6b6b66;margin-bottom:22px">{{ cur.type }} · {{ cur.party }} · {{ cur.amount }} · {{ cur.statute }}</div>
+
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:28px">
+            <sc-for list="{{ cards }}" as="k" hint-placeholder-count="3">
+              <div style="background:#fff;border:1px solid #e2e2de;border-radius:8px;padding:16px;display:flex;flex-direction:column;gap:10px;opacity:{{ k.op }}">
+                <div style="font-size:12px;color:#6b6b66;text-transform:uppercase;letter-spacing:.04em">{{ k.owner }}</div>
+                <div style="font-weight:600;font-size:15px">{{ k.title }}</div>
+                <div style="color:#55554f;font-size:13px;flex:1;text-wrap:pretty">{{ k.body }}</div>
+                <button onClick="{{ k.run }}" style="border:1px solid {{ k.bd }};background:{{ k.bg }};color:{{ k.fg }};border-radius:6px;padding:9px 12px;font-size:13px;font-weight:500;cursor:{{ k.cur }}">{{ k.cta }}</button>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="display:flex;gap:4px;border-bottom:1px solid #e2e2de;margin-bottom:16px">
+            <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+              <button onClick="{{ t.pick }}" style="border:0;background:none;padding:10px 14px;font-size:14px;cursor:pointer;font-weight:500;color:{{ t.fg }};border-bottom:2px solid {{ t.bd }};margin-bottom:-1px">{{ t.label }}</button>
+            </sc-for>
+          </div>
+
+          <sc-if value="{{ tabClauses }}" hint-placeholder-val="{{ true }}">
+            <div style="background:#fff;border:1px solid #e2e2de;border-radius:8px">
+              <sc-for list="{{ clauses }}" as="cl" hint-placeholder-count="6">
+                <div style="display:flex;gap:16px;align-items:flex-start;padding:14px 16px;border-bottom:1px solid #eeeeea">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#6b6b66;width:28px;padding-top:2px">{{ cl.no }}</span>
+                  <div style="flex:1"><div style="font-weight:600;margin-bottom:3px">{{ cl.title }}</div><div style="color:#55554f;font-size:13px;text-wrap:pretty">{{ cl.text }}</div><div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8a8a84;margin-top:6px">{{ cl.vars }}</div></div>
+                  <button onClick="{{ cl.toggle }}" style="border:1px solid #d4d4cf;background:{{ cl.bg }};color:{{ cl.fg }};border-radius:99px;padding:5px 12px;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap">{{ cl.label }}</button>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ tabSigs }}" hint-placeholder-val="{{ false }}">
+            <div style="background:#fff;border:1px solid #e2e2de;border-radius:8px">
+              <sc-for list="{{ sigs }}" as="s" hint-placeholder-count="4">
+                <div style="display:flex;gap:16px;align-items:center;padding:14px 16px;border-bottom:1px solid #eeeeea">
+                  <div style="flex:1"><div style="font-weight:600">{{ s.who }}</div><div style="font-size:13px;color:#6b6b66">{{ s.role }}</div><div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8a8a84;margin-top:4px">{{ s.did }}</div></div>
+                  <span style="font-size:12px;color:#6b6b66">{{ s.note }}</span>
+                  <button onClick="{{ s.run }}" style="border:1px solid {{ s.bd }};background:{{ s.bg }};color:{{ s.fg }};border-radius:6px;padding:8px 14px;font-size:13px;font-weight:500;cursor:{{ s.cur }}">{{ s.label }}</button>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ tabExport }}" hint-placeholder-val="{{ false }}">
+            <div style="display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:16px">
+              <div style="background:#fff;border:1px solid #e2e2de;border-radius:8px;padding:28px 36px;font-family:'Times New Roman',Georgia,serif;font-size:14px;line-height:1.6">
+                <div style="text-align:center;font-weight:700;font-size:17px;margin-bottom:14px">{{ cur.docTitle }}</div>
+                <div style="text-wrap:pretty">{{ cur.docBody }}</div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <div style="background:#fff;border:1px solid #e2e2de;border-radius:8px;padding:16px">
+                  <div style="font-weight:600;margin-bottom:6px">Word export</div>
+                  <div style="font-size:13px;color:#55554f;margin-bottom:12px">Renders template + data to .docx. Stub: file is not generated yet.</div>
+                  <button onClick="{{ exportDoc }}" style="width:100%;border:0;background:#1c1c1a;color:#fff;border-radius:6px;padding:10px;font-size:13px;font-weight:500;cursor:pointer">Export to Word</button>
+                  <sc-if value="{{ exported }}" hint-placeholder-val="{{ false }}"><div style="margin-top:10px;font-size:12px;color:#2f6b3f">Queued: {{ cur.file }}</div></sc-if>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isDraft }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <h1 style="font-size:24px;font-weight:600;margin:0 0 4px">Contract Drafting</h1>
+          <div style="color:#6b6b66;margin-bottom:20px">Draft in the editor, pulling in clauses, contracts and matters from the library below.</div>
+          <div style="background:#fff;border:1px solid #e2e2de;border-radius:8px;overflow:hidden;margin-bottom:24px">
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid #e2e2de;background:#fafaf8">
+              <b style="font-weight:600;flex:1">Untitled draft</b>
+              <span style="font-size:12px;color:#6b6b66">{{ draftMeta }}</span>
+              <button onClick="{{ clearDraft }}" style="border:1px solid #d4d4cf;background:#fff;border-radius:6px;padding:7px 12px;font-size:13px;cursor:pointer">Clear</button>
+              <button onClick="{{ saveDraft }}" style="border:0;background:#1c1c1a;color:#fff;border-radius:6px;padding:8px 14px;font-size:13px;font-weight:500;cursor:pointer">{{ saveLabel }}</button>
+            </div>
+            <textarea value="{{ draftText }}" onInput="{{ setDraft }}" style="display:block;width:100%;box-sizing:border-box;min-height:300px;border:0;padding:20px 24px;font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:1.7;resize:vertical;outline:none;color:#2c2c29"></textarea>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+            <div style="display:flex;border:1px solid #d4d4cf;border-radius:6px;overflow:hidden">
+              <sc-for list="{{ libTabs }}" as="t" hint-placeholder-count="3">
+                <button onClick="{{ t.pick }}" style="border:0;border-right:1px solid #e2e2de;padding:8px 18px;font-size:13px;font-weight:500;cursor:pointer;background:{{ t.bg }};color:{{ t.fg }}">{{ t.label }}</button>
+              </sc-for>
+            </div>
+            <div style="flex:1"></div>
+            <input value="{{ libQuery }}" onInput="{{ setLibQuery }}" placeholder="Search library…" style="width:300px;box-sizing:border-box;border:1px solid #d4d4cf;border-radius:6px;padding:9px 12px;font-size:14px;font-family:inherit;background:#fff;outline:none">
+          </div>
+          <div style="background:#fff;border:1px solid #e2e2de;border-radius:8px;overflow:hidden">
+            <sc-for list="{{ libItems }}" as="i" hint-placeholder-count="5">
+              <div style="display:flex;gap:16px;align-items:center;padding:13px 16px;border-bottom:1px solid #eeeeea">
+                <div style="flex:1"><div style="font-weight:500">{{ i.title }}</div><div style="font-size:13px;color:#6b6b66;text-wrap:pretty">{{ i.sub }}</div></div>
+                <span style="font-size:12px;color:#8a8a84;font-family:'IBM Plex Mono',monospace">{{ i.meta }}</span>
+                <button onClick="{{ i.run }}" style="border:1px solid #c4c4be;background:#fff;border-radius:6px;padding:7px 12px;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap">{{ i.cta }}</button>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isTemplates }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="display:flex;align-items:flex-end;gap:16px;margin-bottom:16px">
+            <div style="flex:1"><h1 style="font-size:24px;font-weight:600;margin:0 0 4px">Templates</h1>
+            <div style="color:#6b6b66">Surety Bond — SCM · one self-contained Concerto model per template.</div></div>
+            <button onClick="{{ validate }}" style="border:0;background:#1c1c1a;color:#fff;border-radius:6px;padding:9px 16px;font-size:13px;font-weight:500;cursor:pointer">Validate model + draft</button>
+          </div>
+          <div style="font-size:13px;color:#2f6b3f;min-height:18px;margin-bottom:6px">{{ validMsg }}</div>
+          <div style="display:flex;gap:4px;border-bottom:1px solid #e2e2de;margin-bottom:0">
+            <sc-for list="{{ tplTabs }}" as="t" hint-placeholder-count="3">
+              <button onClick="{{ t.pick }}" style="border:0;background:none;padding:10px 16px;font-size:14px;cursor:pointer;font-weight:500;color:{{ t.fg }};border-bottom:2px solid {{ t.bd }};margin-bottom:-1px">{{ t.label }}</button>
+            </sc-for>
+          </div>
+          <div style="background:#fff;border:1px solid #e2e2de;border-top:0;border-radius:0 0 8px 8px">
+            <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid #eeeeea;background:#fafaf8">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#6b6b66;flex:1">{{ pane.file }}</span>
+              <sc-if value="{{ tabData }}" hint-placeholder-val="{{ false }}"><button onClick="{{ openDlg }}" style="border:1px solid #1c1c1a;background:#1c1c1a;color:#fff;border-radius:6px;padding:7px 14px;font-size:13px;font-weight:500;cursor:pointer">Enter / edit data</button></sc-if>
+            </div>
+            <pre style="margin:0;padding:24px 28px;font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:1.7;white-space:pre-wrap;min-height:60vh;color:#2c2c29">{{ pane.body }}</pre>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ dlgOpen }}" hint-placeholder-val="{{ false }}">
+        <div style="position:fixed;inset:0;background:rgba(28,28,26,.45);display:flex;align-items:center;justify-content:center;z-index:50">
+          <div style="background:#fff;border-radius:10px;width:560px;max-width:92vw;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 16px 48px rgba(0,0,0,.25)">
+            <div style="padding:18px 22px;border-bottom:1px solid #e2e2de"><div style="font-weight:600;font-size:17px">Contract data</div><div style="font-size:13px;color:#6b6b66">Fields from the SuretyBondSCM model.</div></div>
+            <div style="padding:18px 22px;overflow:auto;display:flex;flex-direction:column;gap:14px">
+              <sc-for list="{{ fields }}" as="f" hint-placeholder-count="6">
+                <label style="display:flex;flex-direction:column;gap:5px;font-size:12px;color:#55554f;font-weight:500"><span style="font-family:'IBM Plex Mono',monospace">{{ f.key }}</span>
+                  <input value="{{ f.value }}" onInput="{{ f.set }}" style="border:1px solid #d4d4cf;border-radius:6px;padding:9px 12px;font-size:14px;font-family:inherit;color:#1c1c1a;outline:none"></label>
+              </sc-for>
+            </div>
+            <div style="padding:14px 22px;border-top:1px solid #e2e2de;display:flex;justify-content:flex-end;gap:10px">
+              <button onClick="{{ closeDlg }}" style="border:1px solid #d4d4cf;background:#fff;border-radius:6px;padding:9px 16px;font-size:13px;cursor:pointer">Cancel</button>
+              <button onClick="{{ saveDlg }}" style="border:0;background:#1c1c1a;color:#fff;border-radius:6px;padding:9px 18px;font-size:13px;font-weight:500;cursor:pointer">Save data</button>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isIds }}" hint-placeholder-val="{{ false }}">
+        <div style="max-width:1000px">
+          <h1 style="font-size:24px;font-weight:600;margin:0 0 4px">Identities</h1>
+          <div style="color:#6b6b66;margin-bottom:20px">Seeded DID identities for China Grove signers. Names and DIDs are placeholders.</div>
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+            <sc-for list="{{ ids }}" as="i" hint-placeholder-count="4">
+              <div style="background:#fff;border:1px solid #e2e2de;border-radius:8px;padding:16px">
+                <div style="display:flex;justify-content:space-between;align-items:center"><b style="font-weight:600">{{ i.role }}</b><span style="font-size:12px;color:#2f6b3f">● Active</span></div>
+                <div style="color:#55554f;font-size:13px;margin:4px 0 10px">{{ i.can }}</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;background:#f6f6f4;border-radius:4px;padding:8px;word-break:break-all">{{ i.did }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+    </main>
+  </div>
+  <sc-if value="{{ showSignals }}" hint-placeholder-val="{{ false }}">
+    <pre style="position:fixed;right:16px;bottom:16px;width:340px;max-height:50vh;overflow:auto;margin:0;background:#1c1c1a;color:#e8e8e4;border-radius:8px;padding:14px;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.5;box-shadow:0 8px 24px rgba(0,0,0,.2)">{{ signalsJson }}</pre>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { tplTab: 'text', dlg: false, form: null, tplData: { principal_name: 'Altec Industries, Inc', principal_entity_type: 'North Carolina corporation', surety_name: 'Philadelphia Indemnity Insurance Company', obligee_name: 'Town of China Grove', project_address: '800 Highway 152 East', bond_amount: '17707.13', completion_period: 'one year', governing_law: 'North Carolina' }, query: '', draftText: '# SURETY BOND\n\nKNOW ALL MEN BY THESE PRESENTS, that {{principal_name}} (Principal) and {{surety_name}} (Surety) are bound unto {{obligee_name}} (Obligee) in the sum of ${{bond_amount}}.\n', libTab: 'clauses', libQuery: '', saved: false, role: 'clerk', view: 'home', cid: 'altec', tab: 'clauses', tpl: 'scm', exported: false, signals: false, validMsg: '',
+    status: { altec: 'review', macys: 'signing', foodlion: 'draft', torbush: 'draft', broad: 'executed' },
+    approved: {}, sigs: {} };
+  ROLES = { clerk: 'Town Clerk', manager: 'Town Manager', attorney: 'Attorney' };
+  CONTRACTS = [
+    { id: 'altec', name: 'Altec Service Center — SCM Bond', type: 'Surety bond · Stormwater', party: 'Altec Industries, Inc', amt: '$17,707.13', statute: 'N.C.G.S. § 143-214.7', file: 'surety-bond-scm-altec.docx', body: 'KNOW ALL MEN BY THESE PRESENTS, that Altec Industries, Inc, a North Carolina corporation (Principal), and Philadelphia Indemnity Insurance Company, a Pennsylvania surety (Surety), are held and firmly bound unto the Town of China Grove (Obligee) in the sum of $17,707.13, to secure stormwater pond improvements at 800 Highway 152 East, to be completed within one year.' },
+    { id: 'macys', name: 'Macy’s Sponsorship 2025–2027', type: 'Multi-year sponsorship', party: 'Macy’s Retail Holdings', amt: '$30,000', statute: 'N.C.G.S. § 160A-11', file: 'macys-sponsorship.docx', body: 'This Agreement is entered into between Macy’s Retail Holdings and the Town of China Grove for a three-year term, with annual payments of $10,000 for the Christmas parade and tree lighting events.' },
+    { id: 'foodlion', name: 'Food Lion Event Sponsorship', type: 'Sponsorship', party: 'Food Lion, LLC', amt: '—', statute: 'N.C.G.S. § 160A-11', file: 'foodlion-sponsorship.docx', body: 'Sponsor agrees to the fee set out in Exhibit A, maintains the insurance minimums stated herein, and is entitled to refund tiers on cancellation of the event.' },
+    { id: 'torbush', name: 'Torbush Street Closing', type: 'Street closing resolution', party: 'Abutting owners', amt: '—', statute: 'N.C.G.S. § 160A-299', file: 'torbush-closing.docx', body: 'WHEREAS the Town Council desires to close a portion of Torbush Street as described herein, and has given notice to abutting owners…' },
+    { id: 'broad', name: 'Broad St ROW Adjustment', type: 'Street closing · ROW', party: 'Adjacent owners', amt: '—', statute: 'N.C.G.S. § 160A-299', file: 'broad-st-adjustment.docx', body: 'Resolution adjusting right-of-way boundaries on Broad Street per the legal descriptions attached.' }
+  ];
+  CLAUSES = [
+    ['§1', 'Bond obligation', 'Principal and Surety are jointly and severally bound to the Obligee for the penal sum.', 'principal_name · surety_name · obligee_name'],
+    ['§2', 'Penal sum', 'The sum of the bond is stated in US dollars and is not reduced by partial performance.', 'bond_amount'],
+    ['§3', 'Completion period', 'Required improvements shall be completed within the stated period from execution.', 'completion_period'],
+    ['§4', 'Ordinance authority', 'This bond is furnished under the cited UDO section and enabling statute.', 'ordinance_section · ordinance_nc_enabling_statute'],
+    ['§5', 'Claims & notice', 'Written notice of default shall be delivered to Surety at its address of record.', 'surety_name'],
+    ['§6', 'Governing law', 'This bond is governed by the laws of the State of North Carolina.', 'governing_law']
+  ];
+  SIGNERS = [['mgr', 'Town Manager', 'Signs for the Town (Obligee)', 'manager'], ['clk', 'Town Clerk', 'Attests Town signature', 'clerk'], ['cp', 'Counterparty signer', 'Principal / vendor representative', null], ['not', 'Notary', 'Acknowledges execution', null]];
+  DIDS = [['Town Manager', 'Authorizes and signs for the Town', 'did:key:z6Mk…manager'], ['Town Clerk', 'Prepares, attests, exports', 'did:key:z6Mk…clerk'], ['Town Attorney', 'Reviews and approves clauses', 'did:key:z6Mk…attorney'], ['Mayor', 'Co-signs where resolution requires', 'did:key:z6Mk…mayor']];
+  CHIP = { draft: ['#eeeeea', '#4a4a45', 'Draft'], review: ['#f6ead0', '#6b4a0a', 'Attorney review'], signing: ['#dde8f5', '#1f3a5f', 'Out for signature'], executed: ['#dcefe0', '#1f5a31', 'Executed'] };
+  set(o) { this.setState(o); }
+  clauseState(id) { return this.state.approved[id] || {}; }
+  sigState(id) { return this.state.sigs[id] || {}; }
+  recompute(id) {
+    const ap = this.clauseState(id), sg = this.sigState(id);
+    const allOk = this.CLAUSES.every((c, i) => ap[i]);
+    const signed = this.SIGNERS.every(s => sg[s[0]]);
+    let st = this.state.status[id];
+    if (st === 'review' && allOk) st = 'signing';
+    return st === 'signing' && signed ? 'executed' : st;
+  }
+  statusOf(id) { return this.recompute(id); }
+  actionsFor(c, role) {
+    const st = this.statusOf(c.id), ap = this.clauseState(c.id), sg = this.sigState(c.id);
+    const pending = this.CLAUSES.filter((x, i) => !ap[i]).length;
+    const out = [];
+    if (role === 'clerk' && st === 'draft') out.push(['Complete draft data', 'Fill template fields', 'review']);
+    if (role === 'attorney' && pending && st !== 'executed' && st !== 'draft') out.push([pending + ' clauses to review', 'Review clauses', 'clauses']);
+    if (role === 'manager' && st === 'signing' && !sg.mgr) out.push(['Signature authorization', 'Authorize', 'sigs']);
+    if (role === 'clerk' && st === 'signing' && sg.mgr && !sg.clk) out.push(['Attest Town signature', 'Attest', 'sigs']);
+    if (role === 'clerk' && st === 'executed') out.push(['Export executed copy', 'Export', 'export']);
+    return out;
+  }
+  MATTERS = [['Altec stormwater pond bond', 'Stormwater · Town Attorney', 'M-2025-014'], ['Macy’s parade sponsorship renewal', 'Sponsorship · Clerk', 'M-2025-009'], ['Torbush Street closing', 'Resolution · Council', 'M-2025-021'], ['Manager employment agreement', 'Employment · Town Manager', 'M-2025-003']];
+  append(t) { this.setState(x => ({ draftText: x.draftText + (x.draftText.endsWith('\n') || !x.draftText ? '' : '\n') + t + '\n', saved: false })); }
+  libItems() {
+    const S = this.state, q = S.libQuery.trim().toLowerCase(); let l = [];
+    if (S.libTab === 'clauses') l = this.CLAUSES.map(c => ({ title: c[1], sub: c[2], meta: c[0], cta: 'Insert', run: () => this.append('## ' + c[1] + '\n' + c[2]) }));
+    else if (S.libTab === 'contracts') l = this.CONTRACTS.map(c => ({ title: c.name, sub: c.type + ' · ' + c.party, meta: c.statute, cta: 'Use as base', run: () => this.set({ draftText: '# ' + c.name.toUpperCase() + '\n\n' + c.body + '\n', saved: false }) }));
+    else l = this.MATTERS.map(m => ({ title: m[0], sub: m[1], meta: m[2], cta: 'Attach', run: () => this.append('<!-- Matter ' + m[2] + ': ' + m[0] + ' -->') }));
+    return q ? l.filter(i => (i.title + i.sub).toLowerCase().includes(q)) : l;
+  }
+  renderVals() {
+    const S = this.state, role = S.role, isC = S.view === 'contract';
+    const mk = c => { const st = this.statusOf(c.id), ch = this.CHIP[st]; return { id: c.id, name: c.name, type: c.type, party: c.party, amount: c.amt, statusLabel: ch[2], chipBg: ch[0], chipFg: ch[1], statute: c.statute, file: c.file, docTitle: c.name.toUpperCase(), docBody: c.body, open: () => this.set({ view: 'contract', cid: c.id, tab: 'clauses', exported: false }) }; };
+    const allRows = this.CONTRACTS.map(mk);
+    const q = S.query.trim().toLowerCase();
+    const rows = q ? allRows.filter(r => (r.name + r.party + r.type + r.statusLabel).toLowerCase().includes(q)) : allRows;
+    const cur = allRows.find(r => r.id === S.cid) || allRows[0];
+    const raw = this.CONTRACTS.find(c => c.id === S.cid);
+    const myActions = []; this.CONTRACTS.forEach(c => this.actionsFor(c, role).forEach(a => myActions.push({ title: a[0], contract: c.name, cta: a[1], open: () => this.set({ view: 'contract', cid: c.id, tab: a[2] === 'review' ? 'clauses' : a[2], exported: false }) })));
+    const cnt = st => allRows.filter(r => this.statusOf(r.id) === st).length;
+    const ap = this.clauseState(S.cid), sg = this.sigState(S.cid), st = this.statusOf(S.cid);
+    const pendingCl = this.CLAUSES.filter((x, i) => !ap[i]).length;
+    const btn = (on, dark) => on ? { bg: dark ? '#1c1c1a' : '#fff', fg: dark ? '#fff' : '#1c1c1a', bd: dark ? '#1c1c1a' : '#c4c4be', cur: 'pointer', op: 1 } : { bg: '#f1f1ee', fg: '#9a9a94', bd: '#e2e2de', cur: 'not-allowed', op: 0.7 };
+    const cardDefs = [
+      { owner: 'Town Clerk', title: 'Prepare draft', body: 'Fill template fields and confirm counterparty details.', cta: st === 'draft' ? 'Mark ready for review' : 'Draft complete', on: role === 'clerk' && st === 'draft', run: () => this.setState(s => ({ status: { ...s.status, [S.cid]: 'review' } })) },
+      { owner: 'Attorney', title: 'Review clauses', body: pendingCl ? pendingCl + ' of 6 clauses awaiting approval.' : 'All clauses approved.', cta: pendingCl ? 'Open Clause Listing' : 'Approved', on: role === 'attorney' && pendingCl > 0 && st !== 'draft', run: () => this.set({ tab: 'clauses' }) },
+      { owner: 'Town Manager', title: 'Authorize signature', body: sg.mgr ? 'Authorization recorded.' : 'Authorize the Town signature once clauses are approved.', cta: sg.mgr ? 'Authorized' : 'Review authorization', on: role === 'manager' && st === 'signing' && !sg.mgr, run: () => this.set({ tab: 'sigs' }) }
+    ];
+    const cards = cardDefs.map(k => { const b = btn(k.on, true); return { owner: k.owner, title: k.title, body: k.body, cta: k.cta, run: k.on ? k.run : () => {}, bg: b.bg, fg: b.fg, bd: b.bd, cur: b.cur, op: k.on ? 1 : 0.75 }; });
+    const clauses = this.CLAUSES.map((c, i) => { const ok = !!ap[i], can = role === 'attorney'; return { no: c[0], title: c[1], text: c[2], vars: '{{' + c[3].split(' · ').join('}} {{') + '}}', label: ok ? '✓ Approved' : (can ? 'Approve' : 'Pending'), bg: ok ? '#dcefe0' : '#fff', fg: ok ? '#1f5a31' : '#4a4a45', toggle: () => can && this.setState(s => ({ approved: { ...s.approved, [S.cid]: { ...(s.approved[S.cid] || {}), [i]: !ok } } })) }; });
+    const prevOk = k => k === 'mgr' ? st === 'signing' || st === 'executed' : k === 'clk' ? !!sg.mgr : k === 'cp' ? !!sg.clk : !!sg.cp;
+    const sigs = this.SIGNERS.map((s, i) => { const done = !!sg[s[0]], can = !done && prevOk(s[0]) && (s[3] ? s[3] === role : role === 'clerk'); const b = btn(can, true); return { who: s[1], role: s[2], did: i < 2 ? this.DIDS[i === 0 ? 0 : 1][2] : '—', note: done ? 'Recorded' : (prevOk(s[0]) ? '' : 'Waiting on prior step'), label: done ? '✓ Authorized' : (s[3] ? (s[0] === 'mgr' ? 'Authorize' : 'Attest') : 'Record'), bg: done ? '#dcefe0' : b.bg, fg: done ? '#1f5a31' : b.fg, bd: done ? '#dcefe0' : b.bd, cur: can ? 'pointer' : 'default', run: () => can && this.setState(x => ({ sigs: { ...x.sigs, [S.cid]: { ...(x.sigs[S.cid] || {}), [s[0]]: true } } })) }; });
+    const tabDefs = [['clauses', 'Clause Listing'], ['sigs', 'Signature Authorizations'], ['export', 'Document & Word export']];
+    const tplCto = 'namespace org.nc.municipal.surety@1.0.0\n\n@template\nconcept SuretyBondSCM {\n  o String principal_name\n  o String principal_entity_type\n  o String surety_name\n  o String obligee_name\n  o String project_address\n  o Double bond_amount\n  o String completion_period\n    default="one year"\n  o String governing_law\n    default="North Carolina"\n}';
+    const tplMd = '# SURETY BOND\n\n**KNOW ALL MEN BY THESE PRESENTS**, that {{principal_name}}, a {{principal_entity_type}} (Principal), and {{surety_name}} (Surety), are held and firmly bound unto {{obligee_name}} (Obligee) in the sum of ${{bond_amount}}.\n\nImprovements at {{project_address}} shall be completed within {{completion_period}}.\n\n{{> surety-bond-clauses}}\n{{> surety-bond-signatures}}';
+    const tplJson = JSON.stringify({ $class: 'org.nc.municipal.surety@1.0.0.SuretyBondSCM', ...S.tplData, bond_amount: Number(S.tplData.bond_amount) || 0 }, null, 2);
+    const blurbs = { clerk: 'Prepare drafts, attest signatures, export documents.', manager: 'Authorize signatures for contracts ready to execute.', attorney: 'Review clause language before contracts go out for signature.' };
+    const nav = [['home', 'Home'], ['dash', 'Active Contracts'], ['draft', 'Contract Drafting'], ['templates', 'Templates'], ['ids', 'Identities']];
+    const sigJson = JSON.stringify({ role: S.role, view: S.view, contract: S.cid, tab: S.tab, status: this.statusOf(S.cid), approvedClauses: Object.values(ap).filter(Boolean).length, signed: Object.keys(sg).filter(k => sg[k]) }, null, 2);
+    return {
+      roles: Object.keys(this.ROLES).map(k => ({ label: this.ROLES[k], bg: role === k ? '#1c1c1a' : '#fff', fg: role === k ? '#fff' : '#1c1c1a', pick: () => this.set({ role: k }) })),
+      navItems: nav.map(n => { const on = n[0] === 'dash' ? (S.view === 'dash' || isC) : S.view === n[0]; return { label: n[1], bg: on ? '#eeeeea' : 'transparent', fg: on ? '#1c1c1a' : '#55554f', fw: on ? 600 : 500, go: () => this.set({ view: n[0] }) }; }),
+      top5: allRows.slice(0, 5).map(r => ({ ...r, next: {draft:'Clerk: complete draft data',review:'Attorney: review clauses',signing:'Signatories: authorize & attest',executed:'Complete — export copy'}[this.statusOf(r.id)] })),
+      statusSummary: ['draft', 'review', 'signing', 'executed'].map(k => cnt(k) + ' ' + this.CHIP[k][2].toLowerCase()).join(' · '),
+      query: S.query, setQuery: e => this.set({ query: e.target.value }),
+      draftText: S.draftText, setDraft: e => this.set({ draftText: e.target.value, saved: false }),
+      draftMeta: S.draftText.length + ' chars', saveLabel: S.saved ? '✓ Saved' : 'Save draft', saveDraft: () => this.set({ saved: true }), clearDraft: () => this.set({ draftText: '', saved: false }),
+      libTabs: [['clauses', 'Clauses'], ['contracts', 'Contracts'], ['matters', 'Matters']].map(t => ({ label: t[1], bg: S.libTab === t[0] ? '#1c1c1a' : '#fff', fg: S.libTab === t[0] ? '#fff' : '#1c1c1a', pick: () => this.set({ libTab: t[0] }) })),
+      libQuery: S.libQuery, setLibQuery: e => this.set({ libQuery: e.target.value }),
+      libItems: this.libItems(),
+      goHome: () => this.set({ view: 'home' }), isHome: S.view === 'home', goActive: () => this.set({ view: 'dash' }), goDraft: () => this.set({ view: 'draft' }), isDash: S.view === 'dash', isDraft: S.view === 'draft', isContract: isC, isTemplates: S.view === 'templates', isIds: S.view === 'ids',
+      roleBlurb: blurbs[role], counts: [['draft', 'Drafts'], ['review', 'In attorney review'], ['signing', 'Out for signature'], ['executed', 'Executed']].map(c => ({ n: cnt(c[0]), label: c[1] })),
+      myActions, noActions: myActions.length === 0, rows, cur, goDash: () => this.set({ view: 'dash' }), cards,
+      tabs: tabDefs.map(t => ({ label: t[1], fg: S.tab === t[0] ? '#1c1c1a' : '#6b6b66', bd: S.tab === t[0] ? '#1c1c1a' : 'transparent', pick: () => this.set({ tab: t[0] }) })),
+      tabClauses: S.tab === 'clauses', tabSigs: S.tab === 'sigs', tabExport: S.tab === 'export', clauses, sigs,
+      exportDoc: () => this.set({ exported: true }), exported: S.exported,
+      tplTabs: [['text', 'Template text'], ['model', 'Concerto Model'], ['data', 'Data']].map(t => ({ label: t[1], fg: S.tplTab === t[0] ? '#1c1c1a' : '#6b6b66', bd: S.tplTab === t[0] ? '#1c1c1a' : 'transparent', pick: () => this.set({ tplTab: t[0] }) })),
+      pane: { text: { file: 'template.md', body: tplMd }, model: { file: 'surety-bond-scm.cto', body: tplCto }, data: { file: 'samples/altec.json', body: tplJson } }[S.tplTab],
+      tabData: S.tplTab === 'data', dlgOpen: S.dlg,
+      openDlg: () => this.set({ dlg: true, form: { ...S.tplData } }), closeDlg: () => this.set({ dlg: false }),
+      saveDlg: () => this.set({ dlg: false, tplData: { ...S.form } }),
+      fields: S.form ? Object.keys(S.form).map(k => ({ key: k, value: S.form[k], set: e => { const v = e.target.value; this.setState(x => ({ form: { ...x.form, [k]: v } })); } })) : [],
+      validate: () => this.set({ validMsg: '✓ Model valid · 9 fields bound · draft renders (no missing variables)' }), validMsg: S.validMsg,
+      ids: this.DIDS.map(d => ({ role: d[0], can: d[1], did: d[2] + '…8f2a' })),
+      toggleSignals: () => this.set({ signals: !S.signals }), showSignals: S.signals, signalsLabel: S.signals ? 'Hide signals' : 'data-signals', signalsJson: sigJson
+    };
+  }
+}
+</script>
+</body>
+</html>

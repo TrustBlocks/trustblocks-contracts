@@ -107,3 +107,18 @@
                                                  :event {"$class" "com.trustblocks.municipal.construction.payapplication@1.0.0.InspectionCertified"
                                                          "approvedPayItems" ["3.1"]}
                                                  :at at :statement "x"}))))))))
+
+(deftest a-minimum-review-result-is-advice-too
+  (with-open [node (xt.node/start-node)]
+    (let [{:keys [agent]} (setup! node)
+          _           (designate! node agent ["ADVISE"])
+          at          (Instant/parse "2026-09-26T09:00:00Z")
+          base        {:agent (:xt/id agent) :document "str-27-pay-3" :at at}]
+      (let [jwt (advisory/advise! node (assoc base :text "The report is signed, dated and lists the quantities."
+                                              :verdict "pass" :checklist ["Signed?" "Dated?" "Lists quantities?"]))
+            vc  (:vc (interop/jws-claims jwt))]
+        (is (= "pass" (get-in vc ["credentialSubject" "verdict"])))
+        (is (= ["Signed?" "Dated?" "Lists quantities?"] (get-in vc ["credentialSubject" "checklist"]))))
+      (is (= "RECEIVED" (get (execute/current-state node "str-27-pay-3") "status")) "a pass moves nothing")
+      (is (= :invalid-advisory
+             (refusal #(advisory/advise! node (assoc base :text "x" :verdict "approved"))))))))

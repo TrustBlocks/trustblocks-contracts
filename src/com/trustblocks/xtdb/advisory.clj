@@ -34,17 +34,25 @@
   `at`: `text`, and `document-hash` when it read a stored file. Returns the
   signed Advisory.
 
+  A minimum-review result may go with it: `verdict`, \"pass\" or \"flag\", and
+  `checklist`, the questions it was asked. It is still advice. A pass says
+  the document met the minimum review, never that it is satisfactory: the
+  officeholder who receives it decides, and attests that they did.
+
   Refusals, tagged :trustblocks/error: :not-an-agent, :no-such-instance,
   :no-such-matter, :missing-authority (no Designation for this matter
   carrying ADVISE in force at `at`, or its designator no longer holds
-  ADVISE), :invalid-advisory (no text)."
-  [node {:keys [agent document text document-hash at]}]
+  ADVISE), :invalid-advisory (no text, or a verdict other than \"pass\" or
+  \"flag\")."
+  [node {:keys [agent document text document-hash at verdict checklist]}]
   (let [identity (identity/by-did node agent)]
     (when-not (and identity (identity/agent? identity))
       (refuse! "Only an AI agent's identity signs an Advisory"
                {:trustblocks/error :not-an-agent :did agent}))
     (when (str/blank? text)
       (refuse! "An Advisory needs some text" {:trustblocks/error :invalid-advisory}))
+    (when-not (or (nil? verdict) (#{"pass" "flag"} verdict))
+      (refuse! "A verdict is \"pass\" or \"flag\"" {:trustblocks/error :invalid-advisory :verdict verdict}))
     (when-not (store/get-instance node document)
       (refuse! "No such document" {:trustblocks/error :no-such-instance :instance document}))
     (let [matter-id (or (matter/matter-of node document :at at)
@@ -63,7 +71,9 @@
                                      "contractId"  document
                                      "text"        text
                                      "certifiedAt" (str (java.time.Instant/now))}
-                              document-hash (assoc "documentHash" document-hash))
+                              document-hash (assoc "documentHash" document-hash)
+                              verdict       (assoc "verdict" verdict)
+                              (seq checklist) (assoc "checklist" (vec checklist)))
         :valid-from at :valid-until open-ended
         :evidence jwt}))))
 

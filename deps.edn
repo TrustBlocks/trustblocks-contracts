@@ -50,13 +50,18 @@
 
         ;; Concerto models as EDN and Malli schemas compiled from them at
         ;; runtime. Not on Clojars yet -- see github.com/TrustBlocks/concerto-clj.
-        io.github.TrustBlocks/concerto-clj {:git/sha "3fd274ed1954c342ffa6d173fa5ca6d5b279da3c"}
+        io.github.TrustBlocks/concerto-clj {:git/sha "910690afdd4bd13145131e25de256ed81389575b"}
 
         ;; The municipal contract templates this app runs -- models, text,
         ;; and Clojure clause logic -- each on the classpath under its own
         ;; name. See com.trustblocks.template.library, and the :templates-local
         ;; alias below for editing them alongside the app.
         io.github.TrustBlocks/trustblocks-templates {:git/sha "25663c7abf586ffabb97bd7f3782fa6a1f2f12e4"}
+
+        ;; Templates as trees, text clauses and their tracking, release
+        ;; pinning -- see com.trustblocks.xtdb.template-tree, .clause-library
+        ;; and .release. A git dependency, pinned by SHA; not on Clojars.
+        io.github.TrustBlocks/templatemark-clj {:git/sha "b30a0aa96ccfd6cba4a132f291fa94bc3d55f74b"}
 
         dev.onionpancakes/chassis     {:mvn/version "1.0.365"}
         ;; CommonMark + pipe tables -- exactly the markdown TemplateMark is
@@ -98,7 +103,12 @@
   {:extra-paths ["test" "dev"]
    :extra-deps  {com.biffweb/tasks {:mvn/version "2.0.0"}}
    :main-opts   ["-m" "com.biffweb.tasks.app"]
-   :jvm-opts    ["--add-opens=java.base/java.nio=ALL-UNNAMED"
+   ;; Parsing a model with a long comment (concerto-clj's block-comment regex)
+   ;; recurses per character; it needs more than Linux's default 1 MB stack.
+   ;; On the command line, since the launcher ignores -Xss in JAVA_TOOL_OPTIONS
+   ;; for the main thread.
+   :jvm-opts    ["-Xss16m"
+                 "--add-opens=java.base/java.nio=ALL-UNNAMED"
                  "--enable-native-access=ALL-UNNAMED"
                  "-Dio.netty.tryReflectionSetAccessible=true"]}
 

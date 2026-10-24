@@ -82,6 +82,15 @@ src/com/trustblocks/
     execute.clj                trigger! — runs a stored SCI clause, records Request/Response + State bitemporally
     identity.clj                the identity ledger: provision-town!/provision-officeholder!, by-did, by-email
     credential.clj              Verifiable Credential storage: issue!, for-subject, for-contract, revoke!
+    clause_library.clj          text clauses as immutable, hash-chained versions + their state (see docs/design/clause-tracking.md)
+    signoff.clj                 a login's thumbs-up / objection on a clause version, template revision or release
+    template_tree.clj           templates as immutable revisions with a moving head, and the clause-use rows
+    release.clj                 pinning a template for deployment: release! (SHA), deploy!, verify, check-active
+    model_repository.clj        Concerto models as immutable namespace@version rows: import-dir!, closure, registry, pins, verify-pins, importers
+    model_use.clj               which clauses/templates read which model property (declaring type): readers, reads-of
+    defaults.clj                versioned default data (the Town): put-version!, in-force, prefill, snapshot, verify-snapshot
+    lifecycle_check.clj         pure: which certifications a lifecycle.json requires that a release's text does not state
+    impact.clj                  impact of changing a property; unused-properties of a model
     certification.clj           grant-office!, certify! (runs execute/trigger! then signs the response as a VC),
                                  attestations-for-contract — the newest and most involved file, read it fully
 

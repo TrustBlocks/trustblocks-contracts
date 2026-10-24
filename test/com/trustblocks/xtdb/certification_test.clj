@@ -20,6 +20,7 @@
             [com.trustblocks.did.vc :as vc]
             [com.trustblocks.xtdb.certification :as cert]
             [com.trustblocks.xtdb.credential :as credential]
+            [com.trustblocks.xtdb.document :as document]
             [com.trustblocks.xtdb.execute :as execute]
             [com.trustblocks.xtdb.identity :as identity]
             [com.trustblocks.xtdb.store :as store]
@@ -256,3 +257,25 @@
       (is (= "APPROVED" (get-in (approved! node) [:state "status"])))
       (is (= :no-transition
              (refusal #(me/approve! node "clerk@china-grove.example.gov" :at "2026-01-05T00:00:00.000Z")))))))
+
+(deftest an-attestation-can-be-required-to-rest-on-something-the-system-holds
+  (with-open [node (xt.node/start-node)]
+    (populate! node)
+    (provision! node)
+    (approved! node)
+    (let [root (str (java.nio.file.Files/createTempDirectory "docs" (make-array java.nio.file.attribute.FileAttribute 0)))
+          doc  (document/store! node root (.getBytes "inspection report" "UTF-8") :filename "report.pdf")
+          args {:email "clerk@china-grove.example.gov" :statement "Received"
+                :contract-id contract-id :required-authority "CERTIFY_MINUTES"
+                :valid-from vote-meeting :valid-until year-end}]
+      (testing "what names a stored file or release is known; anything else is not"
+        (is (= :document (cert/subject-kind node (:xt/id doc))))
+        (is (nil? (cert/subject-kind node "typed by hand")))
+        (is (nil? (cert/subject-kind node nil))))
+      (testing "strict, an unknown reference is refused before anything is signed"
+        (is (= :unknown-subject
+               (:trustblocks/error (ex-data (try (cert/certify! node (assoc args :document-hash "typed by hand" :require-known-subject? true))
+                                                 (catch clojure.lang.ExceptionInfo e e)))))))
+      (testing "a stored file is accepted, and the default still takes a typed reference"
+        (is (string? (cert/certify! node (assoc args :document-hash (:xt/id doc) :require-known-subject? true))))
+        (is (string? (cert/certify! node (assoc args :document-hash "typed by hand"))))))))

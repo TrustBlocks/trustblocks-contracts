@@ -53,26 +53,14 @@
                                      :json-schema {:type "number"}}
                                cm/double-like]}))
 
-(defn- generate-from-regex
-  "concerto-clj writes a regex-constrained String as [:and :string [:re ...]],
-  and Malli generates an :and from its first child and filters -- any
-  string, hoping to match. This points the generator at the regex itself."
-  [form]
-  (walk/postwalk
-   (fn [x]
-     (if-let [re (and (vector? x) (= :and (first x))
-                      (some #(when (and (vector? %) (= :re (first %))) %) (rest x)))]
-       (let [[props children] (if (map? (second x)) [(second x) (drop 2 x)] [{} (rest x)])]
-         (into [:and (assoc props :gen/schema re)] children))
-       x))
-   form))
-
 (defn schema
   "The Malli schema for contract type `fqn`, compiled from its Concerto
-  model in `reg` -- with generators pointed where Malli cannot find them
-  itself (see generate-from-regex and `registry`)."
+  model in `reg` with concerto-clj's generator support (`:generators`), which
+  points Malli at the regexes, ranges and optional properties it cannot find
+  by itself -- and with this namespace's `registry`, whose two named types
+  generate figures and dates the way a contract writes them."
   [reg fqn]
-  (m/schema (generate-from-regex (m/form (cm/->schema reg fqn))) {:registry registry}))
+  (m/schema (m/form (cm/->schema reg fqn :generators true)) {:registry registry}))
 
 (defn form
   "The schema as the EDN it is -- the native Malli form."
@@ -97,13 +85,17 @@
   (json-schema/transform schema))
 
 (defn- plain-types
-  "The model with concerto-clj's two named types written as Malli's own --
+  "The model with concerto-clj's named types written as Malli's own --
   for malli.dot, which re-reads a schema without the options that would
   resolve them. A picture of the structure; validation is unchanged."
   [form]
   (walk/postwalk #(case %
-                    :concerto/date-time [:string {:format "date-time"}]
+                    (:concerto/date-time :concerto/date-time-strict :concerto/date-time-key)
+                    [:string {:format "date-time"}]
                     :concerto/double    :double
+                    :concerto/integer   :int
+                    (:concerto/identifier :concerto/relationship :concerto/map-key :concerto/string-key)
+                    :string
                     %)
                  form))
 
@@ -114,8 +106,14 @@
   anonymous type and draws as a single box holding the whole schema."
   [fqn form]
   (cond
-    (and (vector? form) (= :schema (first form)) (vector? (last form)) (= :ref (first (last form))))
-    (conj (pop form) (second (last form)))
+    ;; concerto-clj's root is [:ref "Root"], or, since it insists a root instance
+    ;; name its $class, [:and [:map [:$class ...]] [:ref "Root"]].
+    (and (vector? form) (= :schema (first form)) (vector? (last form))
+         (or (= :ref (first (last form)))
+             (and (= :and (first (last form))) (some #(and (vector? %) (= :ref (first %))) (last form)))))
+    (let [root (last form)
+          ref  (if (= :ref (first root)) root (some #(when (and (vector? %) (= :ref (first %))) %) root))]
+      (conj (pop form) (second ref)))
 
     ;; A model with nothing nested is a bare :map; give it a registry of one,
     ;; so its box is named for its type too.
