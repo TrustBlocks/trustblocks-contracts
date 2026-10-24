@@ -122,6 +122,10 @@ concept Advisory {
   @description("The stored file it read, when it read one")
   o String documentHash optional
   o String text
+  @description("A minimum-review result, 'pass' or 'flag'. Still advice: the officeholder who receives the document decides")
+  o String verdict optional
+  @description("The questions the minimum review asked")
+  o String[] checklist optional
   o DateTime certifiedAt
 }
 

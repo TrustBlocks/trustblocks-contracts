@@ -46,9 +46,11 @@
   (:require [com.trustblocks.did.interop :as interop]
             [com.trustblocks.did.vc :as vc]
             [com.trustblocks.xtdb.credential :as credential]
+            [com.trustblocks.xtdb.document :as document]
             [com.trustblocks.xtdb.execute :as execute]
             [com.trustblocks.xtdb.identity :as identity]
-            [com.trustblocks.xtdb.matter :as matter]))
+            [com.trustblocks.xtdb.matter :as matter]
+            [com.trustblocks.xtdb.release :as release]))
 
 (def office-grant-class "com.trustblocks.identity@1.0.0.OfficeGrant")
 (def attestation-class "com.trustblocks.identity@1.0.0.Attestation")
@@ -185,6 +187,16 @@
   [contract-id required-authority document-hash valid-from]
   (str "attestation:" contract-id ":" required-authority ":" document-hash ":" valid-from))
 
+(defn subject-kind
+  "What `document-hash` names: :release (a stored release, from
+  release/attestation-subject), :document (a stored file, see
+  xtdb.document), or nil -- a reference the system holds nothing under."
+  [node document-hash]
+  (cond
+    (not (string? document-hash))                nil
+    (release/get-release node document-hash)     :release
+    (document/get-document node document-hash)  :document))
+
 (defn certify!
   "An officeholder, identified by the email their session signed in with,
   certifies something about `contract-id` -- refusing unless their
@@ -209,11 +221,19 @@
   unknown contract bubbles up with execute/trigger!'s own
   :trustblocks/error tag.
 
+  `require-known-subject?` refuses (:unknown-subject) a `document-hash` that
+  names neither a stored release nor a stored file (see subject-kind), so an
+  attestation cannot rest on a reference nothing can check. Off by default:
+  existing callers still type a reference.
+
   Returns the signed Attestation VC. `evidence`, when given, is another
   credential's JWT this one rests on -- the vote certification a minutes
   approval names as what it is approving."
   [node {:keys [email statement document-hash contract-id required-authority
-                valid-from valid-until evidence]}]
+                valid-from valid-until evidence require-known-subject?]}]
+  (when (and require-known-subject? (not (subject-kind node document-hash)))
+    (throw (ex-info "The document reference names no stored release or file"
+                    {:trustblocks/error :unknown-subject :document-hash document-hash})))
   (let [officeholder (or (identity/by-email node email)
                          (throw (ex-info "No officeholder identity for this email"
                                          {:trustblocks/error :no-such-officeholder :email email})))

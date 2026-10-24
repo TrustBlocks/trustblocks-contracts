@@ -71,6 +71,30 @@ States: `{:event "BoardApprovalRequest" :authority "CERTIFY_MINUTES"}`, `{:event
 ### 7. `finance-officer-certification` (new, to be drafted)
 Most contracts do not go to the Board; the Manager executes them. They still need the Finance Officer's certification, so this clause belongs in the standard set and `governing-body-approval` becomes **optional**, used only by contracts the Board approves. The authority name is not yet known (the pay application has `CERTIFY_PAYMENTS`, which is a different act). I believe NC's pre-audit certificate on obligations is the legal basis; the Town Attorney should confirm before the wording is written.
 
+### 7a. `finance-officer-certification` (draft wording)
+States: `{:event "PreAuditCertified" :authority "CERTIFY_PREAUDIT"}` (**event and authority names are proposals**; check them against the OfficeGrants). Not waivable.
+
+> **PRE-AUDIT CERTIFICATE**
+> This instrument has been pre-audited in the manner required by the Local Government Budget and Fiscal Control Act.
+
+The statutory sentence is taken unchanged from the street-resurfacing contract. The signature line and date stay as the template has them (`financeOfficerSignature`, `preAuditDate`). That the certificate is a condition is said once, in `conditions`, not here.
+
+### 8. `background` (draft wording, context only)
+States: none. It creates no obligation, so it has no lifecycle event.
+
+> This Agreement is made by the {{municipalityType}} of {{municipalityName}}, {{stateName}}, acting through its {{governingBodyName}}, with the party named below, for the purpose stated in the Agreement. This Background gives context. It creates no obligation, and nothing in it changes the terms that follow.
+
+### 9. `conditions` (draft wording)
+States: every certification the lifecycle requires. The list below is written by hand for each template for now. Generating it from the lifecycle is the next step, and until then the release check confirms each one is covered.
+
+> The following certifications are conditions of this Agreement. Each is made by the officer who holds the stated authority, and until it is made the step it governs has not happened.
+> 
+> *[one line per required certification, for example: "Pre-audit certificate, by the Finance Officer (G.S. 159-28)."]*
+> 
+> No condition in this section may be waived, except as follows. *[Where the lifecycle allows a waiver: "The {authority} may waive the {event} certification, in writing, and the waiver is recorded with that officer's signature."]* *[Otherwise: "No condition in this section is waivable."]*
+
+Clauses 1 to 6 may then drop their own "not treated as ... until" sentences where `conditions` already says it; I have not edited them yet.
+
 ## Decisions (2026-10-24)
 
 - The wording is acceptable as a starting point. The contract does **not** say how the certification is recorded (the sentence I had considered is dropped).
@@ -104,5 +128,19 @@ A required certification cannot be waived unless the contract says so. The pre-a
 - **Lifecycle:** a requirement may carry `"waivableBy": "AUTHORITY"`. Absent means not waivable.
 - **Clause:** a `:clause/states` entry may carry `:waivable-by "AUTHORITY"`, meaning its text grants that waiver.
 - **Release check** (`lifecycle-check/waivers`, reported with the other findings): `:waiver-unstated` when the lifecycle allows a waiver no clause grants; `:waiver-not-allowed` when a clause grants one the lifecycle does not. `:require-stated?` refuses either.
-- **Not done:** `waivableBy` is not yet in `trustblocks-templates/shared/model/lifecycle.cto` (`Certification`) or its vendored copies, so `bb check` there does not know the field. The recorded waiver act at runtime is also not built.
-- **Next:** a `conditions` clause that lists the required certifications and any waivers, and a `background` clause for context only.
+- **Templates repo:** `waivableBy` is added to `Certification` in `trustblocks-templates` `shared/model/lifecycle.cto` and its three vendored copies, on branch `feat/waivable-by` (commit `3d8c363`, local, not pushed). `bb check` passes.
+- **Not done:** the recorded waiver act at runtime. Drafts for `conditions` and `background` are above (7a, 8, 9); nothing is stored in the library.
+
+## Received documents and the review flag: what already exists
+
+I proposed a `received-document` record. The app already has it, so none was built:
+
+- `xtdb/document`: a file stored by content, id `sha256:<hex>`, the same form as `release/attestation-subject`.
+- `xtdb/receipt`: an officeholder's signed receipt of a stored document on a matter.
+- `xtdb/advisory`: an AI agent's signed note on a document, under an ADVISE designation. It moves nothing.
+
+Added this round:
+- `advise!` takes an optional `verdict` ("pass" or "flag") and `checklist`, and `identity.cto`'s `Advisory` carries them. A pass is advice only; the officeholder decides.
+- `certify!` takes `:require-known-subject?`, which refuses an attestation whose `documentHash` names neither a stored file nor a stored release (`cert/subject-kind`). Off by default; the certify form still takes a typed reference.
+
+Not built: calling a model to produce the verdict, the signature-image mark and its rendering, and the optional confidential / work-product mark.
