@@ -87,19 +87,12 @@ Most contracts do not go to the Board; the Manager executes them. They still nee
 4. **Rendering** the mark onto Word/PDF output.
 5. **Settled (2026-10-24):** contractual documents are public records, so sending them to an external model is acceptable by default. The exception is anything marked confidential or attorney work product (below), which is never sent out.
 
-### Classification flag
+### Classification mark (decided 2026-10-24)
 
-A document or draft carries a **classification**: `public` (the default), `confidential`, or `attorney-work-product`.
+Everything is public. There is no classification by default, and no field to fill in.
 
-- It shows as a stamp or short line on the output, and as a chip in the console.
-- It gates behaviour: a classified document is not sent to an external model, and is not shown on any public listing or export.
-- It is versioned like other drafting state, so the record shows when a draft was marked and when the mark was lifted. Lifting it (for example when a draft is released) is an explicit act by a named person.
-- It matters most during drafting, so new drafts may start as work product and become public at release. **Open:** is that the default you want?
-- The NC Public Records Act has limits and timing rules for attorney communications and trial-preparation material. I believe those exceptions are narrow and time-limited, so the Town Attorney should say which classes the flag offers and what the stamp wording is. The flag is a handling marker, not a legal determination.
-
-## Questions for you and the Town Attorney
-
-1. Are the wordings acceptable as a starting point, and who edits them?
-2. Should the pay application's **paper signature blocks** be tied to these clauses (so "Director of Public Works" is the holder of `CERTIFY_PAY_APPLICATIONS`)? The templates use job titles; the lifecycle uses authorities. The mapping office to authority lives in the OfficeGrant records, not in the template.
-3. `RECEIVE_PAY_APPLICATIONS` and the other authorities: do the names match what is in your real OfficeGrants?
-4. Do you want the check strict (`:require-stated?`) for new templates from now on, and report-only for the ones that exist?
+- A document or draft may carry an **optional mark**: `confidential` or `attorney-work-product`. Unmarked means public.
+- A mark shows as a stamp on the output and a chip in the console. A marked document is not sent to an external model.
+- Setting or lifting a mark is an explicit act by a named person and is recorded.
+- Truly confidential material belongs outside this system. The mark is for the rare case, not a way to keep such material here.
+- The NC Public Records Act exceptions are narrow and time-limited, so the Town Attorney decides the stamp wording. The mark is a handling marker, not a legal determination.
