@@ -42,8 +42,7 @@ jobs:
       # so it needs no services.
       - name: test
         env:
-          # Macroexpanding the street-resurfacing demo overflows Linux's default
-          # 1 MB stack; macOS gives the main thread more.
-          JAVA_TOOL_OPTIONS: -Xss16m
+          # Macroexpanding the street-resurfacing demo overflows the default stack.
+          JAVA_TOOL_OPTIONS: -Xss512m
           CONCERTO_CLI: ${{ github.workspace }}/node_modules/.bin/concerto
         run: clojure -M:dev:run test
