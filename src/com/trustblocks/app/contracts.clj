@@ -490,7 +490,7 @@
     (if-not instance
       (ui/on-error {:status 404})
       (let [fqn     (get instance "$class")
-            today   (java.time.Instant/now)
+            today   (or (:trustblocks/now ctx) (java.time.Instant/now)) ; a test may fix the day
             as-of   (or (some-> (query-param ctx "as-of") not-empty
                                 (#(try (end-of-day %) (catch Exception _ nil))))
                         today)

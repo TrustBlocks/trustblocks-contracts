@@ -15,17 +15,21 @@
            [java.nio.file.attribute FileAttribute]
            [java.time Instant]))
 
+;; The demo's dates are in 2026 and the deadlines in it fall due on fixed days,
+;; so the tests look from a fixed day inside that window, not from today.
+(def ^:private the-day (Instant/parse "2026-09-20T12:00:00Z"))
+
 (defn- loaded! [node]
   (demo/load! node (str (Files/createTempDirectory "dash" (make-array FileAttribute 0)))))
 
 (defn- page [node id & [as-of]]
-  (:body (contracts/show-page {:biff.xtdb/node node :uri (str "/contracts/" id)
+  (:body (contracts/show-page {:biff.xtdb/node node :uri (str "/contracts/" id) :trustblocks/now the-day
                                :params (if as-of {:as-of as-of} {})})))
 
 (deftest a-contracts-timeline-includes-its-matters-documents
   (with-open [node (xt.node/start-node)]
     (loaded! node)
-    (let [items (timeline/items node (store/registry-from-xtdb node) demo/contract-id (Instant/now))
+    (let [items (timeline/items node (store/registry-from-xtdb node) demo/contract-id the-day)
           kinds (frequencies (map :kind items))]
       (testing "the pay requests' and the vendor form's certified steps, each with its document"
         (is (= 12 (:event kinds)))
@@ -52,7 +56,7 @@
 (deftest the-dashboard-shows-where-it-stands-as-of-any-day
   (with-open [node (xt.node/start-node)]
     (loaded! node)
-    (testing "today: approved, and what can happen next"
+    (testing "today (Sept 20 here): approved, and what can happen next"
       (let [body (page node "str-27-pay-2")]
         (is (str/includes? body "Where it stands"))
         (is (str/includes? body ">APPROVED<"))
